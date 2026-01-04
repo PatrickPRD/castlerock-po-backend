@@ -117,10 +117,17 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password required' });
     }
 
-    const [[user]] = await db.query(
-      `SELECT id, email, password, role, active
-       FROM users
-       WHERE email = ?`,
+    const [[user]] = await pool.query(
+      `
+      SELECT
+        id,
+        email,
+        password_hash,
+        role,
+        active
+      FROM users
+      WHERE email = ?
+      `,
       [email]
     );
 
@@ -132,7 +139,7 @@ router.post('/login', async (req, res) => {
       return res.status(403).json({ error: 'Account disabled' });
     }
 
-    const match = await bcrypt.compare(password, user.password);
+    const match = await bcrypt.compare(password, user.password_hash);
 
     if (!match) {
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -144,18 +151,17 @@ router.post('/login', async (req, res) => {
       { expiresIn: '8h' }
     );
 
-    return res.json({
+    res.json({
       token,
       role: user.role
     });
 
   } catch (err) {
     console.error('LOGIN ERROR:', err);
-    return res.status(500).json({
-      error: 'Login failed'
-    });
+    res.status(500).json({ error: 'Login failed' });
   }
 });
+
 
 
 
