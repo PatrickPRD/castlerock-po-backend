@@ -1,0 +1,14 @@
+.card {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+hr {
+  margin: 24px 0;
+}
+.po-summary {
+  background: #f8f9fb;
+  padding: 12px 16px;
+  border-radius: var(--md-radius);
+  margin-bottom: 16px;
+}

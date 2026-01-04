@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Create PO</title>
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="create-po.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">
+    <img src="assets/logo.png">
+    <span><h1>Create Purchase Order</h1></span>
+  </div>
+  <button onclick="location.href='dashboard.html'" class="btn-outline">Back</button>
+</header>
+
+<main class="container">
+  <div class="card">
+    <form id="poForm">
+      <select id="supplier"></select>
+      <select id="site"></select>
+      <select id="location"></select>
+      <select id="stage" required></select>
+      <input type="date" id="poDate" required>
+      <textarea id="description" placeholder="Description"></textarea>
+      <input type="number" id="netAmount" placeholder="Net">
+      <select id="vatRate">
+        <option value="0">0%</option>
+        <option value="13.5">13.5%</option>
+        <option value="23">23%</option>
+      </select>
+      <p>VAT: <span id="vatAmount">0.00</span></p>
+      <p><b>Total: <span id="totalAmount">0.00</span></b></p>
+      <button class="btn-primary">Save PO</button>
+    </form>
+  </div>
+</main>
+
+<script src="create-po.js"></script>
+</body>
+</html>

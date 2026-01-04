@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin | Castlerock Homes</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">
+    <img src="assets/logo.png">
+    <span><h1>Admin</h1></span>
+  </div>
+
+  <div class="header-actions">
+    <button class="btn-outline" onclick="back()">Back</button>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- =======================
+     USERS
+     ======================= -->
+<div class="card" id="usersSection">
+  <h3>Users</h3>
+
+  <div class="form-row">
+    <input id="firstName" placeholder="First name">
+    <input id="lastName" placeholder="Last name">
+    <input id="userEmail" placeholder="Email">
+    <select id="userRole">
+      <option value="admin">Admin</option>
+      <option value="staff">Staff</option>
+      <option value="viewer">Viewer</option>
+    </select>
+    <button class="btn-primary" onclick="addUser()">Add User</button>
+  </div>
+
+  <table class="po-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Role</th>
+        <th>Status</th>
+        <th style="width:200px">Actions</th>
+      </tr>
+    </thead>
+    <tbody id="userTable"></tbody>
+  </table>
+</div>
+
+
+  <!-- =======================
+       SITES
+       ======================= -->
+  <div class="card" id="sitesSection">
+    <h3>Sites</h3>
+<p id="siteEditNotice" class="edit-notice" style="display:none;">
+  Editing existing item — changes affect all Purchase Orders - Site Letter cannot be changed
+</p>
+    <div class="form-row">
+      <input id="siteName" placeholder="Site name">
+        <input
+    id="siteLetter"
+    placeholder="Letter"
+    maxlength="1"
+    style="width:80px;text-transform:uppercase"
+  >
+      <button id="saveSiteBtn" class="btn-primary" onclick="saveSite()">
+  Add Site
+</button>
+
+    </div>
+
+    <table class="po-table">
+      <thead>
+        <tr>
+          <th>Site</th>
+          <th>Site Letter</th>
+          <th style="width:160px">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="siteTable"></tbody>
+    </table>
+  </div>
+
+  <!-- =======================
+       LOCATIONS
+       ======================= -->
+  <div class="card" id="locationsSection">
+    <h3>Locations</h3>
+    <p id="locationEditNotice" class="edit-notice" style="display:none;">
+  Editing existing item — changes affect all Purchase Orders
+</p>
+    <div class="form-row">
+      <input id="locationName" placeholder="Location name">
+      <input id="locationType" placeholder="Location type">
+      <select id="siteSelect"></select>
+      <button
+      type="button"
+  id="saveLocationBtn"
+  class="btn-primary"
+  onclick="saveLocation()">
+  Add Location
+</button>
+
+    </div>
+
+    <table class="po-table">
+      <thead>
+        <tr>
+          <th>Location</th>
+          <th>Type</th>
+          <th>Site</th>
+          <th style="width:160px">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="locationTable"></tbody>
+    </table>
+  </div>
+
+</main>
+
+<script src="admin.js"></script>
+</body>
+</html>

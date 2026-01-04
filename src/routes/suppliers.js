@@ -1,0 +1,231 @@
+const express = require('express');
+const router = express.Router();
+
+const db = require('../db');
+const { authenticate } = require('../middleware/auth');
+const authorizeRoles = require('../middleware/authorizeRoles');
+const logAudit = require('../services/auditService');
+
+/* ======================================================
+   GET suppliers (list + filter)
+   ====================================================== */
+router.get(
+  '/',
+  authenticate,
+  authorizeRoles('admin', 'super_admin'),
+  async (req, res) => {
+
+    const q = req.query.q ? `%${req.query.q}%` : '%';
+
+    const [rows] = await db.query(
+      `
+      SELECT
+        id,
+        name,
+        main_contact,
+        email,
+        phone,
+        notes
+      FROM suppliers
+      WHERE active = 1
+        AND name LIKE ?
+      ORDER BY name
+      `,
+      [q]
+    );
+
+    res.json(rows);
+  }
+);
+
+/* ======================================================
+   GET single supplier
+   ====================================================== */
+router.get(
+  '/:id',
+  authenticate,
+  authorizeRoles('admin', 'super_admin'),
+  async (req, res) => {
+
+    const [rows] = await db.query(
+      `
+      SELECT
+        id,
+        name,
+        main_contact,
+        email,
+        phone,
+        notes
+      FROM suppliers
+      WHERE id = ?
+      `,
+      [req.params.id]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ error: 'Supplier not found' });
+    }
+
+    res.json(rows[0]);
+  }
+);
+
+/* ======================================================
+   CREATE supplier
+   ====================================================== */
+router.post(
+  '/',
+  authenticate,
+  authorizeRoles('admin', 'super_admin'),
+  async (req, res) => {
+
+    const { name, main_contact, email, phone, notes } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Supplier name is required' });
+    }
+
+    try {
+      const [result] = await db.query(
+        `
+        INSERT INTO suppliers
+          (name, main_contact, email, phone, notes)
+        VALUES (?, ?, ?, ?, ?)
+        `,
+        [
+          name.trim(),
+          main_contact || null,
+          email || null,
+          phone || null,
+          notes || null
+        ]
+      );
+
+      await logAudit({
+        table_name: 'suppliers',
+        record_id: result.insertId,
+        action: 'INSERT',
+        old_data: null,
+        new_data: { name, main_contact, email, phone, notes },
+        changed_by: req.user.id
+      });
+
+      res.json({ success: true });
+
+    } catch (err) {
+      if (err.code === 'ER_DUP_ENTRY') {
+        return res.status(400).json({
+          error: 'Supplier with this name already exists'
+        });
+      }
+      throw err;
+    }
+  }
+);
+
+/* ======================================================
+   UPDATE supplier
+   ====================================================== */
+router.put(
+  '/:id',
+  authenticate,
+  authorizeRoles('admin', 'super_admin'),
+  async (req, res) => {
+
+    const { name, main_contact, email, phone, notes } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Supplier name is required' });
+    }
+
+    const [[oldSupplier]] = await db.query(
+      'SELECT * FROM suppliers WHERE id = ?',
+      [req.params.id]
+    );
+
+    if (!oldSupplier) {
+      return res.status(404).json({ error: 'Supplier not found' });
+    }
+
+    await db.query(
+      `
+      UPDATE suppliers
+      SET
+        name = ?,
+        main_contact = ?,
+        email = ?,
+        phone = ?,
+        notes = ?
+      WHERE id = ?
+      `,
+      [
+        name.trim(),
+        main_contact || null,
+        email || null,
+        phone || null,
+        notes || null,
+        req.params.id
+      ]
+    );
+
+    await logAudit({
+      table_name: 'suppliers',
+      record_id: req.params.id,
+      action: 'UPDATE',
+      old_data: oldSupplier,
+      new_data: { name, main_contact, email, phone, notes },
+      changed_by: req.user.id
+    });
+
+    res.json({ success: true });
+  }
+);
+
+/* ======================================================
+   DELETE supplier
+   ====================================================== */
+router.delete(
+  '/:id',
+  authenticate,
+  authorizeRoles('admin', 'super_admin'),
+  async (req, res) => {
+
+    const [[supplier]] = await db.query(
+      'SELECT * FROM suppliers WHERE id = ?',
+      [req.params.id]
+    );
+
+    if (!supplier) {
+      return res.status(404).json({ error: 'Supplier not found' });
+    }
+
+    const [[used]] = await db.query(
+      'SELECT COUNT(*) AS cnt FROM purchase_orders WHERE supplier_id = ?',
+      [req.params.id]
+    );
+
+    if (used.cnt > 0) {
+      return res.status(400).json({
+        error: 'Supplier cannot be deleted because it is used by Purchase Orders'
+      });
+    }
+
+    await db.query(
+      'DELETE FROM suppliers WHERE id = ?',
+      [req.params.id]
+    );
+
+    await logAudit({
+      table_name: 'suppliers',
+      record_id: req.params.id,
+      action: 'DELETE',
+      old_data: supplier,
+      new_data: null,
+      changed_by: req.user.id
+    });
+
+    res.json({ success: true });
+  }
+);
+
+module.exports = router;

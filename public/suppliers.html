@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Suppliers | Castlerock Homes</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">
+    <img src="assets/logo.png">
+    <span><h1>Suppliers</h1></span>
+  </div>
+
+  <div class="header-actions">
+    <button class="btn-outline" onclick="back()">Back</button>
+    <button class="btn-primary" onclick="addSupplier()">Add Supplier</button>
+  </div>
+</header>
+
+<main class="container">
+<div class="card form-card">
+  <input
+    id="filterInput"
+    class="filter-input"
+    placeholder="Search suppliers..."
+  />
+
+  <table class="po-table">
+    <thead>
+      <tr>
+        <th>Supplier</th>
+        <th>Main Contact</th>
+      </tr>
+    </thead>
+    <tbody id="supplierTable"></tbody>
+  </table>
+</div>
+</main>
+
+<script src="suppliers.js"></script>
+</body>
+</html>

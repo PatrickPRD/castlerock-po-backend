@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Edit User | Castlerock Homes</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">
+    <img src="assets/logo.png">
+    <span>Edit User</span>
+  </div>
+
+  <div class="header-actions">
+    <button class="btn-outline" onclick="back()">Back</button>
+  </div>
+</header>
+
+<main class="container">
+
+  <div class="card" style="max-width:600px;margin:auto;">
+    <h3>User Details</h3>
+
+    <form id="userForm">
+
+      <div class="form-row">
+        <input id="firstName" placeholder="First name" required>
+        <input id="lastName" placeholder="Last name" required>
+      </div>
+
+      <div class="form-row">
+        <input id="email" disabled>
+      </div>
+
+      <div class="form-row">
+        <select id="role">
+            <option value="super_admin">Super Admin</option>
+          <option value="admin">Admin</option>
+          <option value="staff">Staff</option>
+          <option value="viewer">Viewer</option>
+        </select>
+
+        <select id="active">
+          <option value="1">Active</option>
+          <option value="0">Disabled</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <button class="btn-primary" type="submit">
+          Save Changes
+        </button>
+      </div>
+
+    </form>
+  </div>
+
+</main>
+
+<script src="edit-user.js"></script>
+</body>
+</html>

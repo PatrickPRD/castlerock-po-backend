@@ -1,0 +1,19 @@
+.login-card {
+  background: white;
+  width: 320px;
+  margin: 120px auto;
+  padding: 30px;
+  text-align: center;
+  border-radius: var(--md-radius);
+  box-shadow: var(--md-shadow);
+}
+
+.login-card img {
+  height: 76px;
+  margin-bottom: 10px;
+}
+
+#error {
+  color: red;
+  margin-top: 10px;
+}

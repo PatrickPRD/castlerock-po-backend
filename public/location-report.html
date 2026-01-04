@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PO Totals by Location</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">
+    <img src="assets/logo.png" alt="Castlerock Homes">
+    <span><h1>PO Totals by Location</h1></span>
+  </div>
+
+  <div class="header-actions">
+    <button class="btn-outline" onclick="exportExcel()">Export to Excel</button>
+    <button class="btn-outline" onclick="back()">Back</button>
+  </div>
+</header>
+
+<main class="container">
+  <div class="card">
+    <table class="po-table">
+      <thead>
+        <tr>
+          <th>Site</th>
+          <th>Location</th>
+          <th>Total Net (€)</th>
+          <th>Total VAT (€)</th>
+          <th>Total Gross (€)</th>
+          <th>Uninvoiced (€)</th>
+        </tr>
+      </thead>
+      <tbody id="reportTable"></tbody>
+    </table>
+  </div>
+</main>
+
+<script src="location-report.js"></script>
+</body>
+</html>

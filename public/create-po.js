@@ -1,0 +1,127 @@
+const token = localStorage.getItem('token');
+const role  = localStorage.getItem('role');
+
+/* =========================
+   Auth guard (FIXED)
+   ========================= */
+if (!token || !['super_admin', 'admin', 'staff'].includes(role)) {
+  window.location.href = 'login.html';
+}
+
+/* =========================
+   Elements
+   ========================= */
+const supplierSelect = document.getElementById('supplier');
+const siteSelect     = document.getElementById('site');
+const locationSelect = document.getElementById('location');
+const netAmount      = document.getElementById('netAmount');
+const vatRate        = document.getElementById('vatRate');
+const vatAmount      = document.getElementById('vatAmount');
+const totalAmount    = document.getElementById('totalAmount');
+const poDate         = document.getElementById('poDate');
+const description    = document.getElementById('description');
+const stageSelect = document.getElementById('stage');
+
+/* =========================
+   Generic loader
+   ========================= */
+async function loadOptions(url, selectEl) {
+  selectEl.innerHTML = '<option value="">Select</option>';
+
+  const res = await fetch(url, {
+    headers: { Authorization: 'Bearer ' + token }
+  });
+
+  if (!res.ok) {
+    console.error('Failed to load', url);
+    return;
+  }
+
+  const data = await res.json();
+
+  data.forEach(item => {
+    const opt = document.createElement('option');
+    opt.value = item.id;
+    opt.textContent = item.name;
+    selectEl.appendChild(opt);
+  });
+}
+
+/* =========================
+   Load initial data
+   ========================= */
+loadOptions('/suppliers', supplierSelect);
+loadOptions('/sites', siteSelect);
+loadOptions('/stages', stageSelect);
+
+/* =========================
+   Site → Location cascade
+   ========================= */
+siteSelect.addEventListener('change', async () => {
+  const siteId = siteSelect.value;
+  locationSelect.innerHTML = '<option value="">Select</option>';
+
+  if (!siteId) return;
+
+  loadOptions(`/locations?siteId=${siteId}`, locationSelect);
+});
+
+/* =========================
+   VAT calculation
+   ========================= */
+function recalc() {
+  const net  = Number(netAmount.value) || 0;
+  const rate = Number(vatRate.value) || 0;
+
+  const vat = net * (rate / 100);
+  const total = net + vat;
+
+  vatAmount.textContent   = vat.toFixed(2);
+  totalAmount.textContent = total.toFixed(2);
+}
+
+netAmount.addEventListener('input', recalc);
+vatRate.addEventListener('change', recalc);
+
+/* =========================
+   Submit PO
+   ========================= */
+document.getElementById('poForm').addEventListener('submit', async e => {
+  e.preventDefault();
+
+  const payload = {
+    supplierId: supplierSelect.value,
+    siteId: siteSelect.value,
+    locationId: locationSelect.value,
+    poDate: poDate.value,
+    description: description.value || '',
+    netAmount: Number(netAmount.value) || 0,
+    vatRate: Number(vatRate.value) || 0,
+    stageId: stageSelect.value
+  };
+
+  if (!payload.supplierId || !payload.siteId || !payload.locationId || !payload.poDate) {
+    alert('Supplier, site, location and date are required');
+    return;
+  }
+
+  const res = await fetch('/purchase-orders', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + token
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    alert(err.error || 'Failed to create purchase order');
+    return;
+  }
+
+const data = await res.json();
+alert(`Purchase Order ${data.poNumber} created successfully`);
+window.location.href = 'dashboard.html';
+
+});

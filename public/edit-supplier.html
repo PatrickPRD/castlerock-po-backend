@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Add / Edit Supplier</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">
+    <img src="assets/logo.png">
+    <span id="pageTitle">Add Supplier</span>
+  </div>
+
+  <div class="header-actions">
+    <button class="btn-outline" onclick="back()">Cancel</button>
+  </div>
+</header>
+
+<main class="container">
+
+  <div class="card form-card">
+    <form id="supplierForm">
+      <div class="form-row">
+        <input id="name" placeholder="Supplier name" required>
+        <input id="contact" placeholder="Main contact">
+      </div>
+
+      <div class="form-row">
+        <input id="email" placeholder="Email">
+        <input id="phone" placeholder="Phone">
+      </div>
+
+      <textarea
+        id="notes"
+        placeholder="Notes"
+        rows="4"></textarea>
+
+      <div class="form-actions">
+        <button class="btn-primary" type="submit">Save Supplier</button>
+      </div>
+    </form>
+  </div>
+
+</main>
+
+<script src="edit-supplier.js"></script>
+</body>
+</html>
