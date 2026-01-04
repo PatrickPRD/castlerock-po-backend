@@ -15,6 +15,9 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/login.html'));
 });
 
+app.listen(3000, '127.0.0.1', () => {
+  console.log('Server running on localhost:3000');
+});
 
 
 // Health check
