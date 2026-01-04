@@ -10,6 +10,10 @@ app.use(express.urlencoded({ extended: true }));
 const path = require('path');
 app.use(express.static(path.join(__dirname, '../public')));
 
+// Root route → login page
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/login.html'));
+});
 
 
 // Health check
