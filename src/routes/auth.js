@@ -110,34 +110,53 @@ router.post('/reset-password', async (req, res) => {
 const jwt = require('jsonwebtoken');
 
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-  const [[user]] = await pool.query(
-    'SELECT * FROM users WHERE email=? AND active=1',
-    [email]
-  );
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password required' });
+    }
 
-  if (!user) {
-    return res.status(401).json({ error: 'Invalid credentials' });
+    const [[user]] = await db.query(
+      `SELECT id, email, password, role, active
+       FROM users
+       WHERE email = ?`,
+      [email]
+    );
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    if (!user.active) {
+      return res.status(403).json({ error: 'Account disabled' });
+    }
+
+    const match = await bcrypt.compare(password, user.password);
+
+    if (!match) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign(
+      { id: user.id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '8h' }
+    );
+
+    return res.json({
+      token,
+      role: user.role
+    });
+
+  } catch (err) {
+    console.error('LOGIN ERROR:', err);
+    return res.status(500).json({
+      error: 'Login failed'
+    });
   }
-
-  const ok = await bcrypt.compare(password, user.password_hash);
-  if (!ok) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
-
-  const token = jwt.sign(
-    { id: user.id, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: '8h' }
-  );
-
-  res.json({
-    token,
-    role: user.role,
-    name: `${user.first_name} ${user.last_name}`
-  });
 });
+
 
 
 
