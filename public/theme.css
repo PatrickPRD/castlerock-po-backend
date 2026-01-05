@@ -662,26 +662,27 @@ tr:hover { background: #f9f9f9; }
 }
 
 /* =====================================================
-   SUPPLIERS – KEEP TABLE LAYOUT ON MOBILE
+   SUPPLIERS – ALWAYS TABLE (NO CARD MODE)
    ===================================================== */
 @media (max-width: 768px) {
-  .suppliers-table,
-  .suppliers-table thead,
-  .suppliers-table tbody,
-  .suppliers-table tr,
+  .suppliers-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .suppliers-table thead {
+    display: table-header-group;
+  }
+
+  .suppliers-table tr {
+    display: table-row;
+  }
+
   .suppliers-table th,
   .suppliers-table td {
-    display: table;
-    width: 100%;
-  }
-
-  .suppliers-table {
-    table-layout: auto;
-  }
-
-  /* Allow horizontal scroll instead of breaking layout */
-  .suppliers-table-wrapper {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    display: table-cell;
+    padding: 12px;
+    border-bottom: 1px solid #eee;
   }
 }
+
