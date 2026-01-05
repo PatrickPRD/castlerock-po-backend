@@ -18,7 +18,6 @@ const valueMin       = document.getElementById('valueMin');
 const valueMax       = document.getElementById('valueMax');
 
 let openDetailsRow = null;
-let openInvoiceRow = null;
 
 let allPOs = [];
 
@@ -203,29 +202,19 @@ mainRow.innerHTML = `
   let loaded = false;
 
 mainRow.onclick = () => {
-  const isCurrentlyOpen = detailsRow.style.display === 'table-row';
+  const isOpen = detailsRow.style.display === 'table-row';
 
-  // Close any other open PO
+  // Close any previously open PO
   if (openDetailsRow && openDetailsRow !== detailsRow) {
     openDetailsRow.style.display = 'none';
   }
 
-  if (openInvoiceRow && openInvoiceRow !== invoiceRow) {
-    openInvoiceRow.style.display = 'none';
-  }
-
-  // Toggle current PO
-  if (isCurrentlyOpen) {
+  if (isOpen) {
     detailsRow.style.display = 'none';
-    invoiceRow.style.display = 'none';
     openDetailsRow = null;
-    openInvoiceRow = null;
   } else {
     detailsRow.style.display = 'table-row';
-    invoiceRow.style.display = 'table-row';
-
     openDetailsRow = detailsRow;
-    openInvoiceRow = invoiceRow;
 
     if (!loaded) {
       loadInvoices(po.id, document.getElementById(`inv-${po.id}`));
@@ -233,6 +222,7 @@ mainRow.onclick = () => {
     }
   }
 };
+
 
 
   poTable.appendChild(mainRow);
