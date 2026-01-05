@@ -1,13 +1,7 @@
 const token = localStorage.getItem('token');
 const role  = localStorage.getItem('role');
 
-/* =========================
-   Default PO Date = Today
-   ========================= */
-(function setDefaultDate() {
-  const today = new Date().toISOString().slice(0, 10);
-  poDate.value = today;
-})();
+
 
 
 
@@ -31,6 +25,16 @@ const totalAmount    = document.getElementById('totalAmount');
 const poDate         = document.getElementById('poDate');
 const description    = document.getElementById('description');
 const stageSelect = document.getElementById('stage');
+
+
+/* =========================
+   Default PO Date = Today
+   ========================= */
+(function setDefaultDate() {
+  const today = new Date().toISOString().slice(0, 10);
+  poDate.value = today;
+})();
+
 
 /* =========================
    Generic loader
