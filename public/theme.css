@@ -661,3 +661,27 @@ tr:hover { background: #f9f9f9; }
   }
 }
 
+/* =====================================================
+   SUPPLIERS – KEEP TABLE LAYOUT ON MOBILE
+   ===================================================== */
+@media (max-width: 768px) {
+  .suppliers-table,
+  .suppliers-table thead,
+  .suppliers-table tbody,
+  .suppliers-table tr,
+  .suppliers-table th,
+  .suppliers-table td {
+    display: table;
+    width: 100%;
+  }
+
+  .suppliers-table {
+    table-layout: auto;
+  }
+
+  /* Allow horizontal scroll instead of breaking layout */
+  .suppliers-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
