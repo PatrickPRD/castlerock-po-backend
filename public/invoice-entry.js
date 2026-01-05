@@ -138,7 +138,7 @@ function editInvoice(id) {
   invoiceNumber.value  = inv.invoice_number;
   invoiceDate.value    = inv.invoice_date;
   netAmountInput.value = inv.net_amount;
-  vatRateSelect.value  = String(inv.vat_rate);
+  vatRateSelect.value = String(num(inv.vat_rate));
   invoiceFormTitle.textContent = 'Edit Invoice';
   updateTotals();
 }
