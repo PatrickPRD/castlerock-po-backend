@@ -17,34 +17,33 @@ router.get(
   async (req, res) => {
 
     const [rows] = await db.query(`
-      SELECT
-        po.id,
-        po.po_number,
-        DATE_FORMAT(po.po_date, '%Y-%m-%d') AS po_date,
-        s.name AS supplier,
-        si.name AS site,
-        l.name AS location,
+  SELECT
+    po.id,
+    po.po_number,
+    DATE_FORMAT(po.po_date, '%Y-%m-%d') AS po_date,
+    s.name AS supplier,
+    si.name AS site,
+    l.name AS location,
 
-        po.net_amount,
+    po.net_amount,
+    po.total_amount,
 
-        ps.name AS stage,
-        po.stage_id,
+    ps.name AS stage,
+    po.stage_id,
 
-        IFNULL(SUM(i.net_amount), 0) AS invoiced_net,
-        (po.net_amount - IFNULL(SUM(i.net_amount), 0)) AS uninvoiced_net
+    IFNULL(SUM(i.total_amount), 0) AS invoiced_total,
+    (po.total_amount - IFNULL(SUM(i.total_amount), 0)) AS uninvoiced_total
 
-      FROM purchase_orders po
-      JOIN suppliers s ON po.supplier_id = s.id
-      JOIN sites si ON po.site_id = si.id
-      JOIN locations l ON po.location_id = l.id
-      JOIN po_stages ps ON po.stage_id = ps.id
-      LEFT JOIN invoices i ON i.purchase_order_id = po.id
-      WHERE po.status = 'Issued'
-
-      GROUP BY po.id
-      ORDER BY po.po_date DESC
-
-    `);
+  FROM purchase_orders po
+  JOIN suppliers s ON po.supplier_id = s.id
+  JOIN sites si ON po.site_id = si.id
+  JOIN locations l ON po.location_id = l.id
+  JOIN po_stages ps ON po.stage_id = ps.id
+  LEFT JOIN invoices i ON i.purchase_order_id = po.id
+  WHERE po.status = 'Issued'
+  GROUP BY po.id
+  ORDER BY po.po_date DESC
+`);
 
     res.json(rows);
   }
