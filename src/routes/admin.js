@@ -4,6 +4,13 @@ const router = express.Router();
 const { authenticate } = require('../middleware/auth');
 const authorizeRoles = require('../middleware/authorizeRoles');
 const db = require('../db');
+const crypto = require('crypto');
+const { sendPasswordSetupEmail } =
+  require('../services/userEmailService');
+
+
+
+
 
 /* ======================================================
    USERS – SUPER ADMIN ONLY
@@ -80,11 +87,29 @@ router.post(
       }
     }
 
-    await db.query(
-      `INSERT INTO users (email, role, first_name, last_name)
-       VALUES (?, ?, ?, ?)`,
-      [email, role, first_name, last_name]
-    );
+// 🔐 Generate password setup token
+const resetToken = crypto.randomBytes(32).toString('hex');
+const resetExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+
+await db.query(
+  `INSERT INTO users
+   (email, role, first_name, last_name, reset_token, reset_token_expires, active)
+   VALUES (?, ?, ?, ?, ?, ?, 1)`,
+  [
+    email,
+    role,
+    first_name,
+    last_name,
+    resetToken,
+    resetExpires
+  ]
+);
+
+// 📧 Send password setup email
+await sendPasswordSetupEmail(email, resetToken);
+
+res.json({ success: true });
+
 
     res.json({ success: true });
   }

@@ -3,6 +3,12 @@ const role  = localStorage.getItem('role');
 const usersSection     = document.getElementById('usersSection');
 const sitesSection     = document.getElementById('sitesSection');
 const locationsSection = document.getElementById('locationsSection');
+const crypto = require('crypto');
+
+function generateResetToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
 
 
 /* ============================
