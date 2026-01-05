@@ -18,7 +18,7 @@
 
   <div class="header-actions">
 <div class="dropdown">
-  <button class="btn-outline" onclick="toggleActionsMenu(this)">Actions ▾</button>
+  <button class="btn-outline" onclick="toggleActionsMenu(this, event)">Actions ▾</button>
   <div id="actionsMenu" class="dropdown-menu">
     <button onclick="createPO()">Create Purchase Order</button>
     <button onclick="location.href='suppliers.html'">Edit Suppliers</button>
@@ -28,7 +28,7 @@
 
 <!-- REPORTS (SUPER ADMIN ONLY) -->
 <div class="dropdown" id="reportsDropdown" style="display:none">
-  <button class="btn-outline" onclick="toggleReportsMenu(this)">Reports ▾</button>
+  <button class="btn-outline" onclick="toggleReportsMenu(this, event)">Reports ▾</button>
   <div id="reportsMenu" class="dropdown-menu">
     <button onclick="location.href='location-report.html'">
       By Location
@@ -134,37 +134,6 @@
 </main>
 
 <script src="dashboard.js"></script>
-
-<script>
-  function logout() {
-    localStorage.clear();
-    location.href = 'login.html';
-  }
-
-  function toggleActionsMenu() {
-    document.getElementById('actionsMenu').classList.toggle('show');
-  }
-
-  function toggleFilters() {
-    const panel = document.getElementById('filterPanel');
-    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-    document.getElementById('actionsMenu').classList.remove('show');
-  }
-
-  function createPO() {
-    location.href = 'create-po.html';
-  }
-
-  function exportExcel() {
-    location.href = '/exports/purchase-orders.xlsx';
-  }
-
-  document.addEventListener('click', e => {
-    if (!e.target.closest('.dropdown')) {
-      document.getElementById('actionsMenu').classList.remove('show');
-    }
-  });
-</script>
 
 </body>
 </html>

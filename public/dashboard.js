@@ -327,15 +327,16 @@ function closeMenus() {
   document.querySelector('.menu-backdrop')?.remove();
 }
 
-function toggleActionsMenu(btn) {
-  console.log('toggleActionsMenu');
+function toggleActionsMenu(btn, e) {
+  e?.stopPropagation();
   toggleMenu(btn, 'actionsMenu');
 }
 
-function toggleReportsMenu(btn) {
-  console.log('toggleReportsMenu');
+function toggleReportsMenu(btn, e) {
+  e?.stopPropagation();
   toggleMenu(btn, 'reportsMenu');
 }
+
 
 function toggleMenu(button, menuId) {
   console.log('toggleMenu:', menuId);
