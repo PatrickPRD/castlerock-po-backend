@@ -54,9 +54,6 @@ function loadOptions(url, selectEl) {
 
   selectEl.innerHTML = `<option value="" disabled>${label}</option>`;
 
-  updateSaveState();
-
-
   fetch(url, {
     headers: { Authorization: 'Bearer ' + token }
   })
@@ -186,5 +183,7 @@ alert(`Purchase Order ${data.poNumber} created successfully`);
 window.location.href = 'dashboard.html';
 
 });
+  updateSaveState();
+
 });
 
