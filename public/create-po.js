@@ -29,15 +29,7 @@ const totalAmount    = document.getElementById('totalAmount');
 const poDate         = document.getElementById('poDate');
 const description    = document.getElementById('description');
 const stageSelect = document.getElementById('stage');
-[
-  supplierSelect,
-  siteSelect,
-  locationSelect,
-  stageSelect,
-  poDate
-].forEach(el => {
-  el.addEventListener('change', updateSaveState);
-});
+
 
 
 /* =========================
@@ -156,6 +148,16 @@ function isFormValid() {
 function updateSaveState() {
   saveBtn.disabled = !isFormValid();
 }
+
+[
+  supplierSelect,
+  siteSelect,
+  locationSelect,
+  stageSelect,
+  poDate
+].forEach(el => {
+  el.addEventListener('change', updateSaveState);
+});
 
 
 if (!payload.supplierId || !payload.siteId || !payload.locationId || !payload.poDate || !payload.stageId) {
