@@ -1,6 +1,8 @@
 const token = localStorage.getItem('token');
 const role  = localStorage.getItem('role');
 
+let initializing = true;
+
 /* =========================
    Auth guard
    ========================= */
@@ -142,14 +144,16 @@ console.log({
    Site → Location cascade
    ========================= */
 siteSelect.addEventListener('change', async () => {
-  const siteId = siteSelect.value;
+  if (initializing) return;
 
+  const siteId = siteSelect.value;
   locationSelect.innerHTML = '<option value="">Select</option>';
 
   if (!siteId) return;
 
   await loadOptions('/locations?siteId=' + siteId, locationSelect);
 });
+
 
 
 /* =========================
@@ -194,6 +198,9 @@ document.getElementById('poForm').addEventListener('submit', async e => {
    ========================= */
 netAmountInp.addEventListener('input', recalc);
 vatRateSelect.addEventListener('change', recalc);
+
+initializing = false;
+
 
 /* =========================
    Init
