@@ -140,7 +140,7 @@ console.log({
   site: siteSelect.value,
   location: locationSelect.value,
   stage: stageSelect.value,
-  vat: vatRateSelect.value
+  vat: poVatRate.value
 });
 
   recalc();
