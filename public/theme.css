@@ -552,7 +552,7 @@ tr:hover { background: #f9f9f9; }
    ========================= */
 
 .po-row.active {
-  background: rgba(198, 40, 40, 0.08); /* subtle brand tint */
+  border-left: #0100ff 5px solid;
 }
 
 .po-row.active td {
