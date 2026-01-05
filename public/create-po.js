@@ -39,35 +39,33 @@ const stageSelect = document.getElementById('stage');
 /* =========================
    Generic loader
    ========================= */
-async function loadOptions(url, selectEl) {
+function loadOptions(url, selectEl) {
   const label =
-  selectEl.id === 'supplier' ? 'Supplier' :
-  selectEl.id === 'site'     ? 'Site' :
-  selectEl.id === 'location' ? 'Location' :
-  selectEl.id === 'stage'    ? 'Stage' :
-  'Select';
+    selectEl.id === 'supplier' ? 'Supplier' :
+    selectEl.id === 'site'     ? 'Site' :
+    selectEl.id === 'location' ? 'Location' :
+    selectEl.id === 'stage'    ? 'Stage' :
+    'Select';
 
-selectEl.innerHTML = `<option value="" disabled selected>${label}</option>`;
+  selectEl.innerHTML = `<option value="" disabled>${label}</option>`;
 
-
-  const res = await fetch(url, {
+  fetch(url, {
     headers: { Authorization: 'Bearer ' + token }
-  });
+  })
+    .then(res => res.json())
+    .then(data => {
+      data.forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = item.id;
+        opt.textContent = item.name;
+        selectEl.appendChild(opt);
+      });
 
-  if (!res.ok) {
-    console.error('Failed to load', url);
-    return;
-  }
-
-  const data = await res.json();
-
-  data.forEach(item => {
-    const opt = document.createElement('option');
-    opt.value = item.id;
-    opt.textContent = item.name;
-    selectEl.appendChild(opt);
-  });
+      // 🔑 IMPORTANT: reset value AFTER options load
+      selectEl.value = '';
+    });
 }
+
 
 /* =========================
    Load initial data
