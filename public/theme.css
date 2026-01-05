@@ -377,3 +377,60 @@ tr:hover { background: #f9f9f9; }
 .dropdown-menu.portal {
   display: block !important;
 }
+
+@media (max-width: 768px) {
+
+  /* Do NOT card-transform expanded details rows */
+  .details-row,
+  .details-row tr {
+    display: table-row;
+    background: transparent;
+    box-shadow: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .details-row td {
+    display: block;
+    padding: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+
+  .details-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .details-grid > div {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+
+  .invoice-container {
+    overflow-x: auto;
+  }
+
+  .sub-table {
+    min-width: 520px;
+  }
+}
+
+@media (max-width: 768px) {
+
+  .details-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .details-actions button {
+    width: 100%;
+  }
+}
