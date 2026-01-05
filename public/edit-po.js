@@ -55,6 +55,11 @@ if (role === 'viewer') {
    Helpers
    ========================= */
 async function loadOptions(url, selectEl, selectedId) {
+  if (!selectEl) {
+    console.error('loadOptions called with null element for', url);
+    return;
+  }
+
   const res = await fetch(url, {
     headers: { Authorization: 'Bearer ' + token }
   });
@@ -72,6 +77,7 @@ async function loadOptions(url, selectEl, selectedId) {
     selectEl.appendChild(opt);
   });
 }
+
 
 function recalc() {
   const net  = Number(netAmountInp.value) || 0;
