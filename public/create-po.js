@@ -2,6 +2,16 @@ const token = localStorage.getItem('token');
 const role  = localStorage.getItem('role');
 
 /* =========================
+   Default PO Date = Today
+   ========================= */
+(function setDefaultDate() {
+  const today = new Date().toISOString().slice(0, 10);
+  poDate.value = today;
+})();
+
+
+
+/* =========================
    Auth guard (FIXED)
    ========================= */
 if (!token || !['super_admin', 'admin', 'staff'].includes(role)) {
@@ -26,7 +36,15 @@ const stageSelect = document.getElementById('stage');
    Generic loader
    ========================= */
 async function loadOptions(url, selectEl) {
-  selectEl.innerHTML = '<option value="">Select</option>';
+  const label =
+  selectEl.id === 'supplier' ? 'Supplier' :
+  selectEl.id === 'site'     ? 'Site' :
+  selectEl.id === 'location' ? 'Location' :
+  selectEl.id === 'stage'    ? 'Stage' :
+  'Select';
+
+selectEl.innerHTML = `<option value="" disabled selected>${label}</option>`;
+
 
   const res = await fetch(url, {
     headers: { Authorization: 'Bearer ' + token }
