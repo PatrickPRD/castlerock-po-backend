@@ -180,7 +180,7 @@ router.post(
             status,
             stage_id
           )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         poNumber,
         supplierId,
