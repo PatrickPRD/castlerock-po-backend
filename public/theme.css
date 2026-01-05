@@ -95,7 +95,6 @@ button { cursor: pointer; }
 .btn-primary:hover { background: var(--md-primary-dark); }
 
 .btn-outline {
-  margin-top: 10px;
   background: transparent;
   border: 2px solid var(--md-primary);
   color: var(--md-primary);
@@ -204,6 +203,7 @@ tr:hover { background: #f9f9f9; }
 }
 
 .filter-actions {
+  padding-top: 10px;
   grid-column: 1 / -1;
   text-align: right;
 }
