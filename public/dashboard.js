@@ -118,8 +118,8 @@ function applyFilters() {
    Render Purchase Order
    ============================ */
 function renderPO(po) {
-  const net        = num(po.net_amount);
-  const uninvoiced = num(po.uninvoiced_net);
+const net        = num(po.total_amount);        // display gross in main row
+const uninvoiced = num(po.uninvoiced_total);    // status based on gross
 
   const isOver        = uninvoiced < 0;
   const isComplete    = uninvoiced === 0;
@@ -154,13 +154,13 @@ detailsRow.innerHTML = `
   <td colspan="5">
     <div class="details-grid">
       <div><strong>Site:</strong> ${po.site}</div>
-      <div><strong>Net (ex VAT):</strong> €${Number(po.net_amount).toFixed(2)}</div>
+      <div><strong>Total (inc VAT):</strong> €${Number(po.total_amount).toFixed(2)}</div>
 
       <div>
         <strong>Uninvoiced (ex VAT):</strong>
         <span class="${
-          po.uninvoiced_net < 0 ? 'over' :
-          po.uninvoiced_net === 0 ? 'ok' : 'warn'
+          po.uninvoiced_total < 0 ? 'over' :
+          po.uninvoiced_total === 0 ? 'ok' : 'warn'
         }">
           €${Number(po.uninvoiced_net).toFixed(2)}
         </span>
