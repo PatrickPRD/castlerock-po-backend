@@ -24,21 +24,6 @@ let openDetailsRow = null;
 
 let allPOs = [];
 
-const transporter = require('./services/emailService');
-
-transporter.sendMail({
-  to: 'your@email.com',
-  from: 'test@blossomhill.ie',
-  subject: 'SMTP Test',
-  text: 'If you received this, SMTP works.'
-}).then(() => {
-  console.log('SMTP test email sent');
-}).catch(console.error);
-
-
-
-
-
 /* ============================
    Utilities
    ============================ */
