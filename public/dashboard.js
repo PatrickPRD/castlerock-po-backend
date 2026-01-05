@@ -339,28 +339,37 @@ function toggleReportsMenu(btn, e) {
 
 
 function toggleMenu(button, menuId) {
-  console.log('toggleMenu:', menuId);
-
   const menu = document.getElementById(menuId);
-  if (!menu) {
-    console.error('Menu not found:', menuId);
+  if (!menu) return;
+
+  const isOpen = menu.classList.contains('show');
+
+  // Close all OTHER menus
+  document.querySelectorAll('.dropdown-menu').forEach(m => {
+    if (m !== menu) {
+      m.classList.remove('show');
+      m.style.left = '';
+      m.style.top = '';
+    }
+  });
+
+  document.querySelector('.menu-backdrop')?.remove();
+
+  // Toggle current menu
+  if (isOpen) {
+    menu.classList.remove('show');
     return;
   }
 
-  const alreadyOpen = menu.classList.contains('show');
-  closeMenus();
-  if (alreadyOpen) return;
-
-  if (isMobile()) {
+  if (window.innerWidth <= 768) {
     openMobileMenu(button, menu);
   } else {
     menu.classList.add('show');
   }
 }
 
-function openMobileMenu(button, menu) {
-  console.log('openMobileMenu');
 
+function openMobileMenu(button, menu) {
   const rect = button.getBoundingClientRect();
   menu.classList.add('show');
 
@@ -388,6 +397,7 @@ function openMobileMenu(button, menu) {
   );
 }
 
+
 document.querySelectorAll('.dropdown-menu').forEach(menu => {
   menu.addEventListener('click', e => e.stopPropagation());
 });
@@ -399,9 +409,6 @@ if (window.innerWidth > 768) {
     }
   });
 }
-
-
-
 
 
 /* ============================
