@@ -66,7 +66,7 @@ function renderHeader() {
       <div><strong>Location:</strong> ${po.location}</div>
 
       <div><strong>Net (ex VAT):</strong> ${euro(po.net_amount)}</div>
-      <div><strong>VAT Rate:</strong> ${po.vat_rate}%</div>
+      <div><strong>VAT Rate:</strong> ${formatVat(po.vat_rate)}</div>
       <div><strong>Total (inc VAT):</strong> ${euro(po.total_amount)}</div>
 
       <div>
