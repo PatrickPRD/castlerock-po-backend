@@ -38,6 +38,13 @@ async function loadPO() {
 
 /* ================= Render PO Header ================= */
 function renderHeader() {
+
+  const invoicedTotal = po.invoices
+    ? po.invoices.reduce((sum, i) => sum + num(i.total_amount), 0)
+    : 0;
+
+  const uninvoicedTotal = num(po.total_amount) - invoicedTotal;
+
   poHeader.innerHTML = `
     <h2>PO: ${po.po_number}</h2>
 
@@ -59,9 +66,20 @@ function renderHeader() {
           ${euro(po.uninvoiced_net)}
         </span>
       </div>
+
+      <div>
+        <strong>Uninvoiced (inc VAT):</strong>
+        <span class="${
+          uninvoicedTotal < 0 ? 'over' :
+          uninvoicedTotal === 0 ? 'ok' : 'warn'
+        }">
+          ${euro(uninvoicedTotal)}
+        </span>
+      </div>
     </div>
   `;
 }
+
 
 /* ================= Render Invoices ================= */
 function renderInvoices() {
