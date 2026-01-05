@@ -17,6 +17,8 @@ const dateTo         = document.getElementById('dateTo');
 const valueMin       = document.getElementById('valueMin');
 const valueMax       = document.getElementById('valueMax');
 
+let openDetailsRow = null;
+let openInvoiceRow = null;
 
 let allPOs = [];
 
@@ -200,15 +202,38 @@ mainRow.innerHTML = `
 
   let loaded = false;
 
-  mainRow.onclick = () => {
-    const show = detailsRow.style.display === 'none';
-    detailsRow.style.display = show ? 'table-row' : 'none';
+mainRow.onclick = () => {
+  const isCurrentlyOpen = detailsRow.style.display === 'table-row';
 
-    if (show && !loaded) {
+  // Close any other open PO
+  if (openDetailsRow && openDetailsRow !== detailsRow) {
+    openDetailsRow.style.display = 'none';
+  }
+
+  if (openInvoiceRow && openInvoiceRow !== invoiceRow) {
+    openInvoiceRow.style.display = 'none';
+  }
+
+  // Toggle current PO
+  if (isCurrentlyOpen) {
+    detailsRow.style.display = 'none';
+    invoiceRow.style.display = 'none';
+    openDetailsRow = null;
+    openInvoiceRow = null;
+  } else {
+    detailsRow.style.display = 'table-row';
+    invoiceRow.style.display = 'table-row';
+
+    openDetailsRow = detailsRow;
+    openInvoiceRow = invoiceRow;
+
+    if (!loaded) {
       loadInvoices(po.id, document.getElementById(`inv-${po.id}`));
       loaded = true;
     }
-  };
+  }
+};
+
 
   poTable.appendChild(mainRow);
   poTable.appendChild(detailsRow);
