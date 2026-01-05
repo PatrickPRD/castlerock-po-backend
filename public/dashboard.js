@@ -258,6 +258,7 @@ mainRow.onclick = () => {
   });
 }
 
+};
 
 
 
