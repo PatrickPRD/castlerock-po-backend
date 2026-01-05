@@ -31,7 +31,6 @@ const description    = document.getElementById('description');
 const stageSelect = document.getElementById('stage');
 
 
-
 /* =========================
    Default PO Date = Today
    ========================= */
@@ -40,20 +39,6 @@ const stageSelect = document.getElementById('stage');
   poDate.value = today;
 })();
 
-/* =========================
-   Form validation
-   ========================= */
-const saveBtn = document.getElementById('saveBtn');
-
-function isFormValid() {
-  return (
-    supplierSelect.value &&
-    siteSelect.value &&
-    locationSelect.value &&
-    stageSelect.value &&
-    poDate.value
-  );
-}
 
 /* =========================
    Generic loader
@@ -83,7 +68,6 @@ function loadOptions(url, selectEl) {
       // 🔑 IMPORTANT: reset value AFTER options load
       selectEl.value = '';
     });
-      updateSaveState();
 }
 
 
@@ -105,19 +89,6 @@ siteSelect.addEventListener('change', async () => {
 
   loadOptions(`/locations?siteId=${siteId}`, locationSelect);
 });
-
-/* =========================
-   Validation triggers
-   ========================= */
-[
-  supplierSelect,
-  siteSelect,
-  locationSelect,
-  stageSelect,
-  poDate
-].forEach(el => el.addEventListener('change', updateSaveState));
-
-updateSaveState();
 
 /* =========================
    VAT calculation
@@ -155,10 +126,6 @@ document.getElementById('poForm').addEventListener('submit', async e => {
 
 console.log(payload);
 
-function updateSaveState() {
-  saveBtn.disabled = !isFormValid();
-}
-
 
 if (!payload.supplierId || !payload.siteId || !payload.locationId || !payload.poDate || !payload.stageId) {
   alert('Supplier, site, location, stage and date are required');
@@ -186,7 +153,5 @@ alert(`Purchase Order ${data.poNumber} created successfully`);
 window.location.href = 'dashboard.html';
 
 });
-
-
 });
 
