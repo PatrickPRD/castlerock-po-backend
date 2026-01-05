@@ -288,6 +288,21 @@ tr:hover { background: #f9f9f9; }
     min-height: 42px;
   }
 
+@media (max-width: 768px) {
+
+  /* Invoice scroll – simple, non-invasive */
+  .invoice-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .invoice-container .sub-table {
+    min-width: 600px;
+  }
+}
+
+
+
   /* ===============================
      MAIN PO LIST → CARDS ONLY
      =============================== */
@@ -374,89 +389,5 @@ tr:hover { background: #f9f9f9; }
   z-index: 1000;
 }
 
-/* =========================================================
-   MOBILE HARD OVERFLOW CONTAINMENT (ANDROID FIX)
-   ========================================================= */
-@media (max-width: 768px) {
-
-  /* Prevent ANY table from widening the viewport */
-  table,
-  tbody,
-  tr,
-  td {
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
-  /* Hard stop: PO table can never exceed viewport */
-  .po-table {
-    width: 100%;
-    max-width: 100%;
-    overflow-x: hidden;
-  }
-
-  /* Expanded details row must not leak width */
-  .details-row,
-  .details-row td {
-    max-width: 100%;
-    overflow-x: hidden;
-  }
-
-  /* Invoice container is the ONLY scrollable area */
-  .invoice-container {
-    max-width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  /* Prevent invoice table from affecting layout */
-  .invoice-container table {
-    width: max-content;
-    min-width: 100%;
-  }
-
-  /* Safety net: nothing inside details can escape */
-  .details-grid,
-  .details-actions {
-    max-width: 100%;
-    overflow-x: hidden;
-  }
-}
-
-/* =========================================================
-   DASHBOARD INVOICE MOBILE FIX (FROM invoice-entry.css)
-   ========================================================= */
-@media (max-width: 768px) {
-
-  /* Match invoice-entry card containment */
-  .details-row td {
-    max-width: 100%;
-    overflow-x: hidden;
-  }
-
-  /* Invoice container behaves like invoice-entry card */
-  .invoice-container {
-    width: 100%;
-    max-width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  /* Make dashboard invoices behave like data-table */
-  .invoice-container .sub-table {
-    display: block;
-    width: max-content;
-    min-width: 600px;
-    border-collapse: collapse;
-  }
-
-  /* Prevent layout from being stretched */
-  .po-table,
-  .po-table tbody,
-  .po-table tr {
-    max-width: 100%;
-    overflow-x: hidden;
-  }
-}
 
 
