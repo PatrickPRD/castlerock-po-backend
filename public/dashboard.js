@@ -135,14 +135,15 @@ function renderPO(po) {
     mainRow.classList.add('po-outstanding');
   }
 
-  mainRow.innerHTML = `
-    <td>${po.po_number}</td>
-    <td>${po.po_date}</td>
-    <td>${po.supplier}</td>
-    <td>${po.location}</td>
-    <td>${po.stage}</td>
-    <td>${euro(net)}</td>
-  `;
+mainRow.innerHTML = `
+  <td data-label="PO Number">${po.po_number}</td>
+  <td data-label="Date">${po.po_date}</td>
+  <td data-label="Supplier">${po.supplier}</td>
+  <td data-label="Location">${po.location}</td>
+  <td data-label="Stage">${po.stage}</td>
+  <td data-label="Total (inc VAT)">${euro(net)}</td>
+`;
+
 
   const detailsRow = document.createElement('tr');
   detailsRow.className = 'details-row';
