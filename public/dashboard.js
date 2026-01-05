@@ -157,7 +157,7 @@ mainRow.innerHTML = `
   <td data-label="Date">${po.po_date}</td>
   <td data-label="Supplier">${po.supplier}</td>
   <td data-label="Location">${po.location}</td>
-  <td data-label="Stage">${po.stage.slice(0, 5)}</td>
+  <td data-label="Stage">${po.stage.slice(0, 8)}</td>
   <td data-label="Total (inc VAT)">${euro(net)}</td>
 `;
 
