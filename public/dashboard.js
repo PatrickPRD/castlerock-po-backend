@@ -149,7 +149,7 @@ function renderPO(po) {
   detailsRow.style.display = 'none';
 
   detailsRow.innerHTML = `
-    <td colspan="5">
+    <td colspan="6">
 <div class="details-grid">
   <div><strong>Site:</strong> ${po.site}</div>
   <div><strong>VAT Rate:</strong> ${Number(po.vat_rate).toFixed(2)}%</div>
