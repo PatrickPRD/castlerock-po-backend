@@ -1,7 +1,6 @@
 const token = localStorage.getItem('token');
 const role  = localStorage.getItem('role');
 
-let initializing = true;
 let poVatRate = null;
 
 
@@ -118,7 +117,10 @@ async function loadPO() {
   descriptionInp.value = po.description || '';
   netAmountInp.value   = po.net_amount;
 
-  await loadOptions('/stages', stageSelect, po.stage_id);
+// store VAT immediately
+poVatRate = String(po.vat_rate);
+
+await loadOptions('/stages', stageSelect, po.stage_id);
 await loadOptions('/suppliers', supplierSelect, po.supplier_id);
 await loadOptions('/sites', siteSelect, po.site_id);
 await loadOptions(
@@ -127,12 +129,10 @@ await loadOptions(
   po.location_id
 );
 
+// apply VAT once, after all async work
 vatRateSelect.value = poVatRate;
 recalc();
 
-
-  // ✅ Set VAT AFTER options exist
-  poVatRate = String(po.vat_rate);
 
 
 console.log({
@@ -140,7 +140,7 @@ console.log({
   site: siteSelect.value,
   location: locationSelect.value,
   stage: stageSelect.value,
-  vat: poVatRate.value
+  vat: vatRateSelect.value
 });
 
   recalc();
@@ -151,7 +151,7 @@ console.log({
    Site → Location cascade
    ========================= */
 siteSelect.addEventListener('change', async () => {
-  if (initializing) return;
+
 
   const siteId = siteSelect.value;
   locationSelect.innerHTML = '<option value="">Select</option>';
