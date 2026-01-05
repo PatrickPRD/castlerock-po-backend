@@ -49,7 +49,7 @@ router.get(
 router.get(
   '/locations',
   authenticate,
-  authorizeRoles('super_admin','super_admin','admin', 'staff', 'viewer'),
+  authorizeRoles('super_admin','admin', 'staff', 'viewer'),
   async (req, res) => {
     const { siteId } = req.query;
 
