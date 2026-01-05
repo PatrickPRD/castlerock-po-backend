@@ -434,3 +434,17 @@ tr:hover { background: #f9f9f9; }
     display: table-header-group;
   }
 }
+
+
+/* =====================================================
+   DASHBOARD – HIDE INVOICE # ON MOBILE
+   ===================================================== */
+@media (max-width: 768px) {
+
+  /* Hide Invoice # column only on dashboard invoices */
+  .invoice-container .data-table th:nth-child(1),
+  .invoice-container .data-table td:nth-child(1) {
+    display: none;
+  }
+
+}
