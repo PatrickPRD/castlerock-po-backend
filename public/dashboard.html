@@ -18,7 +18,7 @@
 
   <div class="header-actions">
 <div class="dropdown">
-  <button class="btn-outline" onclick="toggleActionsMenu()">Actions ▾</button>
+  <button class="btn-outline" onclick="toggleActionsMenu(this)">Actions ▾</button>
   <div id="actionsMenu" class="dropdown-menu">
     <button onclick="createPO()">Create Purchase Order</button>
     <button onclick="location.href='suppliers.html'">Edit Suppliers</button>
@@ -28,7 +28,7 @@
 
 <!-- REPORTS (SUPER ADMIN ONLY) -->
 <div class="dropdown" id="reportsDropdown" style="display:none">
-  <button class="btn-outline" onclick="toggleReportsMenu()">Reports ▾</button>
+  <button class="btn-outline" onclick="toggleReportsMenu(this)">Reports ▾</button>
   <div id="reportsMenu" class="dropdown-menu">
     <button onclick="location.href='location-report.html'">
       By Location

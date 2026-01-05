@@ -305,57 +305,91 @@ function clearFilters() {
     document.getElementById('reportsDropdown').style.display = 'block';
   }
 
-  function toggleReportsMenu() {
-    document.getElementById('reportsMenu').classList.toggle('show');
-    document.getElementById('actionsMenu').classList.remove('show');
-  }
+ /* ============================
+   Unified Menu System
+   ============================ */
 
-document.addEventListener('click', e => {
-  if (!e.target.closest('.dropdown')) {
-    document.getElementById('actionsMenu').classList.remove('show');
-    const reports = document.getElementById('reportsMenu');
-    if (reports) reports.classList.remove('show');
-  }
-});
+function isMobile() {
+  return window.innerWidth <= 768;
+}
 
-function openMenu(button, menu) {
+function closeMenus() {
+  document.querySelectorAll('.dropdown-menu')
+    .forEach(m => m.classList.remove('show'));
+
+  document.querySelector('.menu-backdrop')?.remove();
+}
+
+function toggleMenu(button, menuId) {
+  const menu = document.getElementById(menuId);
+  if (!menu) return;
+
+  const isOpen = menu.classList.contains('show');
+
+  closeMenus();
+  if (isOpen) return;
+
+  if (isMobile()) {
+    openMenuAnchored(button, menu);
+  } else {
+    menu.classList.add('show');
+  }
+}
+
+/* ============================
+   Mobile Anchored Positioning
+   ============================ */
+function openMenuAnchored(button, menu) {
   const rect = button.getBoundingClientRect();
 
-  const menuWidth = Math.min(menu.offsetWidth, window.innerWidth * 0.9);
+  menu.classList.add('show');
+
+  const menuWidth  = menu.offsetWidth;
   const menuHeight = menu.offsetHeight;
 
   let left = rect.left;
-  let top = rect.bottom + 8;
+  let top  = rect.bottom + 8;
 
-  /* Clamp horizontally */
+  /* Clamp X */
   if (left + menuWidth > window.innerWidth - 8) {
     left = window.innerWidth - menuWidth - 8;
   }
   if (left < 8) left = 8;
 
-  /* Clamp vertically */
+  /* Flip vertically if needed */
   if (top + menuHeight > window.innerHeight - 8) {
     top = rect.top - menuHeight - 8;
   }
 
   menu.style.left = `${left}px`;
-  menu.style.top = `${top}px`;
-
-  menu.classList.add("open");
+  menu.style.top  = `${top}px`;
 
   document.body.insertAdjacentHTML(
-    "beforeend",
+    'beforeend',
     '<div class="menu-backdrop" onclick="closeMenus()"></div>'
   );
 }
 
-
-function closeMenus() {
-  document.querySelectorAll(".dropdown-menu, .action-menu, .reports-menu")
-    .forEach(m => m.classList.remove("open"));
-
-  document.querySelector(".menu-backdrop")?.remove();
+/* ============================
+   Specific Menu Hooks (HTML SAFE)
+   ============================ */
+function toggleReportsMenu(btn) {
+  toggleMenu(btn, 'reportsMenu');
 }
+
+function toggleActionMenu(btn) {
+  toggleMenu(btn, 'actionsMenu');
+}
+
+/* ============================
+   Click Outside to Close (Desktop)
+   ============================ */
+document.addEventListener('click', e => {
+  if (!e.target.closest('.dropdown')) {
+    closeMenus();
+  }
+});
+
 
 
 /* ============================
