@@ -50,9 +50,9 @@ async function loadOptions(url, selectEl) {
 /* =========================
    Load initial data
    ========================= */
-loadOptions('/suppliers', supplierSelect);
-loadOptions('/sites', siteSelect);
-loadOptions('/stages', stageSelect);
+loadOptions('/admin/suppliers', supplierSelect);
+loadOptions('/admin/sites', siteSelect);
+loadOptions('/admin/stages', stageSelect);
 
 /* =========================
    Site → Location cascade
