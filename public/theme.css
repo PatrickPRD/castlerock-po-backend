@@ -306,3 +306,148 @@ tr:hover {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+
+  .container {
+    padding: 12px;
+  }
+
+  .card {
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 14px;
+  }
+
+  .brand img {
+    height: 48px;
+  }
+
+  .header-actions {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .header-actions button {
+    flex: 1;
+    min-height: 42px;
+  }
+}
+
+@media (max-width: 768px) {
+  table,
+  thead,
+  tbody,
+  th,
+  td,
+  tr {
+    display: block;
+  }
+
+  thead {
+    display: none;
+  }
+
+  tr {
+    background: white;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    box-shadow: var(--md-shadow);
+    padding: 10px;
+  }
+
+  td {
+    border: none;
+    padding: 6px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+  }
+
+  td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--md-muted);
+  }
+}
+
+@media (max-width: 768px) {
+  .details-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .details-row td {
+    padding: 10px;
+  }
+
+  .details-actions {
+    flex-direction: column;
+  }
+
+  .details-actions button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-actions {
+    text-align: center;
+  }
+
+  .filter-actions button {
+    width: 100%;
+    margin-bottom: 6px;
+  }
+}
+
+@media (max-width: 768px) {
+  button,
+  .btn-primary,
+  .btn-outline,
+  .btn-danger {
+    min-height: 42px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .form-row {
+    flex-direction: column;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .form-actions {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    padding: 10px;
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.08);
+  }
+}
