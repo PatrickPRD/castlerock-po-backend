@@ -305,7 +305,7 @@ function clearFilters() {
     document.getElementById('reportsDropdown').style.display = 'block';
   }
 
- /* ============================
+/* ============================
    Unified Menu System
    ============================ */
 
@@ -315,7 +315,11 @@ function isMobile() {
 
 function closeMenus() {
   document.querySelectorAll('.dropdown-menu')
-    .forEach(m => m.classList.remove('show'));
+    .forEach(m => {
+      m.classList.remove('show');
+      m.style.left = '';
+      m.style.top = '';
+    });
 
   document.querySelector('.menu-backdrop')?.remove();
 }
@@ -336,9 +340,6 @@ function toggleMenu(button, menuId) {
   }
 }
 
-/* ============================
-   Mobile Anchored Positioning
-   ============================ */
 function openMenuAnchored(button, menu) {
   const rect = button.getBoundingClientRect();
 
@@ -350,7 +351,7 @@ function openMenuAnchored(button, menu) {
   let left = rect.left;
   let top  = rect.bottom + 8;
 
-  /* Clamp X */
+  /* Clamp horizontally */
   if (left + menuWidth > window.innerWidth - 8) {
     left = window.innerWidth - menuWidth - 8;
   }
@@ -371,24 +372,25 @@ function openMenuAnchored(button, menu) {
 }
 
 /* ============================
-   Specific Menu Hooks (HTML SAFE)
+   HTML Hook Functions
    ============================ */
+function toggleActionsMenu(btn) {
+  toggleMenu(btn, 'actionsMenu');
+}
+
 function toggleReportsMenu(btn) {
   toggleMenu(btn, 'reportsMenu');
 }
 
-function toggleActionMenu(btn) {
-  toggleMenu(btn, 'actionsMenu');
-}
-
 /* ============================
-   Click Outside to Close (Desktop)
+   Click Outside (Desktop)
    ============================ */
 document.addEventListener('click', e => {
   if (!e.target.closest('.dropdown')) {
     closeMenus();
   }
 });
+
 
 
 
