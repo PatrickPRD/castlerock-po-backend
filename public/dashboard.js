@@ -318,6 +318,21 @@ document.addEventListener('click', e => {
   }
 });
 
+function openMenu(menu) {
+  document.body.insertAdjacentHTML(
+    "beforeend",
+    '<div class="menu-backdrop" onclick="closeMenus()"></div>'
+  );
+  menu.classList.add("open");
+}
+
+function closeMenus() {
+  document.querySelectorAll(".dropdown-menu, .action-menu, .reports-menu")
+    .forEach(m => m.classList.remove("open"));
+
+  document.querySelector(".menu-backdrop")?.remove();
+}
+
 
 /* ============================
    Init
