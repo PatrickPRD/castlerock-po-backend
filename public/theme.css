@@ -526,3 +526,23 @@ tr:hover { background: #f9f9f9; }
     text-align: right;
   }
 }
+
+
+/* =========================
+   PO expand / collapse
+   ========================= */
+
+.details-wrapper {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition:
+    max-height 0.35s ease,
+    opacity 0.25s ease;
+}
+
+/* Expanded state */
+.details-row.open .details-wrapper {
+  max-height: 2000px; /* large enough for invoices */
+  opacity: 1;
+}

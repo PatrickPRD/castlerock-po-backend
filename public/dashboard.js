@@ -166,6 +166,7 @@ mainRow.innerHTML = `
 
   detailsRow.innerHTML = `
     <td colspan="6">
+    <div class="details-wrapper">
 <div class="details-grid">
   <div><strong>Site:</strong> ${po.site}</div>
   <div><strong>VAT Rate:</strong> ${formatVat(po.vat_rate)}</div>
@@ -196,6 +197,7 @@ mainRow.innerHTML = `
           ? `<button class="btn-danger" onclick="deletePO(${po.id})">Delete</button>`
           : ''}
       </div>
+          </div> 
     </td>
   `;
 
