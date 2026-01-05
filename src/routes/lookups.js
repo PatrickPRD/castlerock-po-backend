@@ -76,18 +76,30 @@ router.get(
 );
 
 /* ============================
-   GET /stages?siteId=#
+   GET /stages
    ============================ */
 router.get(
   '/stages',
   authenticate,
+  authorizeRoles('super_admin','admin','staff','viewer'),
   async (req, res) => {
-    const [rows] = await db.query(
-      'SELECT id, name FROM po_stages ORDER BY sort_order'
-    );
-    res.json(rows);
+    try {
+      const [rows] = await pool.query(
+        `
+        SELECT id, name
+        FROM po_stages
+        WHERE active = 1
+        ORDER BY id
+        `
+      );
+      res.json(rows);
+    } catch (err) {
+      console.error('Failed to load stages:', err);
+      res.status(500).json({ error: 'Failed to load stages' });
+    }
   }
 );
+
 
 
 
