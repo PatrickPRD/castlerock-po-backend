@@ -26,6 +26,7 @@ router.get(
     l.name AS location,
 
     po.net_amount,
+    po.vat_rate,
     po.total_amount,
 
     ps.name AS stage,
