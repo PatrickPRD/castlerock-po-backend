@@ -247,6 +247,33 @@ tr:hover { background: #f9f9f9; }
 
 .muted { color: #777; font-size: 13px; }
 
+/* =====================================================
+   HEADER – DESKTOP LAYOUT LOCK
+   ===================================================== */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.header-actions {
+  display: flex;
+  flex-direction: row;      /* 🔒 force side-by-side */
+  align-items: center;
+  gap: 12px;
+  width: auto;
+}
+
+.header-actions button {
+  width: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+
+
+
+
 /* =========================================================
    MOBILE (CLEAN + SCOPED)
    ========================================================= */
