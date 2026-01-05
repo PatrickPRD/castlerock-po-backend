@@ -241,18 +241,23 @@ mainRow.onclick = () => {
     mainRow.classList.remove('open', 'active');
     openDetailsRow = null;
   } else {
-    // Open current
-    detailsRow.style.display = 'table-row';
-    detailsRow.classList.add('open');
-    mainRow.classList.add('open', 'active');
-    openDetailsRow = detailsRow;
+  // Open current
+  detailsRow.style.display = 'table-row';
+  detailsRow.classList.add('open');
+  mainRow.classList.add('open', 'active');
+  openDetailsRow = detailsRow;
 
-    if (!loaded) {
-      loadInvoices(po.id, document.getElementById(`inv-${po.id}`));
-      loaded = true;
-    }
+  if (!loaded) {
+    loadInvoices(po.id, document.getElementById(`inv-${po.id}`));
+    loaded = true;
   }
-};
+
+  // 🔽 Ensure expanded PO is not hidden behind sticky bar
+  requestAnimationFrame(() => {
+    scrollExpandedRowIntoView(detailsRow);
+  });
+}
+
 
 
 
@@ -439,6 +444,25 @@ function toggleReportsMenu(btn) {
   openMenu(btn, 'reportsMenu');
 }
 
+function scrollExpandedRowIntoView(detailsRow) {
+  const rect = detailsRow.getBoundingClientRect();
+
+  const stickyBar = document.getElementById('dashboardTotals');
+  const stickyHeight = stickyBar ? stickyBar.offsetHeight : 0;
+
+  const viewportHeight = window.innerHeight;
+
+  // If bottom of details row is hidden by sticky bar
+  if (rect.bottom > viewportHeight - stickyHeight) {
+    const scrollByAmount =
+      rect.bottom - (viewportHeight - stickyHeight) + 16;
+
+    window.scrollBy({
+      top: scrollByAmount,
+      behavior: 'smooth'
+    });
+  }
+}
 
 
 /* ============================
