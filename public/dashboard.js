@@ -150,20 +150,22 @@ function renderPO(po) {
 
   detailsRow.innerHTML = `
     <td colspan="5">
-      <div class="details-grid">
-        <div><strong>Site:</strong> ${po.site}</div>
-        <div><strong>Total (inc VAT):</strong> €${Number(po.total_amount).toFixed(2)}</div>
+<div class="details-grid">
+  <div><strong>Site:</strong> ${po.site}</div>
+  <div><strong>VAT Rate:</strong> ${Number(po.vat_rate).toFixed(2)}%</div>
+  <div><strong>Total (inc VAT):</strong> €${Number(po.total_amount).toFixed(2)}</div>
 
-        <div>
-          <strong>Uninvoiced (inc VAT):</strong>
-          <span class="${
-            po.uninvoiced_total < 0 ? 'over' :
-            po.uninvoiced_total === 0 ? 'ok' : 'warn'
-          }">
-            €${Number(po.uninvoiced_total).toFixed(2)}
-          </span>
-        </div>
-      </div>
+  <div>
+    <strong>Uninvoiced (inc VAT):</strong>
+    <span class="${
+      po.uninvoiced_total < 0 ? 'over' :
+      po.uninvoiced_total === 0 ? 'ok' : 'warn'
+    }">
+      €${Number(po.uninvoiced_total).toFixed(2)}
+    </span>
+  </div>
+</div>
+
 
       <div class="invoice-container" id="inv-${po.id}">
         <p class="muted">Loading invoices…</p>
