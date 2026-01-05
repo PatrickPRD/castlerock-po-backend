@@ -29,6 +29,15 @@ const totalAmount    = document.getElementById('totalAmount');
 const poDate         = document.getElementById('poDate');
 const description    = document.getElementById('description');
 const stageSelect = document.getElementById('stage');
+[
+  supplierSelect,
+  siteSelect,
+  locationSelect,
+  stageSelect,
+  poDate
+].forEach(el => {
+  el.addEventListener('change', updateSaveState);
+});
 
 
 /* =========================
@@ -52,6 +61,9 @@ function loadOptions(url, selectEl) {
     'Select';
 
   selectEl.innerHTML = `<option value="" disabled>${label}</option>`;
+
+  updateSaveState();
+
 
   fetch(url, {
     headers: { Authorization: 'Bearer ' + token }
@@ -125,6 +137,25 @@ document.getElementById('poForm').addEventListener('submit', async e => {
   };
 
 console.log(payload);
+
+/* =========================
+   Form validation
+   ========================= */
+const saveBtn = document.getElementById('saveBtn');
+
+function isFormValid() {
+  return (
+    supplierSelect.value &&
+    siteSelect.value &&
+    locationSelect.value &&
+    stageSelect.value &&
+    poDate.value
+  );
+}
+
+function updateSaveState() {
+  saveBtn.disabled = !isFormValid();
+}
 
 
 if (!payload.supplierId || !payload.siteId || !payload.locationId || !payload.poDate || !payload.stageId) {
