@@ -318,13 +318,37 @@ document.addEventListener('click', e => {
   }
 });
 
-function openMenu(menu) {
+function openMenu(button, menu) {
+  const rect = button.getBoundingClientRect();
+
+  const menuWidth = Math.min(menu.offsetWidth, window.innerWidth * 0.9);
+  const menuHeight = menu.offsetHeight;
+
+  let left = rect.left;
+  let top = rect.bottom + 8;
+
+  /* Clamp horizontally */
+  if (left + menuWidth > window.innerWidth - 8) {
+    left = window.innerWidth - menuWidth - 8;
+  }
+  if (left < 8) left = 8;
+
+  /* Clamp vertically */
+  if (top + menuHeight > window.innerHeight - 8) {
+    top = rect.top - menuHeight - 8;
+  }
+
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+
+  menu.classList.add("open");
+
   document.body.insertAdjacentHTML(
     "beforeend",
     '<div class="menu-backdrop" onclick="closeMenus()"></div>'
   );
-  menu.classList.add("open");
 }
+
 
 function closeMenus() {
   document.querySelectorAll(".dropdown-menu, .action-menu, .reports-menu")
