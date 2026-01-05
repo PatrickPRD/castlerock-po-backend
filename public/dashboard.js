@@ -18,6 +18,7 @@ const valueMin       = document.getElementById('valueMin');
 const valueMax       = document.getElementById('valueMax');
 const totalNetEl   = document.getElementById('totalNet');
 const totalGrossEl = document.getElementById('totalGross');
+const poCountEl = document.getElementById('poCount');
 
 let openDetailsRow = null;
 
@@ -136,6 +137,8 @@ filtered.forEach(po => {
   totalGross += num(po.total_amount);
   renderPO(po);
 });
+
+poCountEl.textContent = filtered.length;
 
 // Update totals bar
 totalNetEl.textContent   = euro(totalNet);

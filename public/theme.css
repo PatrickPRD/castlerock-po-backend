@@ -605,6 +605,6 @@ tr:hover { background: #f9f9f9; }
 /* Mobile: keep it subtle */
 @media (max-width: 768px) {
   .po-row.active {
-    background: rgba(198, 40, 40, 0.12);
+    border-left: #0100ff 5px solid;
   }
 }
