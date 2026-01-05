@@ -213,34 +213,43 @@ async function loadInvoices(poId, container) {
     return;
   }
 
-  let html = `
-    <table class="sub-table">
+let html = `
+  <div class="card invoice-card">
+    <h4>Invoices</h4>
+
+    <table class="data-table">
       <thead>
         <tr>
           <th>Invoice #</th>
           <th>Date</th>
           <th>Net (ex VAT)</th>
           <th>VAT %</th>
-          <th>Total</th>
+          <th>Total (inc VAT)</th>
         </tr>
       </thead>
       <tbody>
+`;
+
+invoices.forEach(i => {
+  html += `
+    <tr>
+      <td>${i.invoice_number}</td>
+      <td>${i.invoice_date}</td>
+      <td>€${Number(i.net_amount).toFixed(2)}</td>
+      <td>${Number(i.vat_rate).toFixed(2)}%</td>
+      <td>€${Number(i.total_amount).toFixed(2)}</td>
+    </tr>
   `;
+});
 
-  invoices.forEach(i => {
-    html += `
-      <tr>
-        <td>${i.invoice_number}</td>
-        <td>${i.invoice_date}</td>
-        <td>€${Number(i.net_amount).toFixed(2)}</td>
-        <td>${i.vat_rate}%</td>
-        <td>€${Number(i.total_amount).toFixed(2)}</td>
-      </tr>
-    `;
-  });
+html += `
+      </tbody>
+    </table>
+  </div>
+`;
 
-  html += '</tbody></table>';
-  container.innerHTML = html;
+container.innerHTML = html;
+
 }
 
 
