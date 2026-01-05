@@ -648,3 +648,16 @@ tr:hover { background: #f9f9f9; }
     padding: 16px;
   }
 }
+
+/* Space for fixed totals bar */
+.container {
+  padding-bottom: 90px;
+}
+
+/* Slightly taller on mobile */
+@media (max-width: 768px) {
+  .container {
+    padding-bottom: 120px;
+  }
+}
+
