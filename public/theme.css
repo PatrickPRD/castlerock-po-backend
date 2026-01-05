@@ -408,3 +408,29 @@ tr:hover { background: #f9f9f9; }
   width: 100%;
   table-layout: fixed;
 }
+
+/* =====================================================
+   DASHBOARD – DO NOT STACK INVOICE TABLES ON MOBILE
+   ===================================================== */
+@media (max-width: 768px) {
+
+  /* Restore normal table layout for invoice tables */
+  .invoice-container .data-table,
+  .invoice-container .data-table thead,
+  .invoice-container .data-table tbody,
+  .invoice-container .data-table tr {
+    display: table;
+    width: 100%;
+  }
+
+  .invoice-container .data-table th,
+  .invoice-container .data-table td {
+    display: table-cell;
+    white-space: nowrap;
+  }
+
+  /* Keep header visible */
+  .invoice-container .data-table thead {
+    display: table-header-group;
+  }
+}
