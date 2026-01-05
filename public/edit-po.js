@@ -29,6 +29,8 @@ if (!poId) {
 const supplierSelect = document.getElementById('supplier');
 const siteSelect     = document.getElementById('site');
 const locationSelect = document.getElementById('location');
+const stageSelect = document.getElementById('stage');
+
 
 const poNumberInput  = document.getElementById('poNumber');
 const poDateInput    = document.getElementById('poDate');
@@ -105,28 +107,44 @@ async function loadPO() {
   poDateInput.value    = po.po_date;
   descriptionInp.value = po.description || '';
   netAmountInp.value   = po.net_amount;
-  vatRateSelect.value  = po.vat_rate;
 
-  recalc();
+  // ✅ Load dropdowns FIRST, then select values
   await loadOptions('/stages', stageSelect, po.stage_id);
   await loadOptions('/suppliers', supplierSelect, po.supplier_id);
-  await loadOptions('/sites', siteSelect, po.site_id);
+  await loadOptions('/admin/sites', siteSelect, po.site_id);
   await loadOptions(
     '/locations?siteId=' + po.site_id,
     locationSelect,
     po.location_id
   );
+
+  // ✅ Set VAT AFTER options exist
+  vatRateSelect.value = String(po.vat_rate);
+console.log({
+  supplier: supplierSelect.value,
+  site: siteSelect.value,
+  location: locationSelect.value,
+  stage: stageSelect.value,
+  vat: vatRateSelect.value
+});
+
+  recalc();
 }
+
 
 /* =========================
    Site → Location cascade
    ========================= */
 siteSelect.addEventListener('change', async () => {
   const siteId = siteSelect.value;
+
   locationSelect.innerHTML = '<option value="">Select</option>';
+
   if (!siteId) return;
+
   await loadOptions('/locations?siteId=' + siteId, locationSelect);
 });
+
 
 /* =========================
    Save changes
