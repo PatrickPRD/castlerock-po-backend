@@ -204,18 +204,20 @@ mainRow.innerHTML = `
   let loaded = false;
 
 mainRow.onclick = () => {
-  const isOpen = detailsRow.style.display === 'table-row';
+  const isOpen = detailsRow.classList.contains('open');
 
-  // Close any previously open PO
   if (openDetailsRow && openDetailsRow !== detailsRow) {
+    openDetailsRow.classList.remove('open');
     openDetailsRow.style.display = 'none';
   }
 
   if (isOpen) {
+    detailsRow.classList.remove('open');
     detailsRow.style.display = 'none';
     openDetailsRow = null;
   } else {
     detailsRow.style.display = 'table-row';
+    detailsRow.classList.add('open');
     openDetailsRow = detailsRow;
 
     if (!loaded) {
@@ -224,6 +226,7 @@ mainRow.onclick = () => {
     }
   }
 };
+
 
 
 
