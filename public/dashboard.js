@@ -141,6 +141,8 @@ function renderPO(po) {
   const isOutstanding = uninvoiced > 0;
 
   const mainRow = document.createElement('tr');
+  mainRow.classList.add('po-row');
+
 
   if (isOver) {
     mainRow.classList.add('po-over');
@@ -206,18 +208,26 @@ mainRow.innerHTML = `
 mainRow.onclick = () => {
   const isOpen = detailsRow.classList.contains('open');
 
+  // Close previously open PO
   if (openDetailsRow && openDetailsRow !== detailsRow) {
     openDetailsRow.classList.remove('open');
     openDetailsRow.style.display = 'none';
+
+    // remove highlight from previous main row
+    openDetailsRow.previousSibling?.classList.remove('open', 'active');
   }
 
   if (isOpen) {
+    // Close current
     detailsRow.classList.remove('open');
     detailsRow.style.display = 'none';
+    mainRow.classList.remove('open', 'active');
     openDetailsRow = null;
   } else {
+    // Open current
     detailsRow.style.display = 'table-row';
     detailsRow.classList.add('open');
+    mainRow.classList.add('open', 'active');
     openDetailsRow = detailsRow;
 
     if (!loaded) {
@@ -226,6 +236,7 @@ mainRow.onclick = () => {
     }
   }
 };
+
 
 
 

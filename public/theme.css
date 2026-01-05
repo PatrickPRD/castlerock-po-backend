@@ -546,3 +546,22 @@ tr:hover { background: #f9f9f9; }
   max-height: 2000px; /* large enough for invoices */
   opacity: 1;
 }
+
+/* =========================
+   Active PO highlight
+   ========================= */
+
+.po-row.active {
+  background: rgba(198, 40, 40, 0.08); /* subtle brand tint */
+}
+
+.po-row.active td {
+  font-weight: 600;
+}
+
+/* Mobile: keep it subtle */
+@media (max-width: 768px) {
+  .po-row.active {
+    background: rgba(198, 40, 40, 0.12);
+  }
+}
