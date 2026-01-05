@@ -16,6 +16,8 @@ const dateFrom       = document.getElementById('dateFrom');
 const dateTo         = document.getElementById('dateTo');
 const valueMin       = document.getElementById('valueMin');
 const valueMax       = document.getElementById('valueMax');
+const totalNetEl   = document.getElementById('totalNet');
+const totalGrossEl = document.getElementById('totalGross');
 
 let openDetailsRow = null;
 
@@ -106,27 +108,39 @@ function fillSelect(select, values) {
 function applyFilters() {
   poTable.innerHTML = '';
 
-  allPOs.filter(po => {
-    const uninvoiced = num(po.uninvoiced_net);
+let totalNet = 0;
+let totalGross = 0;
 
-    if (statusFilter.value === 'outstanding' && uninvoiced <= 0) return false;
-    if (statusFilter.value === 'complete'    && uninvoiced !== 0) return false;
+const filtered = allPOs.filter(po => {
+  const uninvoiced = num(po.uninvoiced_total);
 
-    if (supplierFilter.value && po.supplier !== supplierFilter.value) return false;
-    if (siteFilter.value     && po.site     !== siteFilter.value)     return false;
-    if (locationFilter.value && po.location !== locationFilter.value) return false;
-    if (stageFilter.value && po.stage !== stageFilter.value) return false;
+  if (statusFilter.value === 'outstanding' && uninvoiced <= 0) return false;
+  if (statusFilter.value === 'complete'    && uninvoiced !== 0) return false;
 
+  if (supplierFilter.value && po.supplier !== supplierFilter.value) return false;
+  if (siteFilter.value     && po.site     !== siteFilter.value)     return false;
+  if (locationFilter.value && po.location !== locationFilter.value) return false;
+  if (stageFilter.value    && po.stage    !== stageFilter.value)    return false;
 
+  if (dateFrom.value && po.po_date < dateFrom.value) return false;
+  if (dateTo.value   && po.po_date > dateTo.value)   return false;
 
-    if (dateFrom.value && po.po_date < dateFrom.value) return false;
-    if (dateTo.value   && po.po_date > dateTo.value)   return false;
+  if (valueMin.value && num(po.total_amount) < num(valueMin.value)) return false;
+  if (valueMax.value && num(po.total_amount) > num(valueMax.value)) return false;
 
-    if (valueMin.value && num(po.net_amount) < num(valueMin.value)) return false;
-    if (valueMax.value && num(po.net_amount) > num(valueMax.value)) return false;
+  return true;
+});
 
-    return true;
-  }).forEach(renderPO);
+filtered.forEach(po => {
+  totalNet   += num(po.net_amount);
+  totalGross += num(po.total_amount);
+  renderPO(po);
+});
+
+// Update totals bar
+totalNetEl.textContent   = euro(totalNet);
+totalGrossEl.textContent = euro(totalGross);
+
 }
 
 /* ============================

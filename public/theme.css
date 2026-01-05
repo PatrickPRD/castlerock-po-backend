@@ -95,6 +95,7 @@ button { cursor: pointer; }
 .btn-primary:hover { background: var(--md-primary-dark); }
 
 .btn-outline {
+  margin-top: 10px;
   background: transparent;
   border: 2px solid var(--md-primary);
   color: var(--md-primary);
@@ -206,6 +207,43 @@ tr:hover { background: #f9f9f9; }
   grid-column: 1 / -1;
   text-align: right;
 }
+
+/* =========================
+   Dashboard sticky totals
+   ========================= */
+
+.totals-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 50;
+
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+
+  padding: 12px 16px;
+  margin-top: 12px;
+
+  background: #ffffff;
+  border-top: 2px solid #e0e0e0;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.08);
+
+  font-size: 15px;
+}
+
+.totals-bar span {
+  font-weight: 700;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .totals-bar {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+
+
 
 /* =========================================================
    PO STATUS / FINANCIAL STATES
