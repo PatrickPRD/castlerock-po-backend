@@ -118,14 +118,13 @@ function applyFilters() {
    Render Purchase Order
    ============================ */
 function renderPO(po) {
-const net        = num(po.total_amount);        // display gross in main row
-const uninvoiced = num(po.uninvoiced_total);    // status based on gross
+  const net        = num(po.total_amount);        // 🔁 was net_amount
+  const uninvoiced = num(po.uninvoiced_total);    // 🔁 was uninvoiced_net
 
   const isOver        = uninvoiced < 0;
   const isComplete    = uninvoiced === 0;
   const isOutstanding = uninvoiced > 0;
 
-  /* MAIN ROW */
   const mainRow = document.createElement('tr');
 
   if (isOver) {
@@ -145,63 +144,59 @@ const uninvoiced = num(po.uninvoiced_total);    // status based on gross
     <td>${euro(net)}</td>
   `;
 
-  /* DETAILS ROW */
-const detailsRow = document.createElement('tr');
-detailsRow.className = 'details-row';
-detailsRow.style.display = 'none';
+  const detailsRow = document.createElement('tr');
+  detailsRow.className = 'details-row';
+  detailsRow.style.display = 'none';
 
-detailsRow.innerHTML = `
-  <td colspan="5">
-    <div class="details-grid">
-      <div><strong>Site:</strong> ${po.site}</div>
-      <div><strong>Total (inc VAT):</strong> €${Number(po.total_amount).toFixed(2)}</div>
+  detailsRow.innerHTML = `
+    <td colspan="5">
+      <div class="details-grid">
+        <div><strong>Site:</strong> ${po.site}</div>
+        <div><strong>Total (inc VAT):</strong> €${Number(po.total_amount).toFixed(2)}</div>
 
-      <div>
-        <strong>Uninvoiced (ex VAT):</strong>
-        <span class="${
-          po.uninvoiced_total < 0 ? 'over' :
-          po.uninvoiced_total === 0 ? 'ok' : 'warn'
-        }">
-          €${Number(po.uninvoiced_net).toFixed(2)}
-        </span>
+        <div>
+          <strong>Uninvoiced (inc VAT):</strong>
+          <span class="${
+            po.uninvoiced_total < 0 ? 'over' :
+            po.uninvoiced_total === 0 ? 'ok' : 'warn'
+          }">
+            €${Number(po.uninvoiced_total).toFixed(2)}
+          </span>
+        </div>
       </div>
-    </div>
 
-    <div class="invoice-container" id="inv-${po.id}">
-      <p class="muted">Loading invoices…</p>
-    </div>
+      <div class="invoice-container" id="inv-${po.id}">
+        <p class="muted">Loading invoices…</p>
+      </div>
 
-    <div class="details-actions">
-      <button class="btn-outline" onclick="editPO(${po.id})">Edit PO</button>
+      <div class="details-actions">
+        <button class="btn-outline" onclick="editPO(${po.id})">Edit PO</button>
+        ${role !== 'viewer'
+          ? `<button class="btn-primary" onclick="addInvoice(${po.id})">Invoices</button>`
+          : ''}
+        ${role === 'admin' || role === 'super_admin'
+          ? `<button class="btn-danger" onclick="deletePO(${po.id})">Delete</button>`
+          : ''}
+      </div>
+    </td>
+  `;
 
-      ${role !== 'viewer'
-        ? `<button class="btn-primary" onclick="addInvoice(${po.id})">Invoices</button>`
-        : ''}
+  let loaded = false;
 
-      ${role === 'admin' || role === 'super_admin'
-        ? `<button class="btn-danger" onclick="deletePO(${po.id})">Delete</button>`
-        : ''}
-    </div>
-  </td>
-`;
+  mainRow.onclick = () => {
+    const show = detailsRow.style.display === 'none';
+    detailsRow.style.display = show ? 'table-row' : 'none';
 
-
-let loaded = false;
-
-mainRow.onclick = () => {
-  const show = detailsRow.style.display === 'none';
-  detailsRow.style.display = show ? 'table-row' : 'none';
-
-  if (show && !loaded) {
-    loadInvoices(po.id, document.getElementById(`inv-${po.id}`));
-    loaded = true;
-  }
-};
-
+    if (show && !loaded) {
+      loadInvoices(po.id, document.getElementById(`inv-${po.id}`));
+      loaded = true;
+    }
+  };
 
   poTable.appendChild(mainRow);
   poTable.appendChild(detailsRow);
 }
+
 
 async function loadInvoices(poId, container) {
   const res = await fetch(`/invoices?poId=${poId}`, {
