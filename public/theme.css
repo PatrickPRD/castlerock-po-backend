@@ -373,3 +373,52 @@ tr:hover { background: #f9f9f9; }
   background: rgba(0,0,0,0.4);
   z-index: 1000;
 }
+
+/* =========================================================
+   MOBILE HARD OVERFLOW CONTAINMENT (ANDROID FIX)
+   ========================================================= */
+@media (max-width: 768px) {
+
+  /* Prevent ANY table from widening the viewport */
+  table,
+  tbody,
+  tr,
+  td {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Hard stop: PO table can never exceed viewport */
+  .po-table {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Expanded details row must not leak width */
+  .details-row,
+  .details-row td {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Invoice container is the ONLY scrollable area */
+  .invoice-container {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent invoice table from affecting layout */
+  .invoice-container table {
+    width: max-content;
+    min-width: 100%;
+  }
+
+  /* Safety net: nothing inside details can escape */
+  .details-grid,
+  .details-actions {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+}
