@@ -467,3 +467,35 @@ tr:hover { background: #f9f9f9; }
   }
 }
 
+/* =====================================================
+   INVOICE ENTRY – MINIMAL TABLE ON MOBILE
+   ===================================================== */
+@media (max-width: 768px) {
+
+  /* Hide all columns by default */
+  .data-table th,
+  .data-table td {
+    display: none;
+  }
+
+  /* Show Date (2nd column) */
+  .data-table th:nth-child(2),
+  .data-table td:nth-child(2) {
+    display: table-cell;
+  }
+
+  /* Show Total (inc VAT) (5th column) */
+  .data-table th:nth-child(5),
+  .data-table td:nth-child(5) {
+    display: table-cell;
+    text-align: right;
+    font-weight: 600;
+  }
+
+  /* Show Actions (6th column) */
+  .data-table th:nth-child(6),
+  .data-table td:nth-child(6) {
+    display: table-cell;
+    text-align: right;
+  }
+}
