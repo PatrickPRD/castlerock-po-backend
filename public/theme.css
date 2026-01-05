@@ -209,24 +209,26 @@ tr:hover { background: #f9f9f9; }
 }
 
 /* =========================
-   Dashboard sticky totals
+   Dashboard fixed totals bar
    ========================= */
 
 .totals-bar {
-  position: sticky;
+  position: fixed;
+  left: 0;
+  right: 0;
   bottom: 0;
-  z-index: 50;
+
+  z-index: 100;
 
   display: flex;
   justify-content: space-between;
   gap: 16px;
 
-  padding: 12px 16px;
-  margin-top: 12px;
+  padding: 12px 20px;
 
   background: #ffffff;
   border-top: 2px solid #e0e0e0;
-  box-shadow: 0 -4px 12px rgba(0,0,0,0.08);
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.15);
 
   font-size: 15px;
 }
@@ -235,13 +237,16 @@ tr:hover { background: #f9f9f9; }
   font-weight: 700;
 }
 
-/* Mobile */
+/* Mobile layout */
 @media (max-width: 768px) {
   .totals-bar {
     flex-direction: column;
     text-align: center;
+    gap: 8px;
+    padding: 10px 16px;
   }
 }
+
 
 
 
