@@ -88,15 +88,22 @@ async function loadUsers() {
         <td>${isActive ? 'Active' : 'Disabled'}</td>
 
         <td>
-          <button class="btn-outline"
-            onclick="toggleUser(${u.id}, ${isActive ? 0 : 1})">
-            ${isActive ? 'Disable' : 'Enable'}
-          </button>
-          <button class="btn-outline"
-          onclick="editUser(${u.id})">
-          Edit
-          </button>
-        </td>
+  <button class="btn-outline"
+    onclick="toggleUser(${u.id}, ${isActive ? 0 : 1})">
+    ${isActive ? 'Disable' : 'Enable'}
+  </button>
+
+  <button class="btn-outline"
+    onclick="sendInvite('${u.email}')">
+    Send Invite
+  </button>
+
+  <button class="btn-outline"
+    onclick="editUser(${u.id})">
+    Edit
+  </button>
+</td>
+
       </tr>
     `;
   });
@@ -159,6 +166,27 @@ async function toggleUser(id, active) {
   await api(`/admin/users/${id}`, 'PUT', { active });
   loadUsers();
 }
+
+async function sendInvite(email) {
+  if (!confirm(`Send password setup email to ${email}?`)) return;
+
+  try {
+    await fetch('/auth/request-reset', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email })
+    });
+
+    alert('Invite email sent (if the user is active).');
+  } catch (err) {
+    alert('Failed to send invite');
+  }
+}
+
+
+
 
 /* ============================
    SITES (SUPER ADMIN ONLY)
