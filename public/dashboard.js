@@ -31,6 +31,20 @@ function euro(v) {
   return `€${num(v).toFixed(2)}`;
 }
 
+function formatVat(rate) {
+  const n = Number(rate);
+
+  if (n === 0) return '0%';
+  if (n === 13.5) return '13.5%';
+  if (n === 23) return '23%';
+
+  // fallback (should rarely happen)
+  return `${n}%`;
+}
+
+
+
+
 /* ============================
    Load Purchase Orders
    ============================ */
@@ -236,7 +250,7 @@ invoices.forEach(i => {
       <td>${i.invoice_number}</td>
       <td>${i.invoice_date}</td>
       <td>€${Number(i.net_amount).toFixed(2)}</td>
-      <td>${Number(i.vat_rate).toFixed(2)}%</td>
+      <td>${formatVat(i.vat_rate)}</td>
       <td>€${Number(i.total_amount).toFixed(2)}</td>
     </tr>
   `;

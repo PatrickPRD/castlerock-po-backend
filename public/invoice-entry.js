@@ -26,6 +26,18 @@ let po = null;
 const num  = v => isNaN(Number(v)) ? 0 : Number(v);
 const euro = v => `€${num(v).toFixed(2)}`;
 
+function formatVat(rate) {
+  const n = Number(rate);
+
+  if (n === 0) return '0%';
+  if (n === 13.5) return '13.5%';
+  if (n === 23) return '23%';
+
+  // fallback (should rarely happen)
+  return `${n}%`;
+}
+
+
 /* ================= Load PO ================= */
 async function loadPO() {
   const res = await fetch(`/purchase-orders/${poId}`, {
@@ -96,7 +108,7 @@ function renderInvoices() {
       <td>${inv.invoice_number}</td>
       <td>${inv.invoice_date}</td>
       <td>${euro(inv.net_amount)}</td>
-      <td>${inv.vat_rate}%</td>
+      <td>${formatVat(inv.vat_rate)}</td>
       <td>${euro(inv.total_amount)}</td>
       <td>
         <button class="btn-outline" onclick="editInvoice(${inv.id})">Edit</button>
