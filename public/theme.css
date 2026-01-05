@@ -422,3 +422,46 @@ tr:hover { background: #f9f9f9; }
     overflow-x: hidden;
   }
 }
+
+/* =========================================================
+   MOBILE INVOICE TABLE — UNIFIED BEHAVIOUR
+   Matches invoice-entry layout exactly
+   ========================================================= */
+@media (max-width: 768px) {
+
+  /* Never allow the page to scroll sideways */
+  html, body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Invoice container behaves like invoice-entry cards */
+  .invoice-container {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    margin-top: 12px;
+  }
+
+  /* Invoice tables keep their structure */
+  .invoice-container table,
+  .data-table {
+    border-collapse: collapse;
+    width: max-content;
+    min-width: 100%;
+  }
+
+  /* Prevent tables from forcing layout width */
+  .details-row,
+  .details-row td {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Ensure nothing inside invoices leaks width */
+  .invoice-container * {
+    box-sizing: border-box;
+  }
+}
