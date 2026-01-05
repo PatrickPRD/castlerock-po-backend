@@ -608,3 +608,43 @@ tr:hover { background: #f9f9f9; }
     border-left: #0100ff 5px solid;
   }
 }
+
+/* =========================
+   Create PO – mobile form fix
+   ========================= */
+@media (max-width: 768px) {
+
+  #poForm {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  #poForm select,
+  #poForm input,
+  #poForm textarea {
+    font-size: 16px;              /* ⬅️ critical for mobile */
+    padding: 12px 14px;
+    border-radius: 12px;
+  }
+
+  #poForm textarea {
+    min-height: 100px;
+  }
+
+  #poForm p {
+    font-size: 15px;
+    margin: 4px 0;
+  }
+
+  #poForm button.btn-primary {
+    font-size: 16px;
+    padding: 14px;
+    border-radius: 999px;
+  }
+
+  /* Give the card breathing room */
+  .container > .card {
+    padding: 16px;
+  }
+}
