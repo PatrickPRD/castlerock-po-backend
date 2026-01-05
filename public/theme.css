@@ -276,7 +276,7 @@ tr:hover { background: #f9f9f9; }
     padding: 10px 14px;
   }
 
-  .brand img { height: 48px; }
+  .brand img { height: 48px; margin:0 auto; }
  @media (max-width: 768px) {
   .brand {
     flex-direction: column;
