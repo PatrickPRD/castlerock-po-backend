@@ -1,3 +1,5 @@
+console.log('dashboard.js loaded');
+
 const token = localStorage.getItem('token');
 const role  = localStorage.getItem('role');
 
@@ -306,7 +308,7 @@ function clearFilters() {
   }
 
 /* ============================
-   Unified Menu System
+   MENU SYSTEM (AUTHORITATIVE)
    ============================ */
 
 function isMobile() {
@@ -314,52 +316,66 @@ function isMobile() {
 }
 
 function closeMenus() {
-  document.querySelectorAll('.dropdown-menu')
-    .forEach(m => {
-      m.classList.remove('show');
-      m.style.left = '';
-      m.style.top = '';
-    });
+  console.log('closeMenus');
+
+  document.querySelectorAll('.dropdown-menu').forEach(menu => {
+    menu.classList.remove('show');
+    menu.style.left = '';
+    menu.style.top = '';
+  });
 
   document.querySelector('.menu-backdrop')?.remove();
 }
 
+function toggleActionsMenu(btn) {
+  console.log('toggleActionsMenu');
+  toggleMenu(btn, 'actionsMenu');
+}
+
+function toggleReportsMenu(btn) {
+  console.log('toggleReportsMenu');
+  toggleMenu(btn, 'reportsMenu');
+}
+
 function toggleMenu(button, menuId) {
+  console.log('toggleMenu:', menuId);
+
   const menu = document.getElementById(menuId);
-  if (!menu) return;
+  if (!menu) {
+    console.error('Menu not found:', menuId);
+    return;
+  }
 
-  const isOpen = menu.classList.contains('show');
-
+  const alreadyOpen = menu.classList.contains('show');
   closeMenus();
-  if (isOpen) return;
+  if (alreadyOpen) return;
 
   if (isMobile()) {
-    openMenuAnchored(button, menu);
+    openMobileMenu(button, menu);
   } else {
     menu.classList.add('show');
   }
 }
 
-function openMenuAnchored(button, menu) {
-  const rect = button.getBoundingClientRect();
+function openMobileMenu(button, menu) {
+  console.log('openMobileMenu');
 
+  const rect = button.getBoundingClientRect();
   menu.classList.add('show');
 
-  const menuWidth  = menu.offsetWidth;
-  const menuHeight = menu.offsetHeight;
+  const w = menu.offsetWidth;
+  const h = menu.offsetHeight;
 
   let left = rect.left;
   let top  = rect.bottom + 8;
 
-  /* Clamp horizontally */
-  if (left + menuWidth > window.innerWidth - 8) {
-    left = window.innerWidth - menuWidth - 8;
+  if (left + w > window.innerWidth - 8) {
+    left = window.innerWidth - w - 8;
   }
   if (left < 8) left = 8;
 
-  /* Flip vertically if needed */
-  if (top + menuHeight > window.innerHeight - 8) {
-    top = rect.top - menuHeight - 8;
+  if (top + h > window.innerHeight - 8) {
+    top = rect.top - h - 8;
   }
 
   menu.style.left = `${left}px`;
@@ -371,25 +387,13 @@ function openMenuAnchored(button, menu) {
   );
 }
 
-/* ============================
-   HTML Hook Functions
-   ============================ */
-function toggleActionsMenu(btn) {
-  toggleMenu(btn, 'actionsMenu');
-}
-
-function toggleReportsMenu(btn) {
-  toggleMenu(btn, 'reportsMenu');
-}
-
-/* ============================
-   Click Outside (Desktop)
-   ============================ */
+/* Close on outside click (desktop) */
 document.addEventListener('click', e => {
   if (!e.target.closest('.dropdown')) {
     closeMenus();
   }
 });
+
 
 
 
