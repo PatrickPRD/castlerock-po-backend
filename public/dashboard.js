@@ -167,7 +167,7 @@ mainRow.innerHTML = `
     <td colspan="6">
 <div class="details-grid">
   <div><strong>Site:</strong> ${po.site}</div>
-  <div><strong>VAT Rate:</strong> ${Number(po.vat_rate).toFixed(2)}%</div>
+  <div><strong>VAT Rate:</strong> ${formatVat(i.vat_rate)}%</div>
   <div><strong>Total (inc VAT):</strong> €${Number(po.total_amount).toFixed(2)}</div>
 
   <div>
