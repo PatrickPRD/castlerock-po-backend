@@ -64,7 +64,7 @@ function renderHeader() {
       <div><strong>Supplier:</strong> ${po.supplier}</div>
       <div><strong>Site:</strong> ${po.site}</div>
       <div><strong>Location:</strong> ${po.location}</div>
-
+     <div><strong>Stage:</strong> ${po.stage}</div>
       <div><strong>Net (ex VAT):</strong> ${euro(po.net_amount)}</div>
       <div><strong>VAT Rate:</strong> ${formatVat(po.vat_rate)}</div>
       <div><strong>Total (inc VAT):</strong> ${euro(po.total_amount)}</div>
