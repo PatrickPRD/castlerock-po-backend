@@ -354,3 +354,7 @@ tr:hover { background: #f9f9f9; }
   background: rgba(0,0,0,0.4);
   z-index: 1000;
 }
+
+.dropdown-menu.portal {
+  display: block !important;
+}

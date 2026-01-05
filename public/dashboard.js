@@ -308,17 +308,12 @@ function clearFilters() {
   }
 
 /* ============================
-   SIMPLE MOBILE-SAFE MENUS
+   PORTALED MENUS (FINAL)
    ============================ */
 
 function closeMenus() {
-  document.getElementById('actionsMenu')?.classList.remove('show');
-  document.getElementById('reportsMenu')?.classList.remove('show');
-
-  document.getElementById('actionsMenu')?.style.removeProperty('left');
-  document.getElementById('actionsMenu')?.style.removeProperty('top');
-  document.getElementById('reportsMenu')?.style.removeProperty('left');
-  document.getElementById('reportsMenu')?.style.removeProperty('top');
+  document.querySelectorAll('.dropdown-menu.portal')
+    .forEach(m => m.remove());
 
   document.querySelector('.menu-backdrop')?.remove();
 }
@@ -326,12 +321,17 @@ function closeMenus() {
 function openMenu(btn, menuId) {
   closeMenus();
 
-  const menu = document.getElementById(menuId);
-  if (!menu) return;
+  const original = document.getElementById(menuId);
+  if (!original) return;
 
-  const rect = btn.getBoundingClientRect();
+  // Clone menu into body (portal)
+  const menu = original.cloneNode(true);
+  menu.classList.add('portal');
   menu.classList.add('show');
 
+  document.body.appendChild(menu);
+
+  const rect = btn.getBoundingClientRect();
   const w = menu.offsetWidth;
   const h = menu.offsetHeight;
 
@@ -347,8 +347,10 @@ function openMenu(btn, menuId) {
     top = rect.top - h - 8;
   }
 
+  menu.style.position = 'fixed';
   menu.style.left = `${left}px`;
   menu.style.top  = `${top}px`;
+  menu.style.zIndex = '10001';
 
   document.body.insertAdjacentHTML(
     'beforeend',
@@ -357,21 +359,11 @@ function openMenu(btn, menuId) {
 }
 
 function toggleActionsMenu(btn) {
-  const menu = document.getElementById('actionsMenu');
-  if (menu.classList.contains('show')) {
-    closeMenus();
-  } else {
-    openMenu(btn, 'actionsMenu');
-  }
+  openMenu(btn, 'actionsMenu');
 }
 
 function toggleReportsMenu(btn) {
-  const menu = document.getElementById('reportsMenu');
-  if (menu.classList.contains('show')) {
-    closeMenus();
-  } else {
-    openMenu(btn, 'reportsMenu');
-  }
+  openMenu(btn, 'reportsMenu');
 }
 
 
