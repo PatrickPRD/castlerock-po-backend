@@ -388,12 +388,17 @@ function openMobileMenu(button, menu) {
   );
 }
 
-/* Close on outside click (desktop) */
-document.addEventListener('click', e => {
-  if (!e.target.closest('.dropdown')) {
-    closeMenus();
-  }
+document.querySelectorAll('.dropdown-menu').forEach(menu => {
+  menu.addEventListener('click', e => e.stopPropagation());
 });
+
+if (window.innerWidth > 768) {
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.dropdown')) {
+      closeMenus();
+    }
+  });
+}
 
 
 

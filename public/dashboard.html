@@ -135,5 +135,28 @@
 
 <script src="dashboard.js"></script>
 
+<script>
+  function logout() {
+    localStorage.clear();
+    location.href = 'login.html';
+  }
+
+  function toggleFilters() {
+    const panel = document.getElementById('filterPanel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    document.getElementById('actionsMenu').classList.remove('show');
+  }
+
+  function createPO() {
+    location.href = 'create-po.html';
+  }
+
+  function exportExcel() {
+    location.href = '/exports/purchase-orders.xlsx';
+  }
+
+
+</script>
+
 </body>
 </html>
