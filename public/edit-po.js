@@ -81,6 +81,20 @@ async function loadOptions(url, selectEl, selectedId) {
   });
 }
 
+function setVatRate(rate) {
+  const target = Number(rate);
+
+  for (const opt of vatRateSelect.options) {
+    if (Number(opt.value) === target) {
+      vatRateSelect.value = opt.value;
+      return;
+    }
+  }
+
+  // fallback – clear if no match
+  vatRateSelect.value = '';
+}
+
 
 function recalc() {
   const net  = Number(netAmountInp.value) || 0;
@@ -130,8 +144,9 @@ await loadOptions(
 );
 
 // apply VAT once, after all async work
-vatRateSelect.value = poVatRate;
+setVatRate(po.vat_rate);
 recalc();
+
 
 
 
