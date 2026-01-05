@@ -391,3 +391,33 @@ tr:hover { background: #f9f9f9; }
 
 
 
+/* =====================================================
+   DASHBOARD – PREVENT TABLE-IN-TABLE WIDTH EXPANSION
+   ===================================================== */
+
+/* Force invoice tables to respect parent width */
+.sub-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+/* Allow text to wrap instead of forcing width */
+.sub-table th,
+.sub-table td {
+  word-break: break-word;
+  white-space: normal;
+}
+
+/* Ensure container never expands parent table */
+.invoice-container {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Safety: prevent parent table expansion */
+.po-table {
+  width: 100%;
+  table-layout: fixed;
+}
