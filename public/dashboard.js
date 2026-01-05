@@ -336,23 +336,27 @@ async function deletePO(id) {
   supplierFilter,
   siteFilter,
   locationFilter,
+  stageFilter,
   dateFrom,
   dateTo,
   valueMin,
   valueMax
 ].forEach(el => el.addEventListener('change', applyFilters));
 
+
 function clearFilters() {
   statusFilter.value = 'all';
   supplierFilter.value = '';
   siteFilter.value = '';
   locationFilter.value = '';
+  stageFilter.value = '';
   dateFrom.value = '';
   dateTo.value = '';
   valueMin.value = '';
   valueMax.value = '';
   applyFilters();
 }
+
 
 
   if (role === 'super_admin') {
