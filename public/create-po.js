@@ -1,3 +1,7 @@
+document.addEventListener('DOMContentLoaded', () => {
+
+
+
 const token = localStorage.getItem('token');
 const role  = localStorage.getItem('role');
 
@@ -120,10 +124,14 @@ document.getElementById('poForm').addEventListener('submit', async e => {
     stageId: stageSelect.value
   };
 
-  if (!payload.supplierId || !payload.siteId || !payload.locationId || !payload.poDate) {
-    alert('Supplier, site, location and date are required');
-    return;
-  }
+console.log(payload);
+
+
+if (!payload.supplierId || !payload.siteId || !payload.locationId || !payload.poDate || !payload.stageId) {
+  alert('Supplier, site, location, stage and date are required');
+  return;
+}
+
 
   const res = await fetch('/purchase-orders', {
     method: 'POST',
@@ -145,3 +153,5 @@ alert(`Purchase Order ${data.poNumber} created successfully`);
 window.location.href = 'dashboard.html';
 
 });
+});
+
