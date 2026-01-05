@@ -12,6 +12,12 @@
   --md-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 
+ h1 {
+    font-size: 30px;
+    line-height: 1.2;
+    margin: 0;
+  }
+
 /* =========================================================
    BASE / RESET
    ========================================================= */
@@ -279,7 +285,7 @@ tr:hover { background: #f9f9f9; }
   }
 
   .brand h1 {
-    font-size: 16px;
+    font-size: 25px;
     line-height: 1.2;
     margin: 0;
   }
