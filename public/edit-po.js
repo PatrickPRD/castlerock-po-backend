@@ -2,6 +2,8 @@ const token = localStorage.getItem('token');
 const role  = localStorage.getItem('role');
 
 let initializing = true;
+let poVatRate = null;
+
 
 /* =========================
    Auth guard
@@ -116,18 +118,23 @@ async function loadPO() {
   descriptionInp.value = po.description || '';
   netAmountInp.value   = po.net_amount;
 
-  // ✅ Load dropdowns FIRST, then select values
   await loadOptions('/stages', stageSelect, po.stage_id);
-  await loadOptions('/suppliers', supplierSelect, po.supplier_id);
-  await loadOptions('/admin/sites', siteSelect, po.site_id);
-  await loadOptions(
-    '/locations?siteId=' + po.site_id,
-    locationSelect,
-    po.location_id
-  );
+await loadOptions('/suppliers', supplierSelect, po.supplier_id);
+await loadOptions('/sites', siteSelect, po.site_id);
+await loadOptions(
+  '/locations?siteId=' + po.site_id,
+  locationSelect,
+  po.location_id
+);
+
+vatRateSelect.value = poVatRate;
+recalc();
+
 
   // ✅ Set VAT AFTER options exist
-  vatRateSelect.value = String(po.vat_rate);
+  poVatRate = String(po.vat_rate);
+
+
 console.log({
   supplier: supplierSelect.value,
   site: siteSelect.value,
