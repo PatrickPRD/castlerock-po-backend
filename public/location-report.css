@@ -51,7 +51,7 @@
 /* Highlight open (expanded) location row */
 .main-row.open {
   background-color: #fff6e5; /* soft amber */
-  box-shadow: inset 4px 0 0 #3c4ca7; /* left accent bar */
+  box-shadow: inset 4px 0 0 #c44747; /* left accent bar */
 }
 
 /* Keep text readable */
@@ -64,7 +64,7 @@
 }
 
 .main-row.open + .details-row td {
-  background: #3c4ca7;
+  background: #fffaf0;
 }
 
 .main-row {
