@@ -5,8 +5,7 @@
 }
 
 /* Lock parent columns */
-.po-table th:nth-child(1),
-.po-table td:nth-child(1) { width: 18%; }
+
 
 .po-table th:nth-child(2),
 .po-table td:nth-child(2) { width: 32%; }
