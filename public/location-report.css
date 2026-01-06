@@ -51,7 +51,7 @@ background-color: #8d888841;
 
 /* Highlight open (expanded) location row */
 .main-row.open {
-  background-color: #fff6e5; /* soft amber */
+  background-color: #f0afaf; /* soft amber */
   box-shadow: inset 4px 0 0 #c44747; /* left accent bar */
 }
 
