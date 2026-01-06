@@ -33,7 +33,6 @@ async function loadReport() {
   <tr class="main-row" data-target="${rowId}">
     <td>${r.site}</td>
     <td>
-      <span class="chevron">▶</span>
       ${r.location}
     </td>
     <td>${euro(r.totals.net)}</td>
