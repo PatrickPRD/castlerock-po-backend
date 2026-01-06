@@ -31,7 +31,7 @@
 .inner-table {
   width: 100%;
   table-layout: fixed;
-  background-color: #ffffff73;
+  background-color: #ffffff41;
 }
 
 .inner-table th:nth-child(1),
@@ -65,7 +65,7 @@
 }
 
 .main-row.open + .details-row td {
-  background-color: #ffffff73;
+  background-color: #ffffff41;
 }
 
 .main-row {
