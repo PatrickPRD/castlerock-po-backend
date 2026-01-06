@@ -58,7 +58,6 @@ async function loadReport() {
             <tr>
               <th>Stage</th>
               <th>Net (€)</th>
-              <th>VAT (€)</th>
               <th>Gross (€)</th>
               <th>Uninvoiced (€)</th>
             </tr>
