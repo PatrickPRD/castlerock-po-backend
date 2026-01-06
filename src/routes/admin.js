@@ -108,8 +108,6 @@ await db.query(
 // 📧 Send password setup email
 await sendPasswordSetupEmail(email, resetToken);
 
-res.json({ success: true });
-
 
     res.json({ success: true });
   }
@@ -121,7 +119,7 @@ router.put(
   authorizeRoles('super_admin'),
   async (req, res) => {
 
-    const { role, first_name, last_name, active } = req.body;
+    const { email, role, first_name, last_name, active } = req.body;
     const userId = Number(req.params.id);
     const actingUserId = req.user.id;
 
@@ -134,6 +132,24 @@ router.put(
     if (!target) {
       return res.status(404).json({ error: 'User not found' });
     }
+
+/* ======================================================
+   EMAIL UNIQUENESS CHECK
+   ====================================================== */
+if (email) {
+  const [[existing]] = await db.query(
+    `SELECT id FROM users WHERE email = ? AND id <> ?`,
+    [email, userId]
+  );
+
+  if (existing) {
+    return res.status(400).json({
+      error: 'This email address is already in use'
+    });
+  }
+}
+
+
 
     /* ======================================================
        ❌ RULE 1: Super Admin cannot disable themselves
@@ -207,14 +223,24 @@ if (target.role === 'super_admin' && role && role !== 'super_admin') {
     await db.query(
       `
       UPDATE users
-      SET
-        role       = COALESCE(?, role),
-        first_name = COALESCE(?, first_name),
-        last_name  = COALESCE(?, last_name),
-        active     = COALESCE(?, active)
-      WHERE id = ?
+SET
+  email      = COALESCE(?, email),
+  role       = COALESCE(?, role),
+  first_name = COALESCE(?, first_name),
+  last_name  = COALESCE(?, last_name),
+  active     = COALESCE(?, active)
+WHERE id = ?
+
       `,
-      [role, first_name, last_name, active, userId]
+      [
+  email,
+  role,
+  first_name,
+  last_name,
+  active,
+  userId
+]
+
     );
 
     res.json({ success: true });

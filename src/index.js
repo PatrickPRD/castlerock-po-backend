@@ -1,7 +1,3 @@
-console.log('SMTP_HOST at startup:', process.env.SMTP_HOST);
-console.log('SMTP_PORT at startup:', process.env.SMTP_PORT);
-
-
 
 require('dotenv').config();
 const express = require('express');
