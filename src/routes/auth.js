@@ -6,31 +6,6 @@ const crypto = require('crypto');
 const createTransporter = require('../services/emailService');
 
 
-
-router.get('/test-email', async (req, res) => {
-  try {
-    const transporter = createTransporter();
-await transporter.sendMail({
-
-      from: `"Castlerock Homes" <${process.env.SMTP_USER}>`,
-      to: process.env.SMTP_USER,
-      subject: 'Email Test',
-      html: '<p>If you received this, email is working.</p>'
-    });
-
-    res.send('Email sent');
-  } catch (err) {
-    console.error(err);
-    res.status(500).send('Email failed');
-  }
-});
-
-
-
-
-
-
-
 /* ======================================================
    REQUEST PASSWORD RESET / INVITE
    ====================================================== */
