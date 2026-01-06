@@ -1,5 +1,7 @@
-const transporter = require('./emailService');
-const inviteHtml = `
+const createTransporter = require('./emailService');
+
+function buildInviteEmail({ firstName, resetUrl }) {
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -11,8 +13,7 @@ const inviteHtml = `
     <tr>
       <td align="center" style="padding:40px 20px;">
         <table width="100%" style="max-width:560px;background:#ffffff;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.08);">
-          
-          <!-- Header -->
+
           <tr>
             <td style="padding:24px 28px;border-bottom:1px solid #eee;">
               <h2 style="margin:0;color:#c62828;font-weight:600;">
@@ -21,15 +22,13 @@ const inviteHtml = `
             </td>
           </tr>
 
-          <!-- Body -->
           <tr>
             <td style="padding:28px;color:#1c1b1f;font-size:15px;line-height:1.6;">
-              <p style="margin-top:0;">
-                Hi ${user.first_name},
-              </p>
+              <p>Hi ${firstName},</p>
 
               <p>
-                You’ve been invited to access the <strong>Castlerock Purchase Order Tracker</strong>.
+                You’ve been invited to access the
+                <strong>Castlerock Purchase Order Tracker</strong>.
               </p>
 
               <p>
@@ -51,22 +50,19 @@ const inviteHtml = `
                 </a>
               </p>
 
-              <p>
-                This link will expire in <strong>24 hours</strong>.
-              </p>
+              <p>This link will expire in <strong>24 hours</strong>.</p>
 
               <p>
                 If you weren’t expecting this invitation, you can safely ignore this email.
               </p>
 
-              <p style="margin-bottom:0;">
+              <p>
                 Thanks,<br />
                 <strong>Castlerock Homes</strong>
               </p>
             </td>
           </tr>
 
-          <!-- Footer -->
           <tr>
             <td style="padding:16px 28px;font-size:12px;color:#6f6f6f;border-top:1px solid #eee;">
               This is an automated message — please do not reply.
@@ -80,17 +76,24 @@ const inviteHtml = `
 </body>
 </html>
 `;
+}
 
+async function sendPasswordSetupEmail(user, token) {
+  const transporter = createTransporter();
 
-async function sendPasswordSetupEmail(email, token) {
   const resetUrl =
     `https://potracker.blossomhill.ie/reset-password.html?token=${token}`;
 
+  const html = buildInviteEmail({
+    firstName: user.first_name,
+    resetUrl
+  });
+
   await transporter.sendMail({
     from: '"Castlerock PO Tracker" <castlerockepc@gmail.com>',
-  to: user.email,
-  subject: 'You’ve been invited to Castlerock PO Tracker',
-  html: inviteHtml
+    to: user.email,
+    subject: 'You’ve been invited to Castlerock PO Tracker',
+    html
   });
 }
 
