@@ -75,3 +75,91 @@ background-color: #8d888841;
 .main-row:hover {
   background-color: #f9fafb;
 }
+
+@media (max-width: 768px) {
+
+  /* Hide Site column */
+  .po-table th:nth-child(1),
+  .po-table td:nth-child(1) {
+    display: none;
+  }
+
+  /* Location becomes primary */
+  .po-table td:nth-child(2) {
+    font-weight: 600;
+  }
+
+  /* Stack numeric values */
+  .po-table td:nth-child(3),
+  .po-table td:nth-child(4),
+  .po-table td:nth-child(5) {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 4px 0;
+  }
+
+  /* Add labels for stacked values */
+  .po-table td:nth-child(3)::before {
+    content: "Net: ";
+    font-weight: 500;
+  }
+
+  .po-table td:nth-child(4)::before {
+    content: "Gross: ";
+    font-weight: 500;
+  }
+
+  .po-table td:nth-child(5)::before {
+    content: "Uninvoiced: ";
+    font-weight: 600;
+  }
+
+  /* Remove header row on mobile */
+  .po-table thead {
+    display: none;
+  }
+
+  /* Add spacing between locations */
+  .main-row {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 8px;
+  }
+}
+
+@media (max-width: 768px) {
+
+  .inner-table thead {
+    display: none;
+  }
+
+  .inner-table tr {
+    display: block;
+    padding: 6px 0;
+    border-bottom: 1px dashed #e5e7eb;
+  }
+
+  .inner-table td {
+    display: block;
+    text-align: left;
+    padding: 2px 0;
+  }
+
+  .inner-table td:nth-child(1) {
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .inner-table td:nth-child(2)::before {
+    content: "Net: ";
+  }
+
+  .inner-table td:nth-child(3)::before {
+    content: "Gross: ";
+  }
+
+  .inner-table td:nth-child(4)::before {
+    content: "Uninvoiced: ";
+    font-weight: 600;
+  }
+}
