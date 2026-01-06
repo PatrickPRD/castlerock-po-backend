@@ -1,4 +1,5 @@
-console.log("dashboard.js loaded");
+
+console.log('SMTP_HOST at startup:', process.env.SMTP_HOST);
 
 const token = localStorage.getItem("token");
 const role = localStorage.getItem("role");
