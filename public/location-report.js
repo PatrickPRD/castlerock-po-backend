@@ -13,7 +13,7 @@ const euro = v => `€${num(v).toFixed(2)}`;
    Load Report
    ========================= */
 async function loadReport() {
-  const res = await fetch('/reports/po-totals-by-location', {
+  const res = await fetch('/reports/po-totals-by-location-breakdown', {
     headers: { Authorization: 'Bearer ' + token }
   });
 
@@ -29,26 +29,26 @@ async function loadReport() {
   const rowId = `loc-${index}`;
 
   // MAIN ROW
-  table.innerHTML += `
-    <tr class="main-row" data-target="${rowId}">
-      <td>${r.site}</td>
-      <td>
-        <span class="chevron">▶</span>
-        ${r.location}
-      </td>
-      <td>${euro(r.totals.net)}</td>
-      <td>${euro(r.totals.vat)}</td>
-      <td>${euro(r.totals.gross)}</td>
-      <td>
-        <span class="${
-          num(r.totals.uninvoiced) < 0 ? 'over' :
-          num(r.totals.uninvoiced) === 0 ? 'ok' : 'warn'
-        }">
-          ${euro(r.totals.uninvoiced)}
-        </span>
-      </td>
-    </tr>
-  `;
+ table.innerHTML += `
+  <tr class="main-row" data-target="${rowId}">
+    <td>${r.site}</td>
+    <td>
+      <span class="chevron">▶</span>
+      ${r.location}
+    </td>
+    <td>${euro(r.totals.net)}</td>
+    <td>${euro(r.totals.gross)}</td>
+    <td>
+      <span class="${
+        r.totals.uninvoiced < 0 ? 'over' :
+        r.totals.uninvoiced === 0 ? 'ok' : 'warn'
+      }">
+        ${euro(r.totals.uninvoiced)}
+      </span>
+    </td>
+  </tr>
+`;
+
 
   // DETAILS ROW (STAGES)
   table.innerHTML += `
