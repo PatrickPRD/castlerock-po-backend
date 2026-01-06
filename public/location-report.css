@@ -139,3 +139,47 @@ background-color: #8d888841;
     margin-bottom: 4px;
   }
 }
+
+@media (max-width: 768px) {
+
+  /* === FIX INNER TABLE MOBILE RENDERING === */
+
+  .inner-table {
+    width: 100%;
+  }
+
+  .inner-table tr {
+    display: block;
+    padding: 10px 0;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .inner-table td {
+    display: block;
+    width: 100% !important;   /* 🔴 critical fix */
+    max-width: 100% !important;
+    text-align: left;
+    padding: 2px 0;
+    white-space: normal;      /* allow normal wrapping */
+  }
+
+  /* Stage name */
+  .inner-table td:nth-child(1) {
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  /* Value labels */
+  .inner-table td:nth-child(2)::before {
+    content: "Net: ";
+    font-weight: 500;
+  }
+
+  .inner-table td:nth-child(3)::before {
+    content: "Gross: ";
+    font-weight: 500;
+  }
+
+  .inner-table td:nth-child(4)::before {
+    content: "Uninvoiced: ";
+    fo
