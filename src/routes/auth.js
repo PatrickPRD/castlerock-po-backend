@@ -59,6 +59,7 @@ router.post('/request-reset', async (req, res) => {
   const link = `${process.env.APP_URL}/reset-password.html?token=${token}`;
 
 
+ try {
   await transporter.sendMail({
     from: `"Castlerock Homes" <${process.env.SMTP_USER}>`,
     to: email,
@@ -70,6 +71,11 @@ router.post('/request-reset', async (req, res) => {
       <p>This link expires in 1 hour.</p>
     `
   });
+} catch (err) {
+  console.error('❌ EMAIL SEND FAILED:', err);
+  return res.status(500).json({ error: 'Email failed to send' });
+}
+
 
   res.json({ success: true });
 });
