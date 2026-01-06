@@ -87,96 +87,55 @@ background-color: #8d888841;
 
 @media (max-width: 768px) {
 
-  .details-row.open {
-    display: table-row; /* keep expansion working */
-  }
-
-  .details-row td {
-    display: block;
-  }
-
-  /* Hide Site column */
-  .po-table th:nth-child(1),
-  .po-table td:nth-child(1) {
-    display: none;
-  }
-
-  /* Location becomes primary */
-  .po-table td:nth-child(2) {
-    font-weight: 600;
-  }
-
-  /* Stack numeric values */
-  .po-table td:nth-child(3),
-  .po-table td:nth-child(4),
-  .po-table td:nth-child(5) {
-    display: block;
-    width: 100%;
-    text-align: left;
-    padding: 4px 0;
-  }
-
-  /* Add labels for stacked values */
-  .po-table td:nth-child(3)::before {
-    content: "Net: ";
-    font-weight: 500;
-  }
-
-  .po-table td:nth-child(4)::before {
-    content: "Gross: ";
-    font-weight: 500;
-  }
-
-  .po-table td:nth-child(5)::before {
-    content: "Uninvoiced: ";
-    font-weight: 600;
-  }
-
-  /* Remove header row on mobile */
+  /* Hide header */
   .po-table thead {
     display: none;
   }
 
-  /* Add spacing between locations */
+  /* Main rows become cards */
   .main-row {
-    border-bottom: 1px solid #eee;
-    padding-bottom: 8px;
+    display: block;
+    padding: 12px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    background: #fff;
   }
-}
 
-@media (max-width: 768px) {
-
-  .inner-table thead {
+  /* Keep details rows as table-rows (CRITICAL) */
+  .details-row {
     display: none;
   }
 
-  .inner-table tr {
+  .details-row.open {
+    display: table-row;
+  }
+
+  /* Stack cells */
+  .po-table td {
     display: block;
-    padding: 6px 0;
-    border-bottom: 1px dashed #e5e7eb;
+    width: 100%;
+    text-align: left;
+  }
+
+  /* Details row content */
+  .details-row td {
+    display: block;
+    padding: 8px 12px;
+  }
+
+  /* Inner table safe stacking */
+  .inner-table {
+    width: 100%;
   }
 
   .inner-table td {
     display: block;
     text-align: left;
-    padding: 2px 0;
   }
 
-  .inner-table td:nth-child(1) {
+  /* Stage name emphasis */
+  .inner-table td:first-child {
     font-weight: 600;
     margin-bottom: 4px;
-  }
-
-  .inner-table td:nth-child(2)::before {
-    content: "Net: ";
-  }
-
-  .inner-table td:nth-child(3)::before {
-    content: "Gross: ";
-  }
-
-  .inner-table td:nth-child(4)::before {
-    content: "Uninvoiced: ";
-    font-weight: 600;
   }
 }
