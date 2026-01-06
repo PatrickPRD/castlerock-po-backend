@@ -1,0 +1,34 @@
+.main-row {
+  cursor: pointer;
+}
+
+.details-row {
+  background: #fafafa;
+}
+
+.inner-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+.inner-table th {
+  font-size: 13px;
+  color: #666;
+  border-bottom: 1px solid #eee;
+  text-align: left;
+}
+
+.inner-table td {
+  padding: 6px 0;
+}
+
+.chevron {
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform 0.2s;
+}
+
+.main-row.open .chevron {
+  transform: rotate(90deg);
+}
