@@ -71,3 +71,28 @@
 * {
   box-sizing: border-box;
 }
+
+/* Lock inner table column widths to match parent table */
+.inner-table th:nth-child(1),
+.inner-table td:nth-child(1) {
+  width: 48%;
+}
+
+.inner-table th:nth-child(2),
+.inner-table td:nth-child(2),
+.inner-table th:nth-child(3),
+.inner-table td:nth-child(3),
+.inner-table th:nth-child(4),
+.inner-table td:nth-child(4) {
+  width: 17%;
+  text-align: right;
+}
+
+.details-row td {
+  padding: 0;
+  overflow: hidden;
+}
+
+.inner-table {
+  margin-left: 48%;
+}
