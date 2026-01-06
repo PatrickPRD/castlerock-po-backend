@@ -47,3 +47,30 @@
   width: 16.66%;
   text-align: right;
 }
+
+/* Highlight open (expanded) location row */
+.main-row.open {
+  background-color: #fff6e5; /* soft amber */
+  box-shadow: inset 4px 0 0 #f59e0b; /* left accent bar */
+}
+
+/* Keep text readable */
+.main-row.open td {
+  font-weight: 600;
+}
+
+.main-row.open + .details-row td {
+  border-top: 0;
+}
+
+.main-row.open + .details-row td {
+  background: #fffaf0;
+}
+
+.main-row {
+  cursor: pointer;
+}
+
+.main-row:hover {
+  background-color: #f9fafb;
+}
