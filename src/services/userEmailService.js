@@ -50,7 +50,7 @@ function buildInviteEmail({ firstName, resetUrl }) {
                 </a>
               </p>
 
-              <p>This link will expire in <strong>24 hours</strong>.</p>
+              <p>This link will expire in <strong>1 hour</strong>.</p>
 
               <p>
                 If you weren’t expecting this invitation, you can safely ignore this email.
