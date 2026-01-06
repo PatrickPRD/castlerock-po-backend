@@ -241,31 +241,41 @@ router.get(
           sheet.getCell(rowCursor, 1).font = { size: 13, bold: true };
           rowCursor++;
 
-          // Header
-          sheet.addRow(['Stage', 'Net (€)', 'Gross (€)', 'Uninvoiced (€)']);
-          sheet.getRow(rowCursor).font = { bold: true };
-          rowCursor++;
+// Build table rows from stages
+const tableRows = loc.stages.map(s => ([
+  s.stage,
+  s.net,
+  s.gross,
+  s.uninvoiced
+]));
 
-          // Stage rows
-          loc.stages.forEach(s => {
-            sheet.addRow([
-              s.stage,
-              s.net,
-              s.gross,
-              s.uninvoiced
-            ]);
-            rowCursor++;
-          });
+// Create Excel table (with filters + totals)
+sheet.addTable({
+  name: `T_${siteName.replace(/\W/g, '')}_${loc.location_id}`,
+  ref: `A${rowCursor}`,
+  headerRow: true,
+  totalsRow: true,
+  style: {
+    theme: 'TableStyleMedium9',
+    showRowStripes: true
+  },
+  columns: [
+    { name: 'Stage', totalsRowLabel: 'TOTAL' },
+    { name: 'Net (€)', totalsRowFunction: 'sum' },
+    { name: 'Gross (€)', totalsRowFunction: 'sum' },
+    { name: 'Uninvoiced (€)', totalsRowFunction: 'sum' }
+  ],
+  rows: tableRows
+});
 
-          // Totals row
-          const totalRow = sheet.addRow([
-            'TOTAL',
-            loc.totals.net,
-            loc.totals.gross,
-            loc.totals.uninvoiced
-          ]);
-          totalRow.font = { bold: true };
-          rowCursor += 2;
+// Currency formatting
+['B', 'C', 'D'].forEach(col => {
+  sheet.getColumn(col).numFmt = '€#,##0.00';
+});
+
+// Advance cursor: header + rows + totals + spacing
+rowCursor += tableRows.length + 3;
+
         });
 
         // Formatting
