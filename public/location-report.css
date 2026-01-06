@@ -45,7 +45,6 @@ background-color: #8d888841;
 .inner-table td:nth-child(3),
 .inner-table th:nth-child(4),
 .inner-table td:nth-child(4) {
-  width: 16.66%;
   text-align: right;
 }
 
@@ -146,6 +145,7 @@ background-color: #8d888841;
 
   .inner-table {
     width: 100%;
+    background-color: #e5e5e5;
   }
 
   .inner-table tr {
