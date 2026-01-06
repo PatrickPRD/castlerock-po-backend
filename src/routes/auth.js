@@ -63,19 +63,10 @@ router.post('/request-reset', async (req, res) => {
 
 
  try {
-  const transporter = createTransporter();
-await transporter.sendMail({
+  const { sendPasswordSetupEmail } = require('../services/userEmailService');
 
-    from: `"Castlerock Homes" <${process.env.SMTP_USER}>`,
-    to: email,
-    subject: 'Set your password',
-    html: `
-      <p>You have been invited to Castlerock Homes.</p>
-      <p>Click below to set your password:</p>
-      <p><a href="${link}">${link}</a></p>
-      <p>This link expires in 1 hour.</p>
-    `
-  });
+await sendPasswordSetupEmail(user, token);
+
 } catch (err) {
   console.error('❌ EMAIL SEND FAILED:', err);
   return res.status(500).json({ error: 'Email failed to send' });
