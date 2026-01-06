@@ -287,8 +287,19 @@ router.get(
         'attachment; filename="po-location-stage-breakdown.xlsx"'
       );
 
-      await workbook.xlsx.write(res);
-      res.end();
+      const buffer = await workbook.xlsx.writeBuffer();
+
+res.setHeader(
+  'Content-Type',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+);
+res.setHeader(
+  'Content-Disposition',
+  'attachment; filename="po-location-stage-breakdown.xlsx"'
+);
+
+res.send(Buffer.from(buffer));
+
 
     } catch (err) {
       console.error('EXCEL EXPORT FAILED:', err);
