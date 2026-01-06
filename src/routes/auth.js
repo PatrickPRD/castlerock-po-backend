@@ -3,12 +3,15 @@ const router = express.Router();
 const pool = require('../db');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
-const transporter = require('../services/emailService');
+const createTransporter = require('../services/emailService');
+
 
 
 router.get('/test-email', async (req, res) => {
   try {
-    await transporter.sendMail({
+    const transporter = createTransporter();
+await transporter.sendMail({
+
       from: `"Castlerock Homes" <${process.env.SMTP_USER}>`,
       to: process.env.SMTP_USER,
       subject: 'Email Test',
@@ -60,7 +63,9 @@ router.post('/request-reset', async (req, res) => {
 
 
  try {
-  await transporter.sendMail({
+  const transporter = createTransporter();
+await transporter.sendMail({
+
     from: `"Castlerock Homes" <${process.env.SMTP_USER}>`,
     to: email,
     subject: 'Set your password',
