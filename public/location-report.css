@@ -1,52 +1,15 @@
-.main-row {
-  cursor: pointer;
-}
-
-.details-row {
-  background: #fafafa;
-}
-
-.inner-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 8px;
-}
-
-.inner-table th {
-  font-size: 13px;
-  color: #666;
-  border-bottom: 1px solid #eee;
-  text-align: left;
-}
-
-.inner-table td {
-  padding: 6px 0;
-}
-
-.chevron {
-  display: inline-block;
-  margin-right: 6px;
-  transition: transform 0.2s;
-}
-
-.main-row.open .chevron {
-  transform: rotate(90deg);
-}
-
+/* Main table */
 .po-table {
   width: 100%;
   table-layout: fixed;
 }
 
+/* Lock parent columns */
 .po-table th:nth-child(1),
-.po-table td:nth-child(1) {
-  width: 18%;
-}
+.po-table td:nth-child(1) { width: 18%; }
 
 .po-table th:nth-child(2),
-.po-table td:nth-child(2) {
-  width: 30%;
-}
+.po-table td:nth-child(2) { width: 32%; }
 
 .po-table th:nth-child(3),
 .po-table td:nth-child(3),
@@ -54,28 +17,25 @@
 .po-table td:nth-child(4),
 .po-table th:nth-child(5),
 .po-table td:nth-child(5) {
-  width: 17%;
+  width: 16%;
   text-align: right;
 }
 
+/* Details row */
 .details-row td {
-  padding: 0;
+  padding: 8px 12px;
   background: #fafafa;
 }
 
+/* Inner table should not affect layout */
 .inner-table {
   width: 100%;
   table-layout: fixed;
 }
 
-* {
-  box-sizing: border-box;
-}
-
-/* Lock inner table column widths to match parent table */
 .inner-table th:nth-child(1),
 .inner-table td:nth-child(1) {
-  width: 48%;
+  width: 50%;
 }
 
 .inner-table th:nth-child(2),
@@ -84,15 +44,6 @@
 .inner-table td:nth-child(3),
 .inner-table th:nth-child(4),
 .inner-table td:nth-child(4) {
-  width: 17%;
+  width: 16.66%;
   text-align: right;
-}
-
-.details-row td {
-  padding: 0;
-  overflow: hidden;
-}
-
-.inner-table {
-  margin-left: 48%;
 }
