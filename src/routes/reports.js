@@ -146,10 +146,50 @@ router.get(
   authorizeRoles('super_admin'),
   async (req, res) => {
     try {
-      // --- fetch same data as JSON route ---
-      const [locations] = await db.query(/* SAME LOCATION QUERY */);
-      const [stages]    = await db.query(/* SAME STAGE QUERY */);
+      /* -------- Location totals -------- */
+      const [locations] = await db.query(`
+        SELECT
+          si.name AS site,
+          l.id    AS location_id,
+          l.name  AS location,
 
+          COALESCE(SUM(po.net_amount), 0)        AS total_net,
+          COALESCE(SUM(po.total_amount), 0)      AS total_gross,
+          COALESCE(SUM(i.total_amount), 0)       AS total_invoiced
+
+        FROM purchase_orders po
+        JOIN sites si     ON si.id = po.site_id
+        JOIN locations l  ON l.id  = po.location_id
+        LEFT JOIN invoices i ON i.purchase_order_id = po.id
+
+        WHERE po.cancelled_at IS NULL
+
+        GROUP BY si.name, l.id, l.name
+        ORDER BY si.name, l.name
+      `);
+
+      /* -------- Stage breakdown -------- */
+      const [stages] = await db.query(`
+        SELECT
+          l.id    AS location_id,
+          ps.name AS stage,
+
+          COALESCE(SUM(po.net_amount), 0)     AS net_total,
+          COALESCE(SUM(po.total_amount), 0)   AS gross_total,
+          COALESCE(SUM(i.total_amount), 0)    AS invoiced_total
+
+        FROM purchase_orders po
+        JOIN locations l   ON l.id = po.location_id
+        JOIN po_stages ps  ON ps.id = po.stage_id
+        LEFT JOIN invoices i ON i.purchase_order_id = po.id
+
+        WHERE po.cancelled_at IS NULL
+
+        GROUP BY l.id, ps.id, ps.name
+        ORDER BY l.id, ps.name
+      `);
+
+      /* -------- Shape data -------- */
       const stageMap = {};
       stages.forEach(s => {
         if (!stageMap[s.location_id]) stageMap[s.location_id] = [];
@@ -164,6 +204,7 @@ router.get(
       const data = locations.map(l => ({
         site: l.site,
         location: l.location,
+        location_id: l.location_id,
         totals: {
           net: Number(l.total_net),
           gross: Number(l.total_gross),
@@ -172,20 +213,19 @@ router.get(
         stages: stageMap[l.location_id] || []
       }));
 
-      // --- group by site ---
+      /* -------- Group by site -------- */
       const sites = {};
       data.forEach(r => {
         if (!sites[r.site]) sites[r.site] = [];
         sites[r.site].push(r);
       });
 
+      /* -------- Build Excel -------- */
       const workbook = new ExcelJS.Workbook();
       workbook.creator = 'Castlerock Homes';
 
-      // --- build sheets ---
       for (const [siteName, rows] of Object.entries(sites)) {
         const sheet = workbook.addWorksheet(siteName.substring(0, 31));
-
         let rowCursor = 1;
 
         // Site title
@@ -201,7 +241,7 @@ router.get(
           sheet.getCell(rowCursor, 1).font = { size: 13, bold: true };
           rowCursor++;
 
-          // Table header
+          // Header
           sheet.addRow(['Stage', 'Net (€)', 'Gross (€)', 'Uninvoiced (€)']);
           sheet.getRow(rowCursor).font = { bold: true };
           rowCursor++;
@@ -217,7 +257,7 @@ router.get(
             rowCursor++;
           });
 
-          // Total row
+          // Totals row
           const totalRow = sheet.addRow([
             'TOTAL',
             loc.totals.net,
@@ -225,19 +265,16 @@ router.get(
             loc.totals.uninvoiced
           ]);
           totalRow.font = { bold: true };
-          rowCursor++;
-
-          // Spacer
-          rowCursor++;
+          rowCursor += 2;
         });
 
         // Formatting
+        sheet.getColumn('A').width = 30;
         ['B', 'C', 'D'].forEach(col => {
           sheet.getColumn(col).numFmt = '€#,##0.00';
           sheet.getColumn(col).width = 18;
         });
 
-        sheet.getColumn('A').width = 30;
         sheet.views = [{ state: 'frozen', ySplit: 2 }];
       }
 
@@ -254,11 +291,12 @@ router.get(
       res.end();
 
     } catch (err) {
-      console.error(err);
+      console.error('EXCEL EXPORT FAILED:', err);
       res.status(500).json({ error: 'Excel export failed' });
     }
   }
 );
+
 
 
 
