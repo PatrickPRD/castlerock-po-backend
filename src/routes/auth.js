@@ -3,7 +3,6 @@ const router = express.Router();
 const pool = require('../db');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
-const createTransporter = require('../services/emailService');
 
 
 /* ======================================================
@@ -13,9 +12,10 @@ router.post('/request-reset', async (req, res) => {
   const { email } = req.body;
 
   const [[user]] = await pool.query(
-    'SELECT id FROM users WHERE email=? AND active=1',
-    [email]
-  );
+  'SELECT id, email, first_name FROM users WHERE email=? AND active=1',
+  [email]
+);
+
 
   if (!user) {
     // Do NOT reveal whether email exists
