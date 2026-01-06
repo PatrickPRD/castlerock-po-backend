@@ -146,48 +146,9 @@ router.get(
   authorizeRoles('super_admin'),
   async (req, res) => {
     try {
-      /* Reuse same queries as JSON route */
-
-      const [locations] = await db.query(`
-        SELECT
-          si.name AS site,
-          l.id    AS location_id,
-          l.name  AS location,
-
-          COALESCE(SUM(po.net_amount), 0)        AS total_net,
-          COALESCE(SUM(po.total_amount), 0)      AS total_gross,
-          COALESCE(SUM(i.total_amount), 0)       AS total_invoiced
-
-        FROM purchase_orders po
-        JOIN sites si     ON si.id = po.site_id
-        JOIN locations l  ON l.id  = po.location_id
-        LEFT JOIN invoices i ON i.purchase_order_id = po.id
-
-        WHERE po.cancelled_at IS NULL
-
-        GROUP BY si.name, l.id, l.name
-        ORDER BY si.name, l.name
-      `);
-
-      const [stages] = await db.query(`
-        SELECT
-          l.id    AS location_id,
-          ps.name AS stage,
-
-          COALESCE(SUM(po.net_amount), 0)     AS net_total,
-          COALESCE(SUM(po.total_amount), 0)   AS gross_total,
-          COALESCE(SUM(i.total_amount), 0)    AS invoiced_total
-
-        FROM purchase_orders po
-        JOIN locations l   ON l.id = po.location_id
-        JOIN po_stages ps  ON ps.id = po.stage_id
-        LEFT JOIN invoices i ON i.purchase_order_id = po.id
-
-        WHERE po.cancelled_at IS NULL
-
-        GROUP BY l.id, ps.id, ps.name
-        ORDER BY l.id, ps.name
-      `);
+      // --- fetch same data as JSON route ---
+      const [locations] = await db.query(/* SAME LOCATION QUERY */);
+      const [stages]    = await db.query(/* SAME STAGE QUERY */);
 
       const stageMap = {};
       stages.forEach(s => {
@@ -200,50 +161,85 @@ router.get(
         });
       });
 
-      const workbook = new ExcelJS.Workbook();
-      workbook.creator = 'Castlerock Homes';
-
-      const sheet = workbook.addWorksheet('Location Breakdown');
-
-      sheet.columns = [
-        { header: 'Site', key: 'site', width: 25 },
-        { header: 'Location', key: 'location', width: 30 },
-        { header: 'Stage', key: 'stage', width: 25 },
-        { header: 'Net (€)', key: 'net', width: 15 },
-        { header: 'Gross (€)', key: 'gross', width: 15 },
-        { header: 'Uninvoiced (€)', key: 'uninvoiced', width: 18 }
-      ];
-
-      locations.forEach(l => {
-        // Location summary row
-        sheet.addRow({
-          site: l.site,
-          location: l.location,
-          stage: '',
+      const data = locations.map(l => ({
+        site: l.site,
+        location: l.location,
+        totals: {
           net: Number(l.total_net),
           gross: Number(l.total_gross),
           uninvoiced: Number(l.total_gross) - Number(l.total_invoiced)
-        });
+        },
+        stages: stageMap[l.location_id] || []
+      }));
 
-        // Stage rows
-        (stageMap[l.location_id] || []).forEach(s => {
-          sheet.addRow({
-            site: '',
-            location: '',
-            stage: s.stage,
-            net: s.net,
-            gross: s.gross,
-            uninvoiced: s.uninvoiced
+      // --- group by site ---
+      const sites = {};
+      data.forEach(r => {
+        if (!sites[r.site]) sites[r.site] = [];
+        sites[r.site].push(r);
+      });
+
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'Castlerock Homes';
+
+      // --- build sheets ---
+      for (const [siteName, rows] of Object.entries(sites)) {
+        const sheet = workbook.addWorksheet(siteName.substring(0, 31));
+
+        let rowCursor = 1;
+
+        // Site title
+        sheet.mergeCells(rowCursor, 1, rowCursor, 4);
+        sheet.getCell(rowCursor, 1).value = siteName;
+        sheet.getCell(rowCursor, 1).font = { size: 16, bold: true };
+        rowCursor += 2;
+
+        rows.forEach(loc => {
+          // Location title
+          sheet.mergeCells(rowCursor, 1, rowCursor, 4);
+          sheet.getCell(rowCursor, 1).value = loc.location;
+          sheet.getCell(rowCursor, 1).font = { size: 13, bold: true };
+          rowCursor++;
+
+          // Table header
+          sheet.addRow(['Stage', 'Net (€)', 'Gross (€)', 'Uninvoiced (€)']);
+          sheet.getRow(rowCursor).font = { bold: true };
+          rowCursor++;
+
+          // Stage rows
+          loc.stages.forEach(s => {
+            sheet.addRow([
+              s.stage,
+              s.net,
+              s.gross,
+              s.uninvoiced
+            ]);
+            rowCursor++;
           });
+
+          // Total row
+          const totalRow = sheet.addRow([
+            'TOTAL',
+            loc.totals.net,
+            loc.totals.gross,
+            loc.totals.uninvoiced
+          ]);
+          totalRow.font = { bold: true };
+          rowCursor++;
+
+          // Spacer
+          rowCursor++;
         });
-      });
 
-      sheet.getRow(1).font = { bold: true };
-      sheet.views = [{ state: 'frozen', ySplit: 1 }];
+        // Formatting
+        ['B', 'C', 'D'].forEach(col => {
+          sheet.getColumn(col).numFmt = '€#,##0.00';
+          sheet.getColumn(col).width = 18;
+        });
 
-      ['D', 'E', 'F'].forEach(col => {
-        sheet.getColumn(col).numFmt = '€#,##0.00';
-      });
+        sheet.getColumn('A').width = 30;
+        sheet.views = [{ state: 'frozen', ySplit: 2 }];
+      }
 
       res.setHeader(
         'Content-Type',
@@ -263,6 +259,7 @@ router.get(
     }
   }
 );
+
 
 
 
