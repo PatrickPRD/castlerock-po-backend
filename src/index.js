@@ -1,3 +1,6 @@
+console.log('SMTP_HOST at startup:', process.env.SMTP_HOST);
+
+
 require('dotenv').config();
 const express = require('express');
 
