@@ -686,3 +686,52 @@ tr:hover { background: #f9f9f9; }
   }
 }
 
+
+/* ===== ACTIONS DROPDOWN ===== */
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+
+  background: #fff;
+  border-radius: 12px;
+  padding: 6px 0;
+
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  border: 1px solid rgba(0,0,0,0.06);
+
+  z-index: 1000;
+}
+
+/* Individual menu items */
+.dropdown-menu a,
+.dropdown-menu button,
+.dropdown-menu div {
+  display: block;
+  padding: 10px 16px;
+
+  font-size: 14px;
+  font-weight: 500;
+  color: #222;
+  text-decoration: none;
+  white-space: nowrap;
+
+  cursor: pointer;
+}
+
+/* Hover state */
+.dropdown-menu a:hover,
+.dropdown-menu button:hover,
+.dropdown-menu div:hover {
+  background: #f7f7f7;
+  color: #c62828;
+}
+
+/* Optional divider */
+.dropdown-menu .divider {
+  height: 1px;
+  margin: 6px 0;
+  background: #eee;
+}
+
