@@ -64,18 +64,18 @@ async function loadReport() {
             </tr>
           </thead>
           <tbody>
-            ${
-              r.stages.map(s => `
-                <tr>
-                  <td>${s.stage}</td>
-                  <td>${euro(s.net)}</td>
-                  <td>${euro(s.vat)}</td>
-                  <td>${euro(s.gross)}</td>
-                  <td>${euro(s.uninvoiced)}</td>
-                </tr>
-              `).join('')
-            }
-          </tbody>
+  ${
+    r.stages.map(s => `
+      <tr>
+        <td>${s.stage}</td>
+        <td>${euro(s.net)}</td>
+        <td>${euro(s.gross)}</td>
+        <td>${euro(s.uninvoiced)}</td>
+      </tr>
+    `).join('')
+  }
+</tbody>
+
         </table>
       </td>
     </tr>
@@ -112,11 +112,14 @@ table.addEventListener('click', e => {
    Export
    ========================= */
 async function exportExcel() {
-  const res = await fetch('/po-totals-by-location-breakdown.xlsx', {
-    headers: {
-      Authorization: 'Bearer ' + token
+  const res = await fetch(
+    '/reports/po-totals-by-location-breakdown.xlsx',
+    {
+      headers: {
+        Authorization: 'Bearer ' + token
+      }
     }
-  });
+  );
 
   if (!res.ok) {
     alert('Failed to export report');
@@ -128,13 +131,14 @@ async function exportExcel() {
 
   const a = document.createElement('a');
   a.href = url;
-  a.download = '/po-totals-by-location-breakdown.xlsx';
+  a.download = 'po-totals-by-location-breakdown.xlsx';
   document.body.appendChild(a);
   a.click();
   a.remove();
 
   window.URL.revokeObjectURL(url);
 }
+
 
 
 /* =========================
