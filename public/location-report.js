@@ -89,19 +89,20 @@ table.addEventListener('click', e => {
 
   const targetId = row.dataset.target;
   const details = document.getElementById(targetId);
-  const chevron = row.querySelector('.chevron');
 
-  const open = details.style.display === 'table-row';
+  const isOpen = details.classList.contains('open');
 
   // close all
-  document.querySelectorAll('.details-row').forEach(r => r.style.display = 'none');
+  document.querySelectorAll('.details-row').forEach(r => r.classList.remove('open'));
   document.querySelectorAll('.main-row').forEach(r => r.classList.remove('open'));
 
-  if (!open) {
-    details.style.display = 'table-row';
+  // open selected
+  if (!isOpen) {
+    details.classList.add('open');
     row.classList.add('open');
   }
 });
+
 
 
 

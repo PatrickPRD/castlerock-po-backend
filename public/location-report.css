@@ -76,7 +76,24 @@ background-color: #8d888841;
   background-color: #f9fafb;
 }
 
+.details-row {
+  display: none;
+}
+
+.details-row.open {
+  display: table-row;
+}
+
+
 @media (max-width: 768px) {
+
+  .details-row.open {
+    display: table-row; /* keep expansion working */
+  }
+
+  .details-row td {
+    display: block;
+  }
 
   /* Hide Site column */
   .po-table th:nth-child(1),
