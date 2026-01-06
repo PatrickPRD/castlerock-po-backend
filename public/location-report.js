@@ -113,7 +113,7 @@ table.addEventListener('click', e => {
    Export
    ========================= */
 async function exportExcel() {
-  const res = await fetch('/reports/po-totals-by-location.xlsx', {
+  const res = await fetch('/po-totals-by-location-breakdown.xlsx', {
     headers: {
       Authorization: 'Bearer ' + token
     }
@@ -129,7 +129,7 @@ async function exportExcel() {
 
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'po-totals-by-location.xlsx';
+  a.download = '/po-totals-by-location-breakdown.xlsx';
   document.body.appendChild(a);
   a.click();
   a.remove();
