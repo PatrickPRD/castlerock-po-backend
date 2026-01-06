@@ -51,7 +51,7 @@ async function loadReport() {
 
   // DETAILS ROW (STAGES)
   table.innerHTML += `
-    <tr class="details-row" id="${rowId}" style="display:none">
+    <tr class="details-row" id="${rowId}">
       <td colspan="5">
         <table class="inner-table">
           <thead>
