@@ -39,12 +39,14 @@ async function loadUser() {
 el('userForm').addEventListener('submit', async e => {
   e.preventDefault();
 
-  const payload = {
-    first_name: el('firstName').value.trim(),
-    last_name:  el('lastName').value.trim(),
-    role:       el('role').value,
-    active:     Number(el('active').value)
-  };
+const payload = {
+  email:      el('email').value.trim(),
+  first_name: el('firstName').value.trim(),
+  last_name:  el('lastName').value.trim(),
+  role:       el('role').value,
+  active:     Number(el('active').value)
+};
+
 
   const res = await fetch(`/admin/users/${userId}`, {
     method: 'PUT',
