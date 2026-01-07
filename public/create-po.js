@@ -75,7 +75,7 @@ function loadOptions(url, selectEl) {
    Load initial data
    ========================= */
 loadOptions('/suppliers', supplierSelect);
-loadOptions('/admin/sites', siteSelect);
+loadOptions('/sites', siteSelect);
 loadOptions('/stages', stageSelect);
 
 /* =========================
