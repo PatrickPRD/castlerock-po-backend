@@ -88,6 +88,7 @@ async function loadUsers() {
         <td>${isActive ? 'Active' : 'Disabled'}</td>
 
         <td class="user-actions">
+<div class="user-actions-secondary">
   <button class="btn-outline"
     onclick="toggleUser(${u.id}, ${isActive ? 0 : 1})">
     ${isActive ? 'Disable' : 'Enable'}
@@ -102,6 +103,7 @@ async function loadUsers() {
     onclick="editUser(${u.id})">
     Edit
   </button>
+  </div>
 
   <button class="btn-danger"
     onclick="deleteUser(${u.id}, '${u.email}')">

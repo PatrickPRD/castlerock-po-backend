@@ -32,3 +32,78 @@
 .user-actions .btn-danger {
   margin-left: 6px;
 }
+
+@media (max-width: 1200px) {
+  .po-table select {
+    min-width: 120px;
+    padding: 6px 8px;
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 1100px) {
+  .user-status {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-start;
+  }
+
+  .user-status button {
+    padding: 5px 10px;
+    font-size: 0.8rem;
+  }
+}
+
+/* ===============================
+   User Admin – Action buttons
+   =============================== */
+
+.user-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+/* Wide desktop */
+@media (min-width: 1200px) {
+  .user-actions {
+    flex-wrap: nowrap;
+  }
+
+  .user-actions button {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+  }
+}
+
+/* Tablet / narrow desktop (key fix) */
+@media (max-width: 1199px) and (min-width: 768px) {
+  .user-actions {
+    max-width: 260px;
+  }
+
+  .user-actions button {
+    flex: 1 1 48%;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+  }
+
+  /* Make Delete visually distinct */
+  .user-actions .btn-danger {
+    flex: 1 1 100%;
+  }
+}
+
+.user-actions-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+@media (max-width: 1199px) and (min-width: 768px) {
+  .user-actions-secondary button {
+    flex: 1 1 48%;
+  }
+}
