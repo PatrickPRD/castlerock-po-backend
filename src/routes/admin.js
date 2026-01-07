@@ -16,58 +16,6 @@ const { sendPasswordSetupEmail } =
    USERS – SUPER ADMIN ONLY
    ====================================================== */
 
-router.get(
-  '/users',
-  authenticate,
-  authorizeRoles('super_admin'),
-  async (req, res) => {
-
-    const [rows] = await db.query(`
-      SELECT
-        id,
-        email,
-        role,
-        active,
-        first_name,
-        last_name,
-        created_at
-      FROM users
-      ORDER BY last_name, first_name
-    `);
-
-    res.json(rows);
-  }
-);
-
-router.get(
-  '/users/:id',
-  authenticate,
-  authorizeRoles('super_admin'),
-  async (req, res) => {
-
-    const [[user]] = await db.query(
-      `
-      SELECT
-        id,
-        email,
-        role,
-        active,
-        first_name,
-        last_name
-      FROM users
-      WHERE id = ?
-      `,
-      [req.params.id]
-    );
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    res.json(user);
-  }
-);
-
 router.post(
   '/users',
   authenticate,
@@ -75,43 +23,67 @@ router.post(
   async (req, res) => {
     const { email, role, first_name, last_name } = req.body;
 
-    // Enforce single Super Admin
-    if (role === 'super_admin') {
-      const [existing] = await db.query(
-        "SELECT id FROM users WHERE role = 'super_admin' LIMIT 1"
+    try {
+      // Enforce single Super Admin
+      if (role === 'super_admin') {
+        const [existing] = await db.query(
+          "SELECT id FROM users WHERE role = 'super_admin' LIMIT 1"
+        );
+        if (existing.length > 0) {
+          return res.status(400).json({
+            error: 'A Super Admin already exists'
+          });
+        }
+      }
+
+      // 🔐 Generate password setup token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const resetExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+      // ✅ Create user
+      const [result] = await db.query(
+        `INSERT INTO users
+         (email, role, first_name, last_name, reset_token, reset_token_expires, active)
+         VALUES (?, ?, ?, ?, ?, ?, 1)`,
+        [
+          email,
+          role,
+          first_name,
+          last_name,
+          resetToken,
+          resetExpires
+        ]
       );
-      if (existing.length > 0) {
+
+      // 📧 Try to send email (non-fatal)
+      try {
+        await sendPasswordSetupEmail(email, resetToken);
+      } catch (emailErr) {
+        console.error('EMAIL FAILED (non-fatal):', emailErr.message);
+      }
+
+      // ✅ Respond ONCE
+      return res.json({
+        success: true,
+        userId: result.insertId
+      });
+
+    } catch (err) {
+      console.error('CREATE USER ERROR:', err);
+
+      if (err.code === 'ER_DUP_ENTRY') {
         return res.status(400).json({
-          error: 'A Super Admin already exists'
+          error: 'Email already exists'
         });
       }
+
+      return res.status(500).json({
+        error: 'Failed to create user'
+      });
     }
-
-// 🔐 Generate password setup token
-const resetToken = crypto.randomBytes(32).toString('hex');
-const resetExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
-
-await db.query(
-  `INSERT INTO users
-   (email, role, first_name, last_name, reset_token, reset_token_expires, active)
-   VALUES (?, ?, ?, ?, ?, ?, 1)`,
-  [
-    email,
-    role,
-    first_name,
-    last_name,
-    resetToken,
-    resetExpires
-  ]
-);
-
-// 📧 Send password setup email
-await sendPasswordSetupEmail(email, resetToken);
-
-
-    res.json({ success: true });
   }
 );
+
 
 router.put(
   '/users/:id',
@@ -244,6 +216,64 @@ WHERE id = ?
     );
 
     res.json({ success: true });
+  }
+);
+
+/* ======================================================
+   DELETE USER – SUPER ADMIN ONLY
+   ====================================================== */
+router.delete(
+  '/users/:id',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const userId = Number(req.params.id);
+    const currentUserId = req.user.id;
+
+    try {
+      // 🔒 Prevent deleting yourself
+      if (userId === currentUserId) {
+        return res.status(400).json({
+          error: 'You cannot delete your own account'
+        });
+      }
+
+      // 🔒 Check if user exists
+      const [users] = await db.query(
+        'SELECT id, role FROM users WHERE id = ?',
+        [userId]
+      );
+
+      if (users.length === 0) {
+        return res.status(404).json({
+          error: 'User not found'
+        });
+      }
+
+      // 🔒 Prevent deleting the only super_admin
+      if (users[0].role === 'super_admin') {
+        const [[count]] = await db.query(
+          "SELECT COUNT(*) AS total FROM users WHERE role = 'super_admin'"
+        );
+
+        if (count.total <= 1) {
+          return res.status(400).json({
+            error: 'Cannot delete the only Super Admin'
+          });
+        }
+      }
+
+      // ✅ Delete user
+      await db.query('DELETE FROM users WHERE id = ?', [userId]);
+
+      return res.json({ success: true });
+
+    } catch (err) {
+      console.error('DELETE USER ERROR:', err);
+      return res.status(500).json({
+        error: 'Failed to delete user'
+      });
+    }
   }
 );
 

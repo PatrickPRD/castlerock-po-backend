@@ -95,12 +95,17 @@ async function loadUsers() {
 
   <button class="btn-outline"
     onclick="sendInvite('${u.email}')">
-    Send Invite
+    Reset Password
   </button>
 
   <button class="btn-outline"
     onclick="editUser(${u.id})">
     Edit
+  </button>
+
+  <button class="btn-danger"
+    onclick="deleteUser(${u.id}, '${u.email}')">
+    Delete
   </button>
 </td>
 
@@ -181,6 +186,20 @@ async function updateUserRole(id, role) {
   } catch (err) {
     alert(err.message);
     loadUsers(); // 🔄 snap UI back to server truth
+  }
+}
+
+async function deleteUser(id, email) {
+  if (!confirm(`Delete user ${email}?\n\nThis cannot be undone.`)) {
+    return;
+  }
+
+  try {
+    await api(`/admin/users/${id}`, 'DELETE');
+    await loadUsers();
+    alert(`User ${email} deleted`);
+  } catch (err) {
+    alert(err.message || 'Failed to delete user');
   }
 }
 
