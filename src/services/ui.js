@@ -142,11 +142,17 @@ window.showToast = function (message, type = 'success', timeout = 3000) {
 
   clearTimeout(toast._timer);
 
-  toast._timer = setTimeout(() => {
+  function hideToast() {
     toast.classList.add('hidden');
     backdrop.classList.add('hidden');
-  }, timeout);
+    backdrop.onclick = null;
+  }
+
+  backdrop.onclick = hideToast;
+
+  toast._timer = setTimeout(hideToast, timeout);
 };
+
 
 
 /* ---------- Confirm Dialog ---------- */
@@ -160,10 +166,7 @@ window.confirmDialog = function (message) {
     const ok = document.getElementById('ui-confirm-ok');
     const cancel = document.getElementById('ui-confirm-cancel');
 
-    if (!modal || !backdrop || !msg) {
-      console.warn('UI not ready');
-      return resolve(false);
-    }
+    if (!modal || !backdrop || !msg) return resolve(false);
 
     msg.textContent = message;
 
@@ -173,15 +176,20 @@ window.confirmDialog = function (message) {
     function cleanup(result) {
       modal.classList.add('hidden');
       backdrop.classList.add('hidden');
+
       ok.onclick = null;
       cancel.onclick = null;
       backdrop.onclick = null;
+
       resolve(result);
     }
 
     ok.onclick = () => cleanup(true);
     cancel.onclick = () => cleanup(false);
+
+    // 👇 background click cancels
     backdrop.onclick = () => cleanup(false);
   });
 };
+
 
