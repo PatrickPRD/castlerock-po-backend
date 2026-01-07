@@ -735,3 +735,6 @@ tr:hover { background: #f9f9f9; }
   background: #eee;
 }
 
+.hidden {
+  display: none !important;
+}
