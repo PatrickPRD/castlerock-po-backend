@@ -136,7 +136,7 @@ function editUser(id) {
 
 
 async function addUser() {
-  if (role !== 'super_admin') return alert('Access denied');
+  if (role !== 'super_admin') return showToast(err.message, 'error');;
 
   const firstName = document.getElementById('firstName').value.trim();
   const lastName  = document.getElementById('lastName').value.trim();
@@ -144,7 +144,9 @@ async function addUser() {
   const userRole  = document.getElementById('userRole').value;
 
   if (!email || !firstName || !lastName) {
-    alert('First name, last name and email are required');
+    catch (err) {
+  showToast(err.message || 'Failed to create user', 'error');
+}
     return;
   }
 
@@ -178,7 +180,7 @@ showToast(`Invite sent to ${email}`, 'success');
 
 
   } catch (err) {
-    alert(err.message || 'Failed to create user');
+    showToast(err.message || 'Failed to create user', 'error');
   }
 }
 
@@ -188,7 +190,7 @@ async function toggleUser(id, active) {
     await api(`/admin/users/${id}`, 'PUT', { active });
     loadUsers();
   } catch (err) {
-    alert(err.message);
+    showToast(err.message, 'error');
     loadUsers(); // 🔄 revert UI
   }
 }
@@ -198,7 +200,7 @@ async function updateUserRole(id, role) {
     await api(`/admin/users/${id}`, 'PUT', { role });
     loadUsers();
   } catch (err) {
-    alert(err.message);
+    showToast(err.message, 'error');
     loadUsers(); // 🔄 snap UI back to server truth
   }
 }
@@ -211,7 +213,7 @@ async function deleteUser(id, email) {
   try {
     await api(`/admin/users/${id}`, 'DELETE');
     await loadUsers();
-    alert(`User ${email} deleted`);
+    showToast(`User ${email} deleted`, 'success');
   } catch (err) {
     showToast(err.message || 'Failed to create user', 'error');
 
@@ -313,14 +315,14 @@ async function saveSite() {
   const siteLetter = letterInput ? letterInput.value.trim().toUpperCase() : '';
 
   if (!name) {
-    alert('Site name is required');
+    showToast('Site name is required', 'error');
     return;
   }
 
   // Creating new site → require site letter
   if (!editingSiteId) {
     if (!siteLetter || siteLetter.length !== 1) {
-      alert('Site letter is required and must be a single character');
+      showToast('Site letter is required and must be a single character', 'error');
       return;
     }
   }
@@ -341,7 +343,7 @@ async function saveSite() {
 
   } catch (err) {
     // 🔥 This will catch "site letter already exists"
-    alert(err.message);
+  showToast(err.message, 'error');
   }
 }
 
@@ -354,7 +356,7 @@ async function deleteSite(id) {
     await api(`/admin/sites/${id}`, 'DELETE');
     loadSites();
   } catch (err) {
-    alert(err.message);
+    showToast(err.message, 'error');
   }
 }
 
@@ -415,15 +417,15 @@ const siteEl = document.getElementById('siteSelect');
   const siteId = document.getElementById('siteSelect').value;
 
   if (!name) {
-  alert('Location name is required');
+  showToast('Location name is required', 'error');
   return;
 }
 if (!type) {
-  alert('Location type is required');
+  showToast('Location type is required', 'error');
   return;
 }
 if (!siteId) {
-  alert('Please select a site');
+  showToast('Please select a site', 'error');
   return;
 }
 
@@ -468,7 +470,7 @@ async function deleteLocation(id) {
     await api(`/admin/locations/${id}`, 'DELETE');
     loadLocations();
   } catch (err) {
-    alert(err.message);
+    showToast(err.message, 'error');
   }
 }
 
