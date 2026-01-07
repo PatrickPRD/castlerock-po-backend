@@ -72,12 +72,14 @@ function showToast(message, type = 'success', timeout = 3000) {
     toast.classList.add('hidden');
     backdrop.classList.add('hidden');
   }, timeout);
-}
 
-backdrop.onclick = () => {
+  backdrop.onclick = () => {
   toast.classList.add('hidden');
   backdrop.classList.add('hidden');
 };
+}
+
+
 
 
 /* ============================
