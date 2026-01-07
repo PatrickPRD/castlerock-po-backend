@@ -213,7 +213,7 @@ async function deleteUser(id, email) {
     await loadUsers();
     showToast(`User ${email} deleted`, 'success');
   } catch (err) {
-    showToast(err.message || 'Failed to create user', 'error');
+    showToast(err.message || 'Failed to delete user', 'error');
 
   }
 }
