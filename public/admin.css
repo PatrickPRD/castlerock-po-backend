@@ -1,0 +1,34 @@
+/* ===============================
+   User Admin – Desktop Actions
+   =============================== */
+
+.user-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+/* Desktop: horizontal + compact */
+@media (min-width: 768px) {
+  .user-actions {
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+
+  .user-actions button {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    line-height: 1;
+  }
+}
+
+/* Secondary actions */
+.user-actions .btn-outline {
+  opacity: 0.85;
+}
+
+/* Primary destructive */
+.user-actions .btn-danger {
+  margin-left: 6px;
+}

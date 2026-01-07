@@ -87,7 +87,7 @@ async function loadUsers() {
 
         <td>${isActive ? 'Active' : 'Disabled'}</td>
 
-        <td>
+        <td class="user-actions">
   <button class="btn-outline"
     onclick="toggleUser(${u.id}, ${isActive ? 0 : 1})">
     ${isActive ? 'Disable' : 'Enable'}
