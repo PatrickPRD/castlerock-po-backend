@@ -46,7 +46,15 @@
       <select id="stage" required></select>
       <input type="date" id="poDate" required>
       <textarea id="description" placeholder="Description"></textarea>
-      <input type="number" id="netAmount" placeholder="Net">
+      <input
+  type="number"
+  id="netAmount"
+  placeholder="Net Value"
+  step="0.01"
+  min="0"
+  inputmode="decimal"
+/>
+
       <select id="vatRate">
         <option value="0">0%</option>
         <option value="13.5">13.5%</option>

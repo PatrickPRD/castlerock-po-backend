@@ -61,7 +61,14 @@
       <textarea id="description"></textarea>
 
       <label>Net Amount (€)</label>
-      <input type="number" id="netAmount" step="0.01">
+            <input
+  type="number"
+  id="netAmount"
+  placeholder="Net Value"
+  step="0.01"
+  min="0"
+  inputmode="decimal"
+/>
 
       <label>VAT Rate</label>
       <select id="vatRate">
