@@ -57,7 +57,7 @@ async function api(url, method = 'GET', body) {
   return res.json();
 }
 
-function showToast(message, type = 'success', timeout = 3000) {
+function showToast(message, type = 'success', timeout = 2000) {
   const toast = document.getElementById('toast');
   const backdrop = document.getElementById('toast-backdrop');
   if (!toast || !backdrop) return;
@@ -79,6 +79,32 @@ function showToast(message, type = 'success', timeout = 3000) {
 };
 }
 
+function confirmDialog(message) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('confirm-modal');
+    const backdrop = document.getElementById('confirm-backdrop');
+    const msg = document.getElementById('confirm-message');
+    const ok = document.getElementById('confirm-ok');
+    const cancel = document.getElementById('confirm-cancel');
+
+    msg.textContent = message;
+
+    modal.classList.remove('hidden');
+    backdrop.classList.remove('hidden');
+
+    function cleanup(result) {
+      modal.classList.add('hidden');
+      backdrop.classList.add('hidden');
+      ok.onclick = null;
+      cancel.onclick = null;
+      resolve(result);
+    }
+
+    ok.onclick = () => cleanup(true);
+    cancel.onclick = () => cleanup(false);
+    backdrop.onclick = () => cleanup(false);
+  });
+}
 
 
 
@@ -213,9 +239,8 @@ async function updateUserRole(id, role) {
 }
 
 async function deleteUser(id, email) {
-  if (!confirm(`Delete user ${email}?\n\nThis cannot be undone.`)) {
-    return;
-  }
+  if (!(await confirmDialog(`Delete user ${email}?`))) return;
+
 
   try {
     await api(`/admin/users/${id}`, 'DELETE');
@@ -234,7 +259,7 @@ async function toggleUser(id, active) {
 }
 
 async function sendInvite(email) {
-  if (!confirm(`Send password setup email to ${email}?`)) return;
+  if (!(await confirmDialog(`Send password setup email to ${email}?`))) return;
 
   try {
     await fetch('/auth/request-reset', {
@@ -357,7 +382,7 @@ async function saveSite() {
 
 
 async function deleteSite(id) {
-  if (!confirm('Delete this site?')) return;
+  if (!(await confirmDialog('Delete this site?'))) return;
 
   try {
     await api(`/admin/sites/${id}`, 'DELETE');
@@ -471,7 +496,7 @@ function resetLocationForm() {
 
 
 async function deleteLocation(id) {
-  if (!confirm('Delete this location?')) return;
+  if (!(await confirmDialog('Delete this location?'))) return;
 
   try {
     await api(`/admin/locations/${id}`, 'DELETE');
