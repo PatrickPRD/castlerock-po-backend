@@ -15,6 +15,35 @@ const { sendPasswordSetupEmail } =
 /* ======================================================
    USERS – SUPER ADMIN ONLY
    ====================================================== */
+router.get(
+  '/users',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      const [users] = await db.query(`
+        SELECT
+          id,
+          email,
+          first_name,
+          last_name,
+          role,
+          active
+        FROM users
+        ORDER BY created_at DESC
+      `);
+
+      res.json(users);
+
+    } catch (err) {
+      console.error('LOAD USERS ERROR:', err);
+      res.status(500).json({
+        error: 'Failed to load users'
+      });
+    }
+  }
+);
+
 
 router.post(
   '/users',
