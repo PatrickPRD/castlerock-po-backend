@@ -1,23 +1,75 @@
 /* =========================================================
    Global UI Utilities (Toast + Confirm)
+   Single-file version (CSS + HTML injected via JS)
    ========================================================= */
 
-/* ---------- Inject CSS from same folder ---------- */
+/* ---------- Inject CSS ---------- */
 (function injectUICSS() {
-  if (document.getElementById('ui-css')) return;
+  if (document.getElementById('ui-style')) return;
 
-  const script = document.currentScript;
-  if (!script) return;
+  const style = document.createElement('style');
+  style.id = 'ui-style';
+  style.textContent = `
+    .hidden {
+      display: none !important;
+    }
 
-  const basePath = script.src.substring(0, script.src.lastIndexOf('/'));
-  const cssPath = `${basePath}/ui.css`;
+    .ui-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      z-index: 9998;
+    }
 
-  const link = document.createElement('link');
-  link.id = 'ui-css';
-  link.rel = 'stylesheet';
-  link.href = cssPath;
+    .ui-toast {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      min-width: 320px;
+      max-width: 90%;
+      padding: 16px 20px;
+      background: #e5e7eb;
+      color: #111827;
+      border-radius: 10px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+      z-index: 9999;
+      text-align: center;
+      font-weight: 500;
+    }
 
-  document.head.appendChild(link);
+    .ui-toast.success {
+      border-left: 5px solid #16a34a;
+    }
+
+    .ui-toast.error {
+      border-left: 5px solid #dc2626;
+    }
+
+    .ui-confirm {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      min-width: 320px;
+      max-width: 90%;
+      padding: 20px;
+      background: #e5e7eb;
+      border-radius: 10px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+      z-index: 9999;
+      text-align: center;
+    }
+
+    .ui-confirm-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 16px;
+    }
+  `;
+
+  document.head.appendChild(style);
 })();
 
 /* ---------- Inject UI HTML ---------- */
@@ -81,11 +133,9 @@ window.confirmDialog = function (message) {
     function cleanup(result) {
       modal.classList.add('hidden');
       backdrop.classList.add('hidden');
-
       ok.onclick = null;
       cancel.onclick = null;
       backdrop.onclick = null;
-
       resolve(result);
     }
 
