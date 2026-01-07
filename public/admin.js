@@ -57,57 +57,6 @@ async function api(url, method = 'GET', body) {
   return res.json();
 }
 
-function showToast(message, type = 'success', timeout = 2000) {
-  const toast = document.getElementById('toast');
-  const backdrop = document.getElementById('toast-backdrop');
-  if (!toast || !backdrop) return;
-
-  toast.textContent = message;
-  toast.className = `toast ${type}`;
-  
-  toast.classList.remove('hidden');
-  backdrop.classList.remove('hidden');
-
-  setTimeout(() => {
-    toast.classList.add('hidden');
-    backdrop.classList.add('hidden');
-  }, timeout);
-
-  backdrop.onclick = () => {
-  toast.classList.add('hidden');
-  backdrop.classList.add('hidden');
-};
-}
-
-function confirmDialog(message) {
-  return new Promise(resolve => {
-    const modal = document.getElementById('confirm-modal');
-    const backdrop = document.getElementById('confirm-backdrop');
-    const msg = document.getElementById('confirm-message');
-    const ok = document.getElementById('confirm-ok');
-    const cancel = document.getElementById('confirm-cancel');
-
-    msg.textContent = message;
-
-    modal.classList.remove('hidden');
-    backdrop.classList.remove('hidden');
-
-    function cleanup(result) {
-      modal.classList.add('hidden');
-      backdrop.classList.add('hidden');
-      ok.onclick = null;
-      cancel.onclick = null;
-      resolve(result);
-    }
-
-    ok.onclick = () => cleanup(true);
-    cancel.onclick = () => cleanup(false);
-    backdrop.onclick = () => cleanup(false);
-  });
-}
-
-
-
 /* ============================
    USERS (SUPER ADMIN ONLY)
    ============================ */
