@@ -18,7 +18,7 @@ async function loadReport() {
   });
 
   if (!res.ok) {
-    alert('Failed to load report');
+    showToast('Failed to load report', 'error');
     return;
   }
 
@@ -122,7 +122,7 @@ async function exportExcel() {
   );
 
   if (!res.ok) {
-    alert('Failed to export report');
+          showToast('Failed to export report', 'error');
     return;
   }
 

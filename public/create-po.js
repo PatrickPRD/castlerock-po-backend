@@ -128,7 +128,7 @@ console.log(payload);
 
 
 if (!payload.supplierId || !payload.siteId || !payload.locationId || !payload.poDate || !payload.stageId) {
-  alert('Supplier, site, location, stage and date are required');
+  showToast('Supplier, site, location, stage and date are required', 'error');
   return;
 }
 
@@ -144,12 +144,12 @@ if (!payload.supplierId || !payload.siteId || !payload.locationId || !payload.po
 
   if (!res.ok) {
     const err = await res.json();
-    alert(err.error || 'Failed to create purchase order');
+    showToast(err.error || 'Failed to create purchase order', 'error');
     return;
   }
 
 const data = await res.json();
-alert(`Purchase Order ${data.poNumber} created successfully`);
+showToast(`Purchase Order ${data.poNumber} created successfully`, 'success');
 window.location.href = 'dashboard.html';
 
 });

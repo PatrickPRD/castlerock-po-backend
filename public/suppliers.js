@@ -92,7 +92,7 @@ function editSupplier(id) {
 }
 
 async function deleteSupplier(id) {
-  if (!confirm('Delete this supplier?')) return;
+  if (!(await confirmDialog('Delete this supplier?'))) return;
 
   const res = await fetch(`/suppliers/${id}`, {
     method: 'DELETE',
@@ -101,7 +101,7 @@ async function deleteSupplier(id) {
 
   const data = await res.json();
   if (!res.ok) {
-    alert(data.error || 'Cannot delete supplier');
+    showToast(data.error || 'Cannot delete supplier', 'error');
   }
 
   loadSuppliers();

@@ -49,7 +49,7 @@ async function loadReport() {
   });
 
   if (!res.ok) {
-    alert('Failed to load supplier report');
+    showToast('Failed to load report', 'error');
     return;
   }
 

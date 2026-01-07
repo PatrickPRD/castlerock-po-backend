@@ -53,7 +53,7 @@ form.onsubmit = async e => {
   };
 
   if (!payload.name) {
-    alert('Supplier name is required');
+    showToast('Supplier name is required', 'error');
     return;
   }
 
@@ -75,7 +75,7 @@ form.onsubmit = async e => {
   const data = await res.json();
 
   if (!res.ok) {
-    alert(data.error || 'Failed to save supplier');
+    showToast(data.error || 'Failed to save supplier', 'error');
     return;
   }
 

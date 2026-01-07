@@ -20,7 +20,7 @@ async function loadUser() {
   });
 
   if (!res.ok) {
-    alert('Failed to load user');
+    showToast('Failed to load user', 'error');
     return;
   }
 
@@ -60,11 +60,11 @@ const payload = {
   const data = await res.json();
 
   if (!res.ok) {
-    alert(data.error || 'Update failed');
+    showToast(data.error || 'Update failed', 'error');
     return;
   }
 
-  alert('User updated');
+  showToast('User updated', 'success');
   location.href = 'admin.html';
 });
 

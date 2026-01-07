@@ -330,7 +330,7 @@ function addInvoice(id) {
 }
 
 async function deletePO(id) {
-  if (!confirm("Cancel this Purchase Order?\nThis cannot be undone.")) return;
+  if (!(await confirmDialog("Cancel this Purchase Order?\nThis cannot be undone."))) return;
 
   const res = await fetch(`/purchase-orders/${id}`, {
     method: "DELETE",
@@ -339,7 +339,7 @@ async function deletePO(id) {
 
   if (!res.ok) {
     const err = await res.json();
-    alert(err.error || "Failed to cancel Purchase Order");
+    showToast(err.error || "Failed to cancel Purchase Order", "error");
     return;
   }
 

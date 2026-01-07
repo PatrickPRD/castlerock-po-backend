@@ -1,7 +1,7 @@
 const token = new URLSearchParams(window.location.search).get('token');
 
 if (!token) {
-  alert('Invalid password reset link');
+  showToast('Invalid password reset link', 'error');
 }
 
 async function resetPassword() {
@@ -9,12 +9,12 @@ async function resetPassword() {
   const confirm  = document.getElementById('confirm').value;
 
   if (!password || password.length < 8) {
-    alert('Password must be at least 8 characters');
+    showToast('Password must be at least 8 characters', 'error');
     return;
   }
 
   if (password !== confirm) {
-    alert('Passwords do not match');
+    showToast('Passwords do not match', 'error');
     return;
   }
 
@@ -27,10 +27,10 @@ async function resetPassword() {
   const data = await res.json();
 
   if (!res.ok) {
-    alert(data.error || 'Invalid or expired link');
+    showToast(data.error || 'Invalid or expired link', 'error');
     return;
   }
 
-  alert('Password set successfully. You can now log in.');
+  showToast('Password set successfully. You can now log in.', 'success');
   window.location.href = 'login.html';
 }

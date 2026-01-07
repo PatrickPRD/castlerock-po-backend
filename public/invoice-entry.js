@@ -180,7 +180,7 @@ function editInvoice(id) {
 }
 
 async function deleteInvoice(id) {
-  if (!confirm('Delete this invoice?')) return;
+  if (!(await confirmDialog('Delete this invoice?'))) return;
 
   await fetch(`/invoices/${id}`, {
     method: 'DELETE',

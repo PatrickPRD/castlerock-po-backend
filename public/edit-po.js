@@ -22,7 +22,7 @@ const params = new URLSearchParams(window.location.search);
 const poId = params.get('id');
 
 if (!poId) {
-  alert('No Purchase Order selected');
+  showToast('No Purchase Order selected', 'error');
   window.location.href = 'dashboard.html';
 }
 
@@ -116,7 +116,7 @@ async function loadPO() {
   });
 
   if (!res.ok) {
-    alert('Failed to load Purchase Order');
+    showToast('Failed to load Purchase Order', 'error');
     window.location.href = 'dashboard.html';
     return;
   }
@@ -208,7 +208,7 @@ document.getElementById('poForm').addEventListener('submit', async e => {
 
   if (!res.ok) {
     const err = await res.json();
-    alert(err.error || 'Failed to save changes');
+    showToast(err.error || 'Failed to save changes', 'error');
     return;
   }
 

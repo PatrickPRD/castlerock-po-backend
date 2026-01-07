@@ -3,7 +3,7 @@ async function login() {
   const password = document.getElementById('password').value;
 
   if (!email || !password) {
-    alert('Email and password are required');
+    showToast('Email and password are required', 'error');
     return;
   }
 
@@ -16,7 +16,7 @@ async function login() {
   const data = await res.json();
 
   if (!res.ok) {
-    alert(data.error || 'Login failed');
+    showToast(data.error || 'Login failed', 'error');
     return;
   }
 
@@ -40,7 +40,8 @@ async function forgotPassword() {
     body: JSON.stringify({ email })
   });
 
-  alert(
-    'If the email exists, a password reset link has been sent.'
+  showToast(
+    'If the email exists, a password reset link has been sent.',
+    'success'
   );
 }
