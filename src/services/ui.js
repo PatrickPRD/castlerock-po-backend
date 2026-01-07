@@ -156,6 +156,8 @@ window.showToast = function (message, type = 'success', timeout = 3000) {
   toast.textContent = message;
   toast.className = `ui-toast ${type}`;
 
+  backdrop.className = `ui-backdrop ${type}`;
+
   toast.classList.remove('hidden');
   backdrop.classList.remove('hidden');
 
@@ -164,13 +166,14 @@ window.showToast = function (message, type = 'success', timeout = 3000) {
   function hideToast() {
     toast.classList.add('hidden');
     backdrop.classList.add('hidden');
+    backdrop.className = 'ui-backdrop';
     backdrop.onclick = null;
   }
 
   backdrop.onclick = hideToast;
-
   toast._timer = setTimeout(hideToast, timeout);
 };
+
 
 
 
@@ -189,12 +192,15 @@ window.confirmDialog = function (message) {
 
     msg.textContent = message;
 
+    backdrop.className = 'ui-backdrop neutral';
+
     modal.classList.remove('hidden');
     backdrop.classList.remove('hidden');
 
     function cleanup(result) {
       modal.classList.add('hidden');
       backdrop.classList.add('hidden');
+      backdrop.className = 'ui-backdrop';
 
       ok.onclick = null;
       cancel.onclick = null;
@@ -205,10 +211,9 @@ window.confirmDialog = function (message) {
 
     ok.onclick = () => cleanup(true);
     cancel.onclick = () => cleanup(false);
-
-    // 👇 background click cancels
     backdrop.onclick = () => cleanup(false);
   });
 };
+
 
 
