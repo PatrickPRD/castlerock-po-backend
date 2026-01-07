@@ -57,21 +57,28 @@ async function api(url, method = 'GET', body) {
   return res.json();
 }
 
-function showToast(message, type = 'success', timeout = 2000) {
+function showToast(message, type = 'success', timeout = 3000) {
   const toast = document.getElementById('toast');
-  if (!toast) return;
+  const backdrop = document.getElementById('toast-backdrop');
+  if (!toast || !backdrop) return;
 
   toast.textContent = message;
   toast.className = `toast ${type}`;
   
-  // Show
   toast.classList.remove('hidden');
+  backdrop.classList.remove('hidden');
 
-  // Auto-hide
   setTimeout(() => {
     toast.classList.add('hidden');
+    backdrop.classList.add('hidden');
   }, timeout);
 }
+
+backdrop.onclick = () => {
+  toast.classList.add('hidden');
+  backdrop.classList.add('hidden');
+};
+
 
 /* ============================
    USERS (SUPER ADMIN ONLY)

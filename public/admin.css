@@ -22,20 +22,41 @@
 }
 
 .toast.success {
-  background-color: #ecfdf5; /* soft green-grey */
   border-left: 5px solid #16a34a;
 }
 
 .toast.error {
-  background-color: #fef2f2; /* soft red-grey */
   border-left: 5px solid #dc2626;
 }
 
-.toast::before {
-  content: '';
+/* Backdrop */
+.toast-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.25);
-  z-index: -1;
+  background: rgba(0, 0, 0, 0.25); /* page dim */
+  z-index: 9998;
 }
+
+/* Toast stays above backdrop */
+.toast {
+  z-index: 9999;
+}
+
+/* Hidden state */
+.toast-backdrop.hidden,
+.toast.hidden {
+  display: none;
+}
+
+.toast,
+.toast-backdrop {
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+
 
