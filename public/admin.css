@@ -222,3 +222,97 @@ h3 {
     left: auto;
   }
 }
+
+@media (max-width: 768px) {
+
+  /* Disable table layout entirely */
+  .po-table,
+  .po-table thead,
+  .po-table tbody,
+  .po-table tr,
+  .po-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .po-table thead {
+    display: none;
+  }
+
+  /* Each row becomes a card */
+  .po-table tr {
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    border: none;
+    position: relative;
+  }
+
+  /* Reset TDs */
+  .po-table td {
+    padding: 6px 0;
+    border: none;
+  }
+
+  /* Name / Email */
+  .po-table td:nth-child(1) {
+    font-weight: 600;
+    font-size: 15px;
+  }
+
+  .po-table td:nth-child(2) {
+    font-size: 13px;
+    color: #666;
+    word-break: break-word;
+  }
+
+  /* Role dropdown */
+  .po-table td:nth-child(3) {
+    margin-top: 8px;
+  }
+
+  .po-table td:nth-child(3) select {
+    width: 100%;
+  }
+
+  /* Status */
+  .po-table td:nth-child(4) {
+    font-size: 13px;
+    color: #444;
+    margin-top: 4px;
+  }
+
+  /* Actions */
+  .user-actions,
+  .site-actions {
+    margin-top: 10px;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .actions-menu {
+    position: relative;
+  }
+
+  .actions-trigger {
+    padding: 6px 14px;
+    font-size: 12px;
+  }
+
+  .actions-dropdown {
+    right: 0;
+    left: auto;
+    top: calc(100% + 6px);
+  }
+
+  /* Forms stack cleanly */
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .btn-primary {
+    width: 100%;
+  }
+}
