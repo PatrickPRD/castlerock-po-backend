@@ -21,11 +21,13 @@
   display: none;
 }
 
-/* Variants */
 .toast.success {
+  background-color: #ecfdf5; /* soft green-grey */
   border-left: 5px solid #16a34a;
 }
 
 .toast.error {
+  background-color: #fef2f2; /* soft red-grey */
   border-left: 5px solid #dc2626;
 }
+

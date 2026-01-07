@@ -57,7 +57,7 @@ async function api(url, method = 'GET', body) {
   return res.json();
 }
 
-function showToast(message, type = 'success', timeout = 3000) {
+function showToast(message, type = 'success', timeout = 2000) {
   const toast = document.getElementById('toast');
   if (!toast) return;
 
