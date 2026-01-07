@@ -1,0 +1,14 @@
+/* Credit invoice styling */
+.credit-invoice {
+  background-color: #fff1f2; /* very light red */
+}
+
+.credit-invoice td {
+  color: #b91c1c; /* strong red */
+  font-weight: 500;
+}
+
+/* Optional: left accent bar */
+.credit-invoice {
+  box-shadow: inset 4px 0 0 #dc2626;
+}

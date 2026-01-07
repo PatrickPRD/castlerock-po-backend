@@ -103,7 +103,11 @@ function renderInvoices() {
   }
 
   po.invoices.forEach(inv => {
+    const isCredit = Number(inv.total_amount) < 0;
+
     const tr = document.createElement('tr');
+    if (isCredit) tr.classList.add('credit-invoice');
+
     tr.innerHTML = `
       <td>${inv.invoice_number}</td>
       <td>${inv.invoice_date}</td>
@@ -117,9 +121,11 @@ function renderInvoices() {
           : ''}
       </td>
     `;
+
     invoiceList.appendChild(tr);
   });
 }
+
 
 /* ================= VAT Calculation ================= */
 function updateTotals() {
