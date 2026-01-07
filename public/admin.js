@@ -61,7 +61,7 @@ async function api(url, method = 'GET', body) {
    USERS (SUPER ADMIN ONLY)
    ============================ */
 async function loadUsers() {
-  if (role !== 'super_admin') return;
+  if (!userTable) return;
 
   const users = await api('/admin/users');
   userTable.innerHTML = '';
@@ -127,19 +127,42 @@ async function addUser() {
     return;
   }
 
-  await api('/admin/users', 'POST', {
-    email,
-    role: userRole,
-    first_name: firstName,
-    last_name: lastName
-  });
+  try {
+    // 1️⃣ Create user
+    await api('/admin/users', 'POST', {
+      email,
+      role: userRole,
+      first_name: firstName,
+      last_name: lastName
+    });
 
-  document.getElementById('firstName').value = '';
-  document.getElementById('lastName').value  = '';
-  document.getElementById('userEmail').value = '';
+    // 2️⃣ Send invite email
+    await fetch('/auth/request-reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
 
-  loadUsers();
+    // 3️⃣ Clear inputs
+    document.getElementById('firstName').value = '';
+    document.getElementById('lastName').value  = '';
+    document.getElementById('userEmail').value = '';
+
+    // 4️⃣ Refresh table
+    await loadUsers();
+
+    // 5️⃣ User feedback
+    const notice = document.getElementById('userNotice');
+  notice.textContent = `Invite sent to ${email}`;
+  notice.style.display = 'block';
+  setTimeout(() => notice.style.display = 'none', 4000);
+
+
+  } catch (err) {
+    alert(err.message || 'Failed to create user');
+  }
 }
+
 
 async function toggleUser(id, active) {
   try {
