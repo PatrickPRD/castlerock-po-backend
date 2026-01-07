@@ -26,6 +26,13 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK' });
 });
 
+app.get('/ui.js', (req, res) => {
+  res.type('application/javascript');
+  res.sendFile(
+    path.join(__dirname, 'services', 'ui.js')
+  );
+});
+
 const supplierRoutes = require('./routes/suppliers');
 app.use('/suppliers', supplierRoutes);
 
