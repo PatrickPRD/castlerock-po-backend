@@ -1,129 +1,58 @@
-/* ===============================
-   User Admin – Desktop Actions
-   =============================== */
+/* =========================================================
+   ADMIN – USERS PAGE
+   ========================================================= */
 
-.user-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  justify-content: flex-end;
+/* ---------- Layout ---------- */
+
+.po-table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-/* Desktop: horizontal + compact */
-@media (min-width: 768px) {
-  .user-actions {
-    flex-wrap: nowrap;
-    gap: 8px;
-  }
-
-  .user-actions button {
-    padding: 6px 12px;
-    font-size: 0.85rem;
-    line-height: 1;
-  }
+.po-table th,
+.po-table td {
+  padding: 12px 10px;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid #eee;
 }
 
-/* Secondary actions */
-.user-actions .btn-outline {
-  opacity: 0.85;
+.po-table th {
+  font-weight: 600;
+  color: #666;
+  font-size: 0.9rem;
 }
 
-/* Primary destructive */
-.user-actions .btn-danger {
-  margin-left: 6px;
+/* ---------- Actions column ---------- */
+
+/* Narrow column, no header text */
+.po-table th.actions-col,
+.po-table td.user-actions {
+  width: 110px;
+  text-align: right;
+  white-space: nowrap;
 }
 
-@media (max-width: 1200px) {
-  .po-table select {
-    min-width: 120px;
-    padding: 6px 8px;
-    font-size: 0.85rem;
-  }
+/* Ensure row separators align */
+.po-table td.user-actions {
+  vertical-align: middle;
 }
 
-@media (max-width: 1100px) {
-  .user-status {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    align-items: flex-start;
-  }
-
-  .user-status button {
-    padding: 5px 10px;
-    font-size: 0.8rem;
-  }
-}
-
-/* ===============================
-   User Admin – Action buttons
-   =============================== */
-
-.user-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  justify-content: flex-end;
-}
-
-/* Wide desktop */
-@media (min-width: 1200px) {
-  .user-actions {
-    flex-wrap: nowrap;
-  }
-
-  .user-actions button {
-    padding: 6px 12px;
-    font-size: 0.85rem;
-  }
-}
-
-/* Tablet / narrow desktop (key fix) */
-@media (max-width: 1199px) and (min-width: 768px) {
-  .user-actions {
-    max-width: 260px;
-  }
-
-  .user-actions button {
-    flex: 1 1 48%;
-    padding: 6px 10px;
-    font-size: 0.8rem;
-  }
-
-  /* Make Delete visually distinct */
-  .user-actions .btn-danger {
-    flex: 1 1 100%;
-  }
-}
-
-.user-actions-secondary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-@media (max-width: 1199px) and (min-width: 768px) {
-  .user-actions-secondary button {
-    flex: 1 1 48%;
-  }
-}
-
-/* ===============================
-   User Admin – Actions Dropdown
-   =============================== */
+/* ---------- Actions dropdown ---------- */
 
 .actions-menu {
   position: relative;
   display: inline-block;
 }
 
+/* Trigger button */
 .actions-trigger {
   background: none;
   border: 1px solid #c0392b;
   color: #c0392b;
   border-radius: 6px;
   padding: 6px 10px;
-  font-size: 18px;
+  font-size: 0.85rem;
   cursor: pointer;
 }
 
@@ -140,7 +69,7 @@
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-  z-index: 10;
+  z-index: 20;
   padding: 6px 0;
 }
 
@@ -153,6 +82,7 @@
   border: none;
   font-size: 0.9rem;
   cursor: pointer;
+  color: #333;
 }
 
 .actions-dropdown button:hover {
@@ -166,12 +96,38 @@
   border-top: 1px solid #e5e7eb;
 }
 
-/* Destructive */
+/* Destructive action */
 .actions-dropdown .danger {
   color: #c0392b;
   font-weight: 600;
 }
 
 .actions-dropdown .danger:hover {
-  background: rgba(192, 57, 43, 0.1);
+  background: rgba(192, 57, 43, 0.12);
+  color: #a93226;
 }
+
+/* ---------- Utility ---------- */
+
+.hidden {
+  display: none !important;
+}
+
+/* =========================================================
+   TABLET / NARROW DESKTOP (fix clunky 900–1100px range)
+   ========================================================= */
+
+@media (max-width: 1100px) and (min-width: 768px) {
+
+  .po-table th,
+  .po-table td {
+    padding: 10px 8px;
+    font-size: 0.85rem;
+  }
+
+  .actions-trigger {
+    padding: 5px 8px;
+    font-size: 0.8rem;
+  }
+}
+

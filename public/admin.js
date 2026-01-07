@@ -115,7 +115,7 @@ async function loadUsers() {
         <td class="user-actions">
           <div class="actions-menu">
               <button class="actions-trigger" onclick="toggleActions(this)">
-                ⋮
+                Actions
               </button>
               <div class="actions-dropdown hidden">
 
