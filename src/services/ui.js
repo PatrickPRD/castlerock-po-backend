@@ -47,27 +47,33 @@ function ensureUI() {
   }
 
   /* ===== Backdrop base ===== */
-  .ui-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 9998;
-    transition: background 0.15s ease;
-  }
+.ui-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;      
+  transition: background 0.15s ease;
+}
 
-  /* Neutral (confirm dialogs) */
-  .ui-backdrop.neutral {
-    background: rgba(0, 0, 0, 0.35);
-  }
+.ui-backdrop.active {
+  pointer-events: auto;      
+}
 
-  /* Success toast */
-  .ui-backdrop.success {
-    background: rgba(22, 163, 74, 0.18); /* subtle green */
-  }
+/* Neutral (confirm) */
+.ui-backdrop.neutral {
+  background: rgba(0, 0, 0, 0.35);
+}
 
-  /* Error toast */
-  .ui-backdrop.error {
-    background: rgba(220, 38, 38, 0.20); /* subtle red */
-  }
+/* Success toast */
+.ui-backdrop.success {
+  background: rgba(22, 163, 74, 0.18);
+}
+
+/* Error toast */
+.ui-backdrop.error {
+  background: rgba(220, 38, 38, 0.20);
+}
+
 
   /* ===== Toast ===== */
   .ui-toast {
@@ -156,7 +162,7 @@ window.showToast = function (message, type = 'success', timeout = 3000) {
   toast.textContent = message;
   toast.className = `ui-toast ${type}`;
 
-  backdrop.className = `ui-backdrop ${type}`;
+  backdrop.className = `ui-backdrop ${type} active`;
 
   toast.classList.remove('hidden');
   backdrop.classList.remove('hidden');
@@ -166,13 +172,15 @@ window.showToast = function (message, type = 'success', timeout = 3000) {
   function hideToast() {
     toast.classList.add('hidden');
     backdrop.classList.add('hidden');
-    backdrop.className = 'ui-backdrop';
+
+    backdrop.className = 'ui-backdrop';   // 👈 removes active + color
     backdrop.onclick = null;
   }
 
   backdrop.onclick = hideToast;
   toast._timer = setTimeout(hideToast, timeout);
 };
+
 
 
 
@@ -192,7 +200,7 @@ window.confirmDialog = function (message) {
 
     msg.textContent = message;
 
-    backdrop.className = 'ui-backdrop neutral';
+    backdrop.className = 'ui-backdrop neutral active';
 
     modal.classList.remove('hidden');
     backdrop.classList.remove('hidden');
@@ -200,8 +208,8 @@ window.confirmDialog = function (message) {
     function cleanup(result) {
       modal.classList.add('hidden');
       backdrop.classList.add('hidden');
-      backdrop.className = 'ui-backdrop';
 
+      backdrop.className = 'ui-backdrop';  // 👈 CRITICAL
       ok.onclick = null;
       cancel.onclick = null;
       backdrop.onclick = null;
@@ -214,6 +222,7 @@ window.confirmDialog = function (message) {
     backdrop.onclick = () => cleanup(false);
   });
 };
+
 
 
 
