@@ -37,7 +37,7 @@ let editingSiteId = null;
 let editingLocationId = null;
 
 /* ============================
-   API HELPER
+   HELPERS
    ============================ */
 async function api(url, method = 'GET', body) {
   const res = await fetch(url, {
@@ -55,6 +55,22 @@ async function api(url, method = 'GET', body) {
   }
 
   return res.json();
+}
+
+function showToast(message, type = 'success', timeout = 3000) {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+
+  toast.textContent = message;
+  toast.className = `toast ${type}`;
+  
+  // Show
+  toast.classList.remove('hidden');
+
+  // Auto-hide
+  setTimeout(() => {
+    toast.classList.add('hidden');
+  }, timeout);
 }
 
 /* ============================
@@ -157,10 +173,8 @@ async function addUser() {
     await loadUsers();
 
     // 5️⃣ User feedback
-    const notice = document.getElementById('userNotice');
-  notice.textContent = `Invite sent to ${email}`;
-  notice.style.display = 'block';
-  setTimeout(() => notice.style.display = 'none', 4000);
+showToast(`Invite sent to ${email}`, 'success');
+
 
 
   } catch (err) {
@@ -199,7 +213,8 @@ async function deleteUser(id, email) {
     await loadUsers();
     alert(`User ${email} deleted`);
   } catch (err) {
-    alert(err.message || 'Failed to delete user');
+    showToast(err.message || 'Failed to create user', 'error');
+
   }
 }
 
@@ -221,9 +236,10 @@ async function sendInvite(email) {
       body: JSON.stringify({ email })
     });
 
-    alert('Invite email sent (if the user is active).');
+    showToast(`Invite email sent to ${email}`, 'success');
   } catch (err) {
-    alert('Failed to send invite');
+    showToast('Failed to send invite email', 'error');
+
   }
 }
 
