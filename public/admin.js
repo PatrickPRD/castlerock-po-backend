@@ -144,9 +144,7 @@ async function addUser() {
   const userRole  = document.getElementById('userRole').value;
 
   if (!email || !firstName || !lastName) {
-    catch (err) {
-  showToast(err.message || 'Failed to create user', 'error');
-}
+    showToast('Please fill in all required fields', 'error');
     return;
   }
 
