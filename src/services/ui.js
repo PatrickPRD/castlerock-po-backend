@@ -3,6 +3,38 @@
    Single-file version (CSS + HTML injected via JS)
    ========================================================= */
 
+
+
+/*------HELPERS------*/
+function ensureUI() {
+  if (document.getElementById('ui-backdrop')) return;
+
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = `
+    <div id="ui-backdrop" class="ui-backdrop hidden"></div>
+
+    <div id="ui-toast" class="ui-toast hidden"></div>
+
+    <div id="ui-confirm" class="ui-confirm hidden">
+      <p id="ui-confirm-message"></p>
+      <div class="ui-confirm-actions">
+        <button id="ui-confirm-cancel" class="btn-outline">Cancel</button>
+        <button id="ui-confirm-ok" class="btn-danger">Confirm</button>
+      </div>
+    </div>
+  `;
+
+  // Ensure body exists
+  if (!document.body) {
+    document.addEventListener('DOMContentLoaded', () => {
+      document.body.appendChild(wrapper);
+    });
+  } else {
+    document.body.appendChild(wrapper);
+  }
+}
+
+
 /* ---------- Inject CSS ---------- */
 (function injectUICSS() {
   if (document.getElementById('ui-style')) return;
@@ -96,6 +128,8 @@
 
 /* ---------- Toast ---------- */
 window.showToast = function (message, type = 'success', timeout = 3000) {
+  ensureUI();
+
   const toast = document.getElementById('ui-toast');
   const backdrop = document.getElementById('ui-backdrop');
   if (!toast || !backdrop) return;
@@ -114,8 +148,11 @@ window.showToast = function (message, type = 'success', timeout = 3000) {
   }, timeout);
 };
 
+
 /* ---------- Confirm Dialog ---------- */
 window.confirmDialog = function (message) {
+  ensureUI();
+
   return new Promise(resolve => {
     const modal = document.getElementById('ui-confirm');
     const backdrop = document.getElementById('ui-backdrop');
@@ -123,7 +160,10 @@ window.confirmDialog = function (message) {
     const ok = document.getElementById('ui-confirm-ok');
     const cancel = document.getElementById('ui-confirm-cancel');
 
-    if (!modal || !backdrop) return resolve(false);
+    if (!modal || !backdrop || !msg) {
+      console.warn('UI not ready');
+      return resolve(false);
+    }
 
     msg.textContent = message;
 
@@ -144,3 +184,4 @@ window.confirmDialog = function (message) {
     backdrop.onclick = () => cleanup(false);
   });
 };
+
