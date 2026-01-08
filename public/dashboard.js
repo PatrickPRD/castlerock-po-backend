@@ -3,6 +3,11 @@
 const token = localStorage.getItem("token");
 const role = localStorage.getItem("role");
 
+// Hide Admin menu item unless super_admin
+if (role !== "super_admin") {
+  document.getElementById("adminMenuBtn")?.remove();
+}
+
 if (!token) location.href = "login.html";
 
 const poTable = document.getElementById("poTable");

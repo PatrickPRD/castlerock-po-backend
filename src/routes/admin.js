@@ -427,13 +427,13 @@ router.delete(
 );
 
 /* ======================================================
-   LOCATIONS – ADMIN + SUPER ADMIN
+   LOCATIONS – SUPER ADMIN
    ====================================================== */
 
 router.get(
   '/locations',
   authenticate,
-  authorizeRoles('admin', 'super_admin'),
+  authorizeRoles('super_admin'),
   async (req, res) => {
     const [rows] = await db.query(
       `SELECT l.id, l.name, l.type, s.name AS site
@@ -476,7 +476,7 @@ router.post(
 router.put(
   '/locations/:id',
   authenticate,
-  authorizeRoles('admin', 'super_admin'),
+  authorizeRoles('super_admin'),
   async (req, res) => {
     const locationId = req.params.id;
     const { name, type, site_id } = req.body;
@@ -508,7 +508,7 @@ router.put(
 router.delete(
   '/locations/:id',
   authenticate,
-  authorizeRoles('admin', 'super_admin'),
+  authorizeRoles('super_admin'),
   async (req, res) => {
     const locationId = req.params.id;
 
