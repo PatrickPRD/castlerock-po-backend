@@ -152,7 +152,7 @@ function ensureUI() {
 })();
 
 /* ---------- Toast ---------- */
-window.showToast = function (message, type = 'success', timeout = 3000) {
+window.showToast = function (message, type = 'success', timeout = 5000) {
   ensureUI();
 
   const toast = document.getElementById('ui-toast');
