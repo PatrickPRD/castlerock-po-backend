@@ -1,31 +1,43 @@
-const token = localStorage.getItem('token');
-const role  = localStorage.getItem('role');
+const token = localStorage.getItem("token");
+const role = localStorage.getItem("role");
 
-if (!token || !['admin', 'super_admin'].includes(role)) {
-  location.href = 'dashboard.html';
+if (!token || !["admin", "super_admin"].includes(role)) {
+  location.href = "dashboard.html";
 }
 
-const table = document.getElementById('supplierTable');
-const filterInput = document.getElementById('filterInput');
+const table = document.getElementById("supplierTable");
+const filterInput = document.getElementById("filterInput");
 
 let suppliers = [];
 
 /* =========================
    API helper
    ========================= */
-async function api(url) {
+async function api(url, method = 'GET', body) {
   const res = await fetch(url, {
-    headers: { Authorization: 'Bearer ' + token }
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + token
+    },
+    body: body ? JSON.stringify(body) : undefined
   });
-  return res.json();
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Request failed');
+  }
+
+  return data;
 }
+
 
 /* =========================
    Load suppliers
    ========================= */
 async function loadSuppliers() {
   const q = filterInput.value.trim();
-  suppliers = await api(`/suppliers${q ? '?q=' + encodeURIComponent(q) : ''}`);
+  suppliers = await api(`/suppliers${q ? "?q=" + encodeURIComponent(q) : ""}`);
   render();
 }
 
@@ -33,44 +45,56 @@ async function loadSuppliers() {
    Render
    ========================= */
 function render() {
-  table.innerHTML = '';
+  table.innerHTML = "";
 
-  suppliers.forEach(s => {
-    const main = document.createElement('tr');
-    main.className = 'main-row';
+  suppliers.forEach((s) => {
+    const main = document.createElement("tr");
+    main.className = "main-row";
     main.innerHTML = `
       <td>${s.name}</td>
-      <td>${s.main_contact || ''}</td>
+      <td>${s.main_contact || ""}</td>
     `;
 
-    const details = document.createElement('tr');
-    details.className = 'details-row';
-    details.style.display = 'none';
+    const details = document.createElement("tr");
+    details.className = "details-row";
+    details.style.display = "none";
     details.innerHTML = `
       <td colspan="2">
         <div class="details-grid">
-          <div><strong>Email:</strong> ${s.email || '—'}</div>
-          <div><strong>Phone:</strong> ${s.phone || '—'}</div>
+          <div><strong>Email:</strong> ${s.email || "—"}</div>
+          <div><strong>Phone:</strong> ${s.phone || "—"}</div>
           <div class="full-width">
             <strong>Notes:</strong><br>
-            ${s.notes || '—'}
+            ${s.notes || "—"}
           </div>
         </div>
 
         <div class="details-actions">
-          ${role === 'super_admin' ? `
-            <button class="btn-outline" onclick="editSupplier(${s.id})">
-              Edit
-            </button>
-            <button class="btn-danger"
-              onclick="deleteSupplier(${s.id}, '${s.name.replace(/'/g, "\\'")}')">
-              Delete
-            </button>
+          ${
+            role === "super_admin"
+              ? `
+            <button class="btn-outline"
+  onclick="event.stopPropagation(); editSupplier(${s.id})">
+  Edit
+</button>
 
-            <button class="btn-outline" onclick="mergeSupplier(${s.id})">
-              Merge
-            </button>
-          ` : ''}
+<button class="btn-danger"
+  onclick="event.stopPropagation(); deleteSupplier(${s.id}, '${s.name.replace(
+                  /'/g,
+                  "\\'"
+                )}')">
+  Delete
+</button>
+
+
+            <button class="btn-outline"
+  onclick="event.stopPropagation(); mergeSupplier(${s.id})">
+  Merge
+</button>
+
+          `
+              : ""
+          }
         </div>
 
       </td>
@@ -78,7 +102,7 @@ function render() {
 
     main.onclick = () => {
       details.style.display =
-        details.style.display === 'none' ? 'table-row' : 'none';
+        details.style.display === "none" ? "table-row" : "none";
     };
 
     table.appendChild(main);
@@ -90,7 +114,7 @@ function render() {
    Actions
    ========================= */
 function addSupplier() {
-  location.href = 'edit-supplier.html';
+  location.href = "edit-supplier.html";
 }
 
 function editSupplier(id) {
@@ -99,39 +123,39 @@ function editSupplier(id) {
 
 async function mergeSuppliers(sourceId, targetId) {
   const ok = await confirmDialog(
-    'All purchase orders will be moved to the selected supplier.\nThis cannot be undone.'
+    "All purchase orders will be moved to the selected supplier.\nThis cannot be undone."
   );
   if (!ok) return;
 
   try {
-    await api('/suppliers/merge', 'POST', { sourceId, targetId });
-    showToast('Suppliers merged successfully', 'success');
+    await api("/suppliers/merge", "POST", { sourceId, targetId });
+    showToast("Suppliers merged successfully", "success");
     loadSuppliers();
   } catch (err) {
-    showToast(err.message, 'error');
+    showToast(err.message, "error");
   }
 }
 
 async function mergeSupplier(sourceId) {
-  const source = suppliers.find(s => s.id === sourceId);
+  const source = suppliers.find((s) => s.id === sourceId);
   if (!source) {
-    showToast('Supplier not found', 'error');
+    showToast("Supplier not found", "error");
     return;
   }
 
   // Build options excluding source
   const options = suppliers
-    .filter(s => s.id !== sourceId)
-    .map(s => `<option value="${s.id}">${s.name}</option>`)
-    .join('');
+    .filter((s) => s.id !== sourceId)
+    .map((s) => `<option value="${s.id}">${s.name}</option>`)
+    .join("");
 
   if (!options) {
-    showToast('No other suppliers available to merge into', 'error');
+    showToast("No other suppliers available to merge into", "error");
     return;
   }
 
-  const modal = document.createElement('div');
-  modal.className = 'modal-backdrop';
+  const modal = document.createElement("div");
+  modal.className = "modal-backdrop";
   modal.innerHTML = `
     <div class="modal">
       <h3>Merge Supplier</h3>
@@ -158,32 +182,30 @@ async function mergeSupplier(sourceId) {
 
   document.body.appendChild(modal);
 
-  modal.querySelector('#mergeCancel').onclick = () => modal.remove();
+  modal.querySelector("#mergeCancel").onclick = () => modal.remove();
 
-  modal.querySelector('#mergeConfirm').onclick = async () => {
-    const targetId = modal.querySelector('#mergeTarget').value;
+  modal.querySelector("#mergeConfirm").onclick = async () => {
+    const targetId = modal.querySelector("#mergeTarget").value;
     if (!targetId) {
-      showToast('Please select a target supplier', 'error');
+      showToast("Please select a target supplier", "error");
       return;
     }
 
     modal.remove();
 
     try {
-      await api('/suppliers/merge', 'POST', {
+      await api("/suppliers/merge", "POST", {
         sourceId,
-        targetId: Number(targetId)
+        targetId: Number(targetId),
       });
 
-      showToast('Suppliers merged successfully', 'success');
+      showToast("Suppliers merged successfully", "success");
       loadSuppliers();
     } catch (err) {
-      showToast(err.message, 'error');
+      showToast(err.message, "error");
     }
   };
 }
-
-
 
 async function deleteSupplier(id, name) {
   const ok = await confirmDialog(
@@ -192,19 +214,19 @@ async function deleteSupplier(id, name) {
   if (!ok) return;
 
   try {
-    await api(`/suppliers/${id}`, 'DELETE');
-    showToast('Supplier deleted', 'success');
+    await api(`/suppliers/${id}`, "DELETE");
+    showToast("Supplier deleted", "success");
     loadSuppliers();
   } catch (err) {
-    showToast(err.message, 'error');
+    showToast(err.message, "error");
   }
 }
 
 function back() {
-  location.href = 'dashboard.html';
+  location.href = "dashboard.html";
 }
 
-filterInput.addEventListener('input', loadSuppliers);
+filterInput.addEventListener("input", loadSuppliers);
 
 /* =========================
    Init
