@@ -154,31 +154,70 @@ async function mergeSupplier(sourceId) {
     return;
   }
 
-  const modal = document.createElement("div");
-  modal.className = "modal-backdrop";
-  modal.innerHTML = `
-    <div class="modal">
-      <h3>Merge Supplier</h3>
-      <p>
-        <strong>${source.name}</strong> will be merged into:
-      </p>
+const backdrop = document.createElement("div");
+backdrop.className = "ui-backdrop neutral active";
 
-      <select id="mergeTarget" class="input">
-        <option value="">Select target supplier</option>
-        ${options}
-      </select>
+const modal = document.createElement("div");
+modal.className = "ui-confirm";
 
-      <p class="warn-text">
-        All purchase orders will be reassigned.<br>
-        This action cannot be undone.
-      </p>
+modal.innerHTML = `
+  <h3>Merge Supplier</h3>
 
-      <div class="modal-actions">
-        <button class="btn-outline" id="mergeCancel">Cancel</button>
-        <button class="btn-danger" id="mergeConfirm">Merge</button>
-      </div>
-    </div>
-  `;
+  <p>
+    <strong>${source.name}</strong> will be merged into:
+  </p>
+
+  <select id="mergeTarget" class="input">
+    <option value="">Select target supplier</option>
+    ${options}
+  </select>
+
+  <p class="warn-text">
+    All purchase orders will be reassigned.<br>
+    This action cannot be undone.
+  </p>
+
+  <div class="ui-confirm-actions">
+    <button class="btn-outline" id="mergeCancel">Cancel</button>
+    <button class="btn-danger" id="mergeConfirm">Merge</button>
+  </div>
+`;
+
+function closeMerge() {
+  backdrop.remove();
+  modal.remove();
+}
+
+backdrop.onclick = closeMerge;
+modal.querySelector("#mergeCancel").onclick = closeMerge;
+
+modal.querySelector("#mergeConfirm").onclick = async () => {
+  const targetId = modal.querySelector("#mergeTarget").value;
+
+  if (!targetId) {
+    showToast("Please select a target supplier", "error");
+    return;
+  }
+
+  closeMerge();
+
+  try {
+    await api("/suppliers/merge", "POST", {
+      sourceId,
+      targetId: Number(targetId),
+    });
+
+    showToast("Suppliers merged successfully", "success");
+    loadSuppliers();
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+};
+
+
+document.body.appendChild(backdrop);
+document.body.appendChild(modal);
+
 
   document.body.appendChild(modal);
 
