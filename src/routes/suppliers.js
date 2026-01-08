@@ -129,7 +129,7 @@ router.post(
 router.put(
   '/:id',
   authenticate,
-  authorizeRoles('admin', 'super_admin'),
+  authorizeRoles('super_admin'),
   async (req, res) => {
 
     const { name, main_contact, email, phone, notes } = req.body;
@@ -187,7 +187,7 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
-  authorizeRoles('admin', 'super_admin'),
+  authorizeRoles('super_admin'),
   async (req, res) => {
 
     const [[supplier]] = await db.query(
@@ -227,5 +227,64 @@ router.delete(
     res.json({ success: true });
   }
 );
+
+/* ======================================================
+   MERGE suppliers
+   ====================================================== */
+router.post(
+  '/merge',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+
+    const { sourceId, targetId } = req.body;
+
+    if (!sourceId || !targetId) {
+      return res.status(400).json({ error: 'Source and target suppliers are required' });
+    }
+
+    if (sourceId === targetId) {
+      return res.status(400).json({ error: 'Suppliers must be different' });
+    }
+
+    const [[source]] = await db.query(
+      'SELECT * FROM suppliers WHERE id = ?',
+      [sourceId]
+    );
+
+    const [[target]] = await db.query(
+      'SELECT * FROM suppliers WHERE id = ?',
+      [targetId]
+    );
+
+    if (!source || !target) {
+      return res.status(404).json({ error: 'Supplier not found' });
+    }
+
+    // Reassign POs
+    await db.query(
+      'UPDATE purchase_orders SET supplier_id = ? WHERE supplier_id = ?',
+      [targetId, sourceId]
+    );
+
+    // Delete source supplier
+    await db.query(
+      'DELETE FROM suppliers WHERE id = ?',
+      [sourceId]
+    );
+
+    await logAudit({
+      table_name: 'suppliers',
+      record_id: sourceId,
+      action: 'MERGE',
+      old_data: source,
+      new_data: { merged_into: targetId },
+      changed_by: req.user.id
+    });
+
+    res.json({ success: true });
+  }
+);
+
 
 module.exports = router;

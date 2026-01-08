@@ -58,15 +58,19 @@ function render() {
         </div>
 
         <div class="details-actions">
-          <button class="btn-outline"
-            onclick="editSupplier(${s.id})">
-            Edit
-          </button>
-          <button class="btn-danger"
-            onclick="deleteSupplier(${s.id})">
-            Delete
-          </button>
+          ${role === 'super_admin' ? `
+            <button class="btn-outline" onclick="editSupplier(${s.id})">
+              Edit
+            </button>
+            <button class="btn-danger" onclick="deleteSupplier(${s.id})">
+              Delete
+            </button>
+            <button class="btn-outline" onclick="mergeSupplier(${s.id})">
+              Merge
+            </button>
+          ` : ''}
         </div>
+
       </td>
     `;
 
@@ -91,21 +95,44 @@ function editSupplier(id) {
   location.href = `edit-supplier.html?id=${id}`;
 }
 
-async function deleteSupplier(id) {
-  if (!(await confirmDialog('Delete this supplier?'))) return;
+async function mergeSuppliers(sourceId, targetId) {
+  const ok = await confirmDialog(
+    'All purchase orders will be moved to the selected supplier.\nThis cannot be undone.'
+  );
+  if (!ok) return;
 
-  const res = await fetch(`/suppliers/${id}`, {
-    method: 'DELETE',
-    headers: { Authorization: 'Bearer ' + token }
-  });
-
-  const data = await res.json();
-  if (!res.ok) {
-    showToast(data.error || 'Cannot delete supplier', 'error');
+  try {
+    await api('/suppliers/merge', 'POST', { sourceId, targetId });
+    showToast('Suppliers merged successfully', 'success');
+    loadSuppliers();
+  } catch (err) {
+    showToast(err.message, 'error');
   }
-
-  loadSuppliers();
 }
+
+
+
+
+async function deleteSupplier(id, name) {
+  const ok = await confirmDialog(
+    `Delete supplier "${name}"?\nThis cannot be undone.`
+  );
+  if (!ok) return;
+
+  try {
+    await api(`/suppliers/${id}`, 'DELETE');
+    showToast('Supplier deleted', 'success');
+    loadSuppliers();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+if (role !== 'super_admin') {
+  showToast('Access denied', 'error');
+  setTimeout(() => location.href = 'suppliers.html', 800);
+}
+
 
 function back() {
   location.href = 'dashboard.html';
