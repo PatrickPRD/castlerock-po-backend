@@ -128,12 +128,6 @@ async function deleteSupplier(id, name) {
   }
 }
 
-if (role !== 'super_admin') {
-  showToast('Access denied', 'error');
-  setTimeout(() => location.href = 'suppliers.html', 800);
-}
-
-
 function back() {
   location.href = 'dashboard.html';
 }
