@@ -149,8 +149,17 @@ if (!payload.supplierId || !payload.siteId || !payload.locationId || !payload.po
   }
 
 const data = await res.json();
-showToast(`Purchase Order ${data.poNumber} created successfully`, 'success');
+
+sessionStorage.setItem(
+  'toast',
+  JSON.stringify({
+    message: `Purchase Order ${data.poNumber} created successfully`,
+    type: 'success'
+  })
+);
+
 window.location.href = 'dashboard.html';
+
 
 });
 });

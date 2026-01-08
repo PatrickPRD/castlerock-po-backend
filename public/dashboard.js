@@ -103,6 +103,14 @@ function fillSelect(select, values) {
   });
 }
 
+const storedToast = sessionStorage.getItem('toast');
+if (storedToast) {
+  const { message, type } = JSON.parse(storedToast);
+  showToast(message, type);
+  sessionStorage.removeItem('toast');
+}
+
+
 /* ============================
    Apply Filters
    ============================ */
