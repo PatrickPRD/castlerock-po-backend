@@ -62,9 +62,11 @@ function render() {
             <button class="btn-outline" onclick="editSupplier(${s.id})">
               Edit
             </button>
-            <button class="btn-danger" onclick="deleteSupplier(${s.id})">
+            <button class="btn-danger"
+              onclick="deleteSupplier(${s.id}, '${s.name.replace(/'/g, "\\'")}')">
               Delete
             </button>
+
             <button class="btn-outline" onclick="mergeSupplier(${s.id})">
               Merge
             </button>
@@ -110,6 +112,76 @@ async function mergeSuppliers(sourceId, targetId) {
   }
 }
 
+async function mergeSupplier(sourceId) {
+  const source = suppliers.find(s => s.id === sourceId);
+  if (!source) {
+    showToast('Supplier not found', 'error');
+    return;
+  }
+
+  // Build options excluding source
+  const options = suppliers
+    .filter(s => s.id !== sourceId)
+    .map(s => `<option value="${s.id}">${s.name}</option>`)
+    .join('');
+
+  if (!options) {
+    showToast('No other suppliers available to merge into', 'error');
+    return;
+  }
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-backdrop';
+  modal.innerHTML = `
+    <div class="modal">
+      <h3>Merge Supplier</h3>
+      <p>
+        <strong>${source.name}</strong> will be merged into:
+      </p>
+
+      <select id="mergeTarget" class="input">
+        <option value="">Select target supplier</option>
+        ${options}
+      </select>
+
+      <p class="warn-text">
+        All purchase orders will be reassigned.<br>
+        This action cannot be undone.
+      </p>
+
+      <div class="modal-actions">
+        <button class="btn-outline" id="mergeCancel">Cancel</button>
+        <button class="btn-danger" id="mergeConfirm">Merge</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  modal.querySelector('#mergeCancel').onclick = () => modal.remove();
+
+  modal.querySelector('#mergeConfirm').onclick = async () => {
+    const targetId = modal.querySelector('#mergeTarget').value;
+    if (!targetId) {
+      showToast('Please select a target supplier', 'error');
+      return;
+    }
+
+    modal.remove();
+
+    try {
+      await api('/suppliers/merge', 'POST', {
+        sourceId,
+        targetId: Number(targetId)
+      });
+
+      showToast('Suppliers merged successfully', 'success');
+      loadSuppliers();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+}
 
 
 
