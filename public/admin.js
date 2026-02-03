@@ -464,6 +464,57 @@ async function deleteLocation(id) {
 }
 
 /* ============================
+   AUTO-POPULATE SITES & LOCATIONS
+   ============================ */
+async function autoPopulateSites() {
+  if (!confirm('This will automatically update sites and locations based on PO data. Continue?')) {
+    return;
+  }
+
+  try {
+    showToast('Processing... This may take a moment.', 'info');
+    
+    const result = await api('/admin/auto-populate-sites', 'POST');
+    
+    let message = `✅ Auto-population complete!\n\n`;
+    
+    if (result.site_updates && result.site_updates.length > 0) {
+      message += `Sites Updated: ${result.site_updates.length}\n`;
+      result.site_updates.forEach(u => {
+        message += `  • ${u.old_name} → ${u.new_name} (Letter: ${u.letter})\n`;
+      });
+    }
+    
+    if (result.location_updates > 0) {
+      message += `\nLocations Updated: ${result.location_updates}\n`;
+    }
+    
+    if (result.summary) {
+      message += `\n📊 Summary:\n`;
+      result.summary.forEach(s => {
+        message += `  • ${s.name}: ${s.location_count} locations, ${s.po_count} POs\n`;
+      });
+    }
+    
+    showToast('Sites and locations updated successfully!', 'success');
+    
+    // Show detailed results in console
+    console.log('Auto-populate results:', result);
+    
+    // Refresh the UI
+    await loadSites();
+    await loadLocations();
+    
+    // Show alert with details
+    alert(message);
+    
+  } catch (err) {
+    showToast(err.message, 'error');
+    console.error('Auto-populate error:', err);
+  }
+}
+
+/* ============================
    INIT
    ============================ */
 if (role === "super_admin") {

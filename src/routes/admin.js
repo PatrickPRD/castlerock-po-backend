@@ -317,7 +317,7 @@ router.get(
   authorizeRoles('super_admin'),
   async (req, res) => {
     const [rows] = await db.query(
-      `SELECT id, name, site_letter
+      `SELECT id, name, address, active
        FROM sites
        ORDER BY name`
     );
@@ -436,7 +436,7 @@ router.get(
   authorizeRoles('super_admin'),
   async (req, res) => {
     const [rows] = await db.query(
-      `SELECT l.id, l.name, l.type, s.name AS site
+      `SELECT l.id, l.name, l.site_id, s.name AS site
        FROM locations l
        JOIN sites s ON l.site_id = s.id
        ORDER BY s.name, l.name`
@@ -531,6 +531,135 @@ router.delete(
     );
 
     res.json({ success: true });
+  }
+);
+
+/* ======================================================
+   AUTO-POPULATE SITES & LOCATIONS FROM PO DATA
+   ====================================================== */
+router.post(
+  '/auto-populate-sites',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      console.log('🔄 Starting auto-population of sites and locations...');
+
+      // Step 1: Get unique site letters from PO numbers and their existing site_id
+      const [poSiteData] = await db.query(`
+        SELECT DISTINCT
+          SUBSTRING(po_number, 1, 1) as site_letter,
+          site_id,
+          COUNT(*) as po_count
+        FROM purchase_orders
+        GROUP BY site_letter, site_id
+        ORDER BY site_letter
+      `);
+
+      console.log('Found PO site data:', poSiteData);
+
+      // Step 2: Get existing sites
+      const [existingSites] = await db.query('SELECT id, name FROM sites');
+      const siteMap = {};
+      existingSites.forEach(s => {
+        siteMap[s.id] = s.name;
+      });
+
+      // Step 3: Update site names based on PO letter mapping
+      const siteLetterMap = {
+        'B': 'Bandon',
+        'M': 'Midleton', 
+        'P': 'Phase 2',
+        'T': 'Test Site'
+      };
+
+      const updates = [];
+      const siteIdToLetter = {};
+
+      for (const data of poSiteData) {
+        const siteName = siteLetterMap[data.site_letter] || `Site ${data.site_letter}`;
+        
+        // Check if this site_id exists
+        if (data.site_id && siteMap[data.site_id]) {
+          // Update the name if it doesn't match
+          if (siteMap[data.site_id] !== siteName) {
+            await db.query(
+              'UPDATE sites SET name = ? WHERE id = ?',
+              [siteName, data.site_id]
+            );
+            updates.push({
+              action: 'updated',
+              site_id: data.site_id,
+              old_name: siteMap[data.site_id],
+              new_name: siteName,
+              letter: data.site_letter
+            });
+          }
+          siteIdToLetter[data.site_id] = data.site_letter;
+        }
+      }
+
+      // Step 4: Update location associations based on PO site_id
+      // Find all locations that need to be associated with the correct site
+      const [locationUpdates] = await db.query(`
+        SELECT DISTINCT
+          l.id as location_id,
+          l.name as location_name,
+          l.site_id as current_site_id,
+          po.site_id as po_site_id,
+          COUNT(*) as po_count
+        FROM locations l
+        JOIN purchase_orders po ON po.location_id = l.id
+        WHERE l.site_id != po.site_id OR l.site_id IS NULL
+        GROUP BY l.id, l.name, l.site_id, po.site_id
+        ORDER BY po_count DESC
+      `);
+
+      const locationUpdateResults = [];
+      for (const loc of locationUpdates) {
+        await db.query(
+          'UPDATE locations SET site_id = ? WHERE id = ?',
+          [loc.po_site_id, loc.location_id]
+        );
+        locationUpdateResults.push({
+          location_id: loc.location_id,
+          location_name: loc.location_name,
+          old_site_id: loc.current_site_id,
+          new_site_id: loc.po_site_id,
+          po_count: loc.po_count
+        });
+      }
+
+      // Step 5: Get summary
+      const [siteSummary] = await db.query(`
+        SELECT 
+          s.id,
+          s.name,
+          COUNT(DISTINCT l.id) as location_count,
+          COUNT(DISTINCT po.id) as po_count
+        FROM sites s
+        LEFT JOIN locations l ON l.site_id = s.id
+        LEFT JOIN purchase_orders po ON po.site_id = s.id
+        GROUP BY s.id, s.name
+        ORDER BY s.name
+      `);
+
+      res.json({
+        success: true,
+        message: 'Sites and locations auto-populated successfully',
+        site_updates: updates,
+        location_updates: locationUpdateResults.length,
+        location_details: locationUpdateResults,
+        summary: siteSummary
+      });
+
+    } catch (err) {
+      console.error('AUTO-POPULATE ERROR:', err);
+      res.status(500).json({
+        error: 'Failed to auto-populate sites and locations',
+        details: err.message
+      });
+    }
   }
 );
 

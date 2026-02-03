@@ -77,7 +77,12 @@
        SITES
        ======================= -->
   <div class="card" id="sitesSection">
-    <h3>Sites</h3>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <h3 style="margin: 0;">Sites</h3>
+      <button class="btn-outline" onclick="autoPopulateSites()" style="background: #4CAF50; color: white;">
+        🔄 Auto-Populate from POs
+      </button>
+    </div>
 <p id="siteEditNotice" class="edit-notice" style="display:none;">
   Editing existing item — changes affect all Purchase Orders - Site Letter cannot be changed
 </p>
