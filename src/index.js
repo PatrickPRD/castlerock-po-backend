@@ -1,12 +1,12 @@
 
 require('dotenv').config();
 const express = require('express');
+const pool = require('./db');
 
 const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
 
 const path = require('path');
 app.use(express.static(path.join(__dirname, '../public')));
@@ -16,14 +16,22 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/login.html'));
 });
 
-app.listen(3000, '127.0.0.1', () => {
-  console.log('Server running on localhost:3000');
-});
-
-
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK' });
+// Health check with database connectivity test
+app.get('/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ 
+      status: 'OK', 
+      database: 'connected',
+      environment: process.env.NODE_ENV || 'development'
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'ERROR', 
+      database: 'disconnected',
+      error: error.message 
+    });
+  }
 });
 
 app.get('/ui.js', (req, res) => {
@@ -65,7 +73,12 @@ app.use('/reports', reportRoutes);
 const exportRoutes = require('./routes/exports');
 app.use('/exports', exportRoutes);
 
+// Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
+
+app.listen(PORT, HOST, () => {
+  console.log(`🚀 Server running on ${HOST}:${PORT}`);
+  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🗄️  Database: ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
 });

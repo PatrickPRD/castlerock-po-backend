@@ -2,8 +2,15 @@
   "name": "castlerock-po-backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "src/index.js",
   "scripts": {
+    "start": "node src/index.js",
+    "dev": "set NODE_ENV=development && node src/index.js",
+    "setup": "node database/setup.js",
+    "migrate": "node database/migrate.js",
+    "test-db": "node database/test-connection.js",
+    "reset-db": "node database/reset-db.js",
+    "import-data": "node database/import-data.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

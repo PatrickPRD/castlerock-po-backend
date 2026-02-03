@@ -43,7 +43,7 @@ router.get(
       LEFT JOIN invoices i
         ON i.purchase_order_id = po.id
 
-      WHERE po.cancelled_at IS NULL
+      WHERE po.status NOT IN ('cancelled', 'draft')
 
       GROUP BY si.name, l.name
       ORDER BY si.name, l.name
@@ -78,7 +78,7 @@ router.get(
         JOIN locations l  ON l.id  = po.location_id
         LEFT JOIN invoices i ON i.purchase_order_id = po.id
 
-        WHERE po.cancelled_at IS NULL
+        WHERE po.status NOT IN ('cancelled', 'draft')
 
         GROUP BY si.name, l.id, l.name
         ORDER BY si.name, l.name
@@ -99,7 +99,7 @@ router.get(
         JOIN po_stages ps  ON ps.id = po.stage_id
         LEFT JOIN invoices i ON i.purchase_order_id = po.id
 
-        WHERE po.cancelled_at IS NULL
+        WHERE po.status NOT IN ('cancelled', 'draft')
 
         GROUP BY l.id, ps.id, ps.name
         ORDER BY l.id, ps.name
@@ -162,7 +162,7 @@ router.get(
         JOIN locations l  ON l.id  = po.location_id
         LEFT JOIN invoices i ON i.purchase_order_id = po.id
 
-        WHERE po.cancelled_at IS NULL
+        WHERE po.status NOT IN ('cancelled', 'draft')
 
         GROUP BY si.name, l.id, l.name
         ORDER BY si.name, l.name
@@ -183,7 +183,7 @@ router.get(
         JOIN po_stages ps  ON ps.id = po.stage_id
         LEFT JOIN invoices i ON i.purchase_order_id = po.id
 
-        WHERE po.cancelled_at IS NULL
+        WHERE po.status NOT IN ('cancelled', 'draft')
 
         GROUP BY l.id, ps.id, ps.name
         ORDER BY l.id, ps.name
@@ -346,7 +346,7 @@ router.get(
       JOIN sites s      ON po.site_id = s.id
       JOIN locations l  ON po.location_id = l.id
       LEFT JOIN invoices i ON i.purchase_order_id = po.id
-      WHERE po.cancelled_at IS NULL
+      WHERE po.status NOT IN ('cancelled', 'draft')
       GROUP BY s.name, l.name
       ORDER BY s.name, l.name
     `);
@@ -467,7 +467,7 @@ router.get(
       JOIN purchase_orders po ON po.supplier_id = s.id
       LEFT JOIN invoices i ON i.purchase_order_id = po.id
 
-      WHERE po.cancelled_at IS NULL
+      WHERE po.status NOT IN ('cancelled', 'draft')
         ${siteFilter}
 
       GROUP BY s.id, s.name

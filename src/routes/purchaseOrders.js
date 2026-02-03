@@ -41,7 +41,7 @@ router.get(
   JOIN locations l ON po.location_id = l.id
   JOIN po_stages ps ON po.stage_id = ps.id
   LEFT JOIN invoices i ON i.purchase_order_id = po.id
-  WHERE po.status = 'Issued'
+  WHERE po.status IN ('Issued', 'open', 'approved', 'received')
   GROUP BY po.id
   ORDER BY po.po_date DESC
 `);
