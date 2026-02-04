@@ -2,9 +2,9 @@
 -- Castlerock PO Tracker - Complete Database Schema
 -- ========================================
 
-DROP DATABASE IF EXISTS castlerock_dev;
-CREATE DATABASE castlerock_dev;
-USE castlerock_dev;
+DROP DATABASE IF EXISTS castlerock_po_dev;
+CREATE DATABASE castlerock_po_dev;
+USE castlerock_po_dev;
 
 -- ========================================
 -- USERS TABLE

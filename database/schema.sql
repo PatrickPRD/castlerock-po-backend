@@ -2,8 +2,8 @@
 -- Castlerock PO Tracker Database Schema
 -- ========================================
 
-CREATE DATABASE IF NOT EXISTS castlerock_dev;
-USE castlerock_dev;
+CREATE DATABASE IF NOT EXISTS castlerock_po_dev;
+USE castlerock_po_dev;
 
 -- Users Table
 CREATE TABLE IF NOT EXISTS users (

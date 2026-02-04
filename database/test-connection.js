@@ -1,4 +1,5 @@
 const mysql = require('mysql2/promise');
+const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 async function testConnection() {
@@ -33,6 +34,38 @@ async function testConnection() {
       console.log(`✅ Database '${process.env.DB_NAME}' created successfully!`);
     }
     
+    // Test 2: Check admin user and password hash
+    console.log('\nTest 2: Checking admin user and password hash...');
+    const [users] = await connection.query(
+      `
+      SELECT id, email, password_hash
+      FROM ${process.env.DB_NAME}.users
+      WHERE email = 'admin@castlerock.com'
+      LIMIT 1
+      `
+    );
+
+    if (users.length === 0) {
+      console.log('⚠️  Admin user not found in users table.');
+    } else {
+      const user = users[0];
+      const passwordHash =
+        typeof user.password_hash === 'string'
+          ? user.password_hash
+          : user.password_hash?.toString();
+
+      if (!passwordHash) {
+        console.log('⚠️  Admin user has no password_hash value.');
+      } else {
+        const match = await bcrypt.compare('Admin@123', passwordHash);
+        console.log(
+          match
+            ? '✅ Admin password hash matches Admin@123'
+            : '❌ Admin password hash does NOT match Admin@123'
+        );
+      }
+    }
+
     await connection.end();
     console.log('\n🎉 MySQL connection test passed!\n');
     console.log('You can now run: npm run setup');

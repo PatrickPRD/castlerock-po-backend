@@ -12,7 +12,11 @@ if (role === "admin") {
   if (sitesSection) sitesSection.style.display = "none";
 }
 
-// super_admin sees everything
+// super_admin sees everything, hide backup button for non-super-admins
+const backupBtn = document.querySelector('[onclick="goToBackupManagement()"]');
+if (backupBtn && role !== 'super_admin') {
+  backupBtn.style.display = 'none';
+}
 
 /* ============================
    AUTH GUARD
@@ -512,6 +516,17 @@ async function autoPopulateSites() {
     showToast(err.message, 'error');
     console.error('Auto-populate error:', err);
   }
+}
+
+/* ============================
+   NAVIGATION
+   ============================ */
+function back() {
+  location.href = 'dashboard.html';
+}
+
+function goToBackupManagement() {
+  location.href = 'backup-management.html';
 }
 
 /* ============================

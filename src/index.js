@@ -54,6 +54,9 @@ app.use('/audit', auditRoutes);
 const authRoutes = require('./routes/auth');
 app.use('/auth', authRoutes);
 
+const backupRoutes = require('./routes/backups');
+app.use('/backups', backupRoutes);
+
 const lookupRoutes = require('./routes/lookups');
 app.use('/', lookupRoutes);
 

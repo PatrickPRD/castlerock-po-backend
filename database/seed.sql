@@ -3,7 +3,15 @@
 -- ========================================
 -- Password: Admin@123 (change after first login)
 
-USE castlerock_dev;
+USE castlerock_po_dev;
+
+-- Clean up existing data
+SET FOREIGN_KEY_CHECKS=0;
+TRUNCATE TABLE purchase_orders;
+TRUNCATE TABLE locations;
+TRUNCATE TABLE sites;
+TRUNCATE TABLE invoices;
+SET FOREIGN_KEY_CHECKS=1;
 
 -- Insert Super Admin User
 -- Password hash for: Admin@123
@@ -16,24 +24,39 @@ INSERT INTO users (
   active
 ) VALUES (
   'admin@castlerock.com',
-  '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYIeWeCrHuG',
+  '$2b$12$06ipjAsIuEoUhYKjH2yk/eVkmf4ZciAByv9N9q8LKqSyrlCJvwPiO',
   'Super',
   'Admin',
   'super_admin',
   1
 );
 
--- Insert sample locations
-INSERT INTO locations (name, code, address, active) VALUES
-('Main Warehouse', 'MAIN', '123 Main St, City, State 12345', 1),
-('Branch Office', 'BRANCH', '456 Branch Ave, City, State 12345', 1),
-('Store Location 1', 'STORE01', '789 Store Blvd, City, State 12345', 1);
-
--- Insert sample suppliers
-INSERT INTO suppliers (name, contact_person, email, phone, active) VALUES
-('ABC Supplies Inc', 'John Doe', 'john@abcsupplies.com', '555-0100', 1),
-('XYZ Trading Co', 'Jane Smith', 'jane@xyztrading.com', '555-0200', 1),
-('Global Parts Ltd', 'Mike Johnson', 'mike@globalparts.com', '555-0300', 1);
+-- Insert System Upload User
+INSERT INTO users (
+  id,
+  email,
+  password_hash,
+  first_name,
+  last_name,
+  role,
+  active,
+  reset_token,
+  reset_token_expires,
+  created_at,
+  updated_at
+) VALUES (
+  99,
+  'system@upload.local',
+  '__SYSTEM__',
+  'System',
+  'Upload',
+  'admin',
+  1,
+  NULL,
+  NULL,
+  '2026-02-04 12:45:50',
+  '2026-02-04 12:45:50'
+);
 
 SELECT '✅ Database seeded successfully!' AS message;
 SELECT CONCAT('📧 Admin Email: admin@castlerock.com') AS credentials;

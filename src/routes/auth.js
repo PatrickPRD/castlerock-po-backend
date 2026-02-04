@@ -1,8 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+
+async function hasActiveColumn() {
+  const [rows] = await pool.query(
+    `
+    SELECT 1
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'users'
+      AND COLUMN_NAME = 'active'
+    LIMIT 1
+    `
+  );
+  return rows.length > 0;
+}
 
 
 /* ======================================================
@@ -11,10 +25,13 @@ const crypto = require('crypto');
 router.post('/request-reset', async (req, res) => {
   const { email } = req.body;
 
+  const hasActive = await hasActiveColumn();
   const [[user]] = await pool.query(
-  'SELECT id, email, first_name FROM users WHERE email=? AND active=1',
-  [email]
-);
+    hasActive
+      ? 'SELECT id, email, first_name FROM users WHERE email=? AND active=1'
+      : 'SELECT id, email, first_name FROM users WHERE email=?',
+    [email]
+  );
 
 
   if (!user) {
@@ -94,17 +111,28 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password required' });
     }
 
+    const hasActive = await hasActiveColumn();
     const [[user]] = await pool.query(
-      `
-      SELECT
-        id,
-        email,
-        password_hash,
-        role,
-        active
-      FROM users
-      WHERE email = ?
-      `,
+      hasActive
+        ? `
+          SELECT
+            id,
+            email,
+            password_hash,
+            role,
+            active
+          FROM users
+          WHERE email = ?
+          `
+        : `
+          SELECT
+            id,
+            email,
+            password_hash,
+            role
+          FROM users
+          WHERE email = ?
+          `,
       [email]
     );
 
@@ -112,11 +140,20 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    if (!user.active) {
+    if (hasActive && !user.active) {
       return res.status(403).json({ error: 'Account disabled' });
     }
 
-    const match = await bcrypt.compare(password, user.password_hash);
+    const passwordHash =
+      typeof user.password_hash === 'string'
+        ? user.password_hash
+        : user.password_hash?.toString();
+
+    if (!passwordHash) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const match = await bcrypt.compare(password, passwordHash);
 
     if (!match) {
       return res.status(401).json({ error: 'Invalid credentials' });
