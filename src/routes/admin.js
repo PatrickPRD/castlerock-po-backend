@@ -566,11 +566,11 @@ router.post(
       });
 
       // Step 3: Update site names based on PO letter mapping
+      // NOTE: 'T' (Test Site) is excluded from production
       const siteLetterMap = {
         'B': 'Bandon',
         'M': 'Midleton', 
-        'P': 'Phase 2',
-        'T': 'Test Site'
+        'P': 'Phase 2'
       };
 
       const updates = [];

@@ -11,6 +11,7 @@
     "test-db": "node database/test-connection.js",
     "reset-db": "node database/reset-db.js",
     "import-data": "node database/import-data.js",
+    "cleanup-test-data": "node database/cleanup-test-data.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

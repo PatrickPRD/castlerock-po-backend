@@ -12,6 +12,7 @@ if (!token || role !== 'super_admin') {
    BACKUP DATA STORAGE
    ============================ */
 let backupData = null;
+let backupMode = null; // 'json' | 'sql'
 
 /* ============================
    API HELPER
@@ -86,6 +87,7 @@ function resetRestoreForm() {
   document.getElementById('parseError').style.display = 'none';
   document.getElementById('restoreBtn').disabled = true;
   backupData = null;
+  backupMode = null;
 }
 
 /* ============================
@@ -97,6 +99,28 @@ async function validateBackupFile(event) {
 
   try {
     const text = await file.text();
+    const isSqlFile = file.name.toLowerCase().endsWith('.sql');
+
+    if (isSqlFile) {
+      backupMode = 'sql';
+      backupData = text;
+
+      const lineCount = text.split('\n').length;
+      const sizeKb = (file.size / 1024).toFixed(1);
+      const details = `
+        <strong>Type:</strong> SQL script<br>
+        <strong>File:</strong> ${file.name}<br>
+        <strong>Size:</strong> ${sizeKb} KB<br>
+        <strong>Lines:</strong> ${lineCount}
+      `;
+      document.getElementById('backupDetails').innerHTML = details;
+      document.getElementById('backupInfo').style.display = 'block';
+      document.getElementById('parseError').style.display = 'none';
+      document.getElementById('restoreBtn').disabled = false;
+      return;
+    }
+
+    backupMode = 'json';
     backupData = JSON.parse(text);
 
     // Validate structure
@@ -149,9 +173,12 @@ async function restoreBackup() {
   try {
     showToast('Restoring backup...', 'info');
 
-    const response = await api('/backups/restore', 'POST', {
-      backup: backupData
-    });
+    const payload =
+      backupMode === 'sql'
+        ? { sql: backupData }
+        : { backup: backupData };
+
+    const response = await api('/backups/restore', 'POST', payload);
 
     closeRestoreModal();
     showToast(

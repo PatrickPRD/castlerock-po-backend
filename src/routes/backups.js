@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { createBackup, restoreBackup } = require('../services/backupService');
+const {
+  createBackup,
+  restoreBackup,
+  restoreBackupSql
+} = require('../services/backupService');
 const { authenticate } = require('../middleware/auth');
 const authorizeRoles = require('../middleware/authorizeRoles');
 
@@ -34,16 +38,16 @@ router.post(
   authorizeRoles('super_admin'),
   async (req, res) => {
     try {
-      const { backup } = req.body;
+      const { backup, sql } = req.body;
 
-      if (!backup) {
+      if (!backup && !sql) {
         return res
           .status(400)
           .json({ error: 'No backup data provided' });
       }
 
       console.log('🔄 Restoring database from backup...');
-      const result = await restoreBackup(backup);
+      const result = sql ? await restoreBackupSql(sql) : await restoreBackup(backup);
 
       res.json(result);
     } catch (err) {

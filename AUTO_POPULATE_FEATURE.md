@@ -11,7 +11,7 @@ This feature automatically populates and updates sites and locations based on ex
    - B = Bandon
    - M = Midleton
    - P = Phase 2
-   - T = Test Site
+   - T = Test Site (excluded from auto-populate)
 
 3. **Updates Sites**: Updates site names to match the mapping
 4. **Updates Locations**: Associates locations with the correct sites based on which site their POs belong to
@@ -54,7 +54,7 @@ Based on existing PO data:
 - **B** (3,010 POs) → Bandon
 - **M** (541 POs) → Midleton
 - **P** (549 POs) → Phase 2
-- **T** (1 PO) → Test Site
+- **T** (1 PO) → Test Site (excluded from auto-populate, should be removed)
 
 ## Safety Features
 

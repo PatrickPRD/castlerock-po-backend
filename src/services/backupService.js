@@ -1,5 +1,24 @@
 const pool = require('../db');
 
+async function clearDatabaseExceptUsers(connection) {
+  const [tables] = await connection.query(
+    `
+    SELECT table_name AS tableName
+    FROM information_schema.tables
+    WHERE table_schema = DATABASE()
+      AND table_type = 'BASE TABLE'
+    `
+  );
+
+  for (const { tableName } of tables) {
+    if (tableName === 'users') {
+      continue;
+    }
+
+    await connection.query(`DELETE FROM \`${tableName}\` WHERE 1=1`);
+  }
+}
+
 /**
  * Create a backup of all data except users
  * Returns JSON structure with metadata and all tables
@@ -40,7 +59,7 @@ async function createBackup() {
 
 /**
  * Restore a backup
- * Clears all data except users and audit_log, then restores from backup
+ * Clears all data except users, then restores from backup
  */
 async function restoreBackup(backupData) {
   const connection = await pool.getConnection();
@@ -58,19 +77,8 @@ async function restoreBackup(backupData) {
       // Disable foreign key checks
       await connection.query('SET FOREIGN_KEY_CHECKS=0');
 
-      // Clear all tables (in correct order to avoid FK constraints)
-      const clearOrder = [
-        'invoices',
-        'purchase_orders',
-        'locations',
-        'sites',
-        'suppliers',
-        'po_stages'
-      ];
-
-      for (const table of clearOrder) {
-        await connection.query(`DELETE FROM ${table} WHERE 1=1`);
-      }
+      // Clear all tables except users
+      await clearDatabaseExceptUsers(connection);
 
       // Restore data
       const restoreOrder = [
@@ -115,7 +123,38 @@ async function restoreBackup(backupData) {
   }
 }
 
+/**
+ * Restore a SQL backup script
+ * Executes raw SQL (super admin only)
+ */
+async function restoreBackupSql(sqlText) {
+  if (!sqlText || !sqlText.trim()) {
+    throw new Error('Invalid SQL backup: empty file');
+  }
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.query('SET FOREIGN_KEY_CHECKS=0');
+    await clearDatabaseExceptUsers(connection);
+    await connection.query(sqlText);
+    await connection.query('SET FOREIGN_KEY_CHECKS=1');
+
+    return { success: true, message: 'SQL backup restored successfully' };
+  } catch (err) {
+    try {
+      await connection.query('SET FOREIGN_KEY_CHECKS=1');
+    } catch (restoreErr) {
+      // ignore secondary error
+    }
+    throw err;
+  } finally {
+    connection.release();
+  }
+}
+
 module.exports = {
   createBackup,
-  restoreBackup
+  restoreBackup,
+  restoreBackupSql
 };
