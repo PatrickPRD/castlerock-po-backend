@@ -106,18 +106,14 @@ async function getLocationBreakdownData(showSpreadLocations) {
   });
 
   if (!showSpreadLocations) {
-    console.log('Applying location spread logic...');
     const [rules] = await db.query(`
       SELECT id, source_location_id
       FROM location_spread_rules
     `);
-    
-    console.log('Found', rules.length, 'spread rules');
 
     if (rules.length > 0) {
       // Track all source location IDs to prevent them from being targets
       const allSourceLocationIds = new Set(rules.map(r => r.source_location_id));
-      console.log('Source location IDs:', Array.from(allSourceLocationIds).join(', '));
 
       const [ruleSites] = await db.query(`
         SELECT rs.id, rs.rule_id, rs.site_id, rs.spread_all
@@ -159,7 +155,6 @@ async function getLocationBreakdownData(showSpreadLocations) {
       rules.forEach(rule => {
         const sourceId = rule.source_location_id;
         const sourceTotals = totalsMap.get(sourceId);
-        console.log('Processing rule', rule.id, 'for source location', sourceId, 'has totals:', !!sourceTotals);
         if (!sourceTotals) return;
 
         const siteRules = ruleSitesByRule.get(rule.id) || [];
@@ -185,7 +180,6 @@ async function getLocationBreakdownData(showSpreadLocations) {
         targets.forEach(targetId => {
           // Skip if this target is itself a source location in another rule
           if (allSourceLocationIds.has(targetId)) {
-            console.log('Skipping target', targetId, 'because it is a source location in another rule');
             return;
           }
 
@@ -234,7 +228,6 @@ async function getLocationBreakdownData(showSpreadLocations) {
           });
         });
 
-        console.log('Deleting source location', sourceId, 'from maps');
         totalsMap.delete(sourceId);
         stageMap.delete(sourceId);
       });
@@ -264,7 +257,7 @@ async function getLocationBreakdownData(showSpreadLocations) {
       }))
     }));
 
-  console.log('Returning', result.length, 'locations. Location IDs:', result.map(r => r.location_id).join(', '));
+
   return result;
 }
 
@@ -326,7 +319,6 @@ router.get(
   async (req, res) => {
     try {
       const showSpreadLocations = req.query.showSpread === '1' || req.query.showSpread === 'true';
-      console.log('Location Breakdown - showSpread param:', req.query.showSpread, 'showSpreadLocations:', showSpreadLocations);
       const result = await getLocationBreakdownData(showSpreadLocations);
       res.json(result);
 
