@@ -10,7 +10,8 @@ const el = id => document.getElementById(id);
 const poHeader         = el('poHeader');
 const invoiceList      = el('invoiceList');
 const invoiceForm      = el('invoiceForm');
-const invoiceFormTitle = el('invoiceFormTitle');
+const invoiceModal     = el('invoiceModal');
+const modalTitle       = el('modalTitle');
 
 const invoiceIdInput   = el('invoiceId');
 const invoiceNumber    = el('invoiceNumber');
@@ -22,6 +23,38 @@ const totalAmountSpan = el('totalAmount');
 
 let po = null;
 
+/* ================= Modal Functions ================= */
+function openAddInvoiceModal() {
+  resetForm();
+  modalTitle.textContent = 'Add Invoice';
+  invoiceModal.style.display = 'flex';
+}
+
+function closeInvoiceModal() {
+  invoiceModal.style.display = 'none';
+  resetForm();
+}
+
+function editInvoice(id) {
+  const inv = po.invoices.find(i => i.id === id);
+  invoiceIdInput.value = inv.id;
+  invoiceNumber.value  = inv.invoice_number;
+  invoiceDate.value    = inv.invoice_date;
+  netAmountInput.value = inv.net_amount;
+  vatRateSelect.value = String(num(inv.vat_rate));
+  
+  modalTitle.textContent = 'Edit Invoice';
+  invoiceModal.style.display = 'flex';
+  
+  // Trigger updateTotals after modal is displayed
+  setTimeout(updateTotals, 0);
+}
+
+// Close modal when clicking outside
+invoiceModal.addEventListener('click', e => {
+  if (e.target === invoiceModal) closeInvoiceModal();
+});
+
 /* ================= Utilities ================= */
 const num  = v => isNaN(Number(v)) ? 0 : Number(v);
 const euro = v => `€${num(v).toFixed(2)}`;
@@ -31,9 +64,10 @@ function formatVat(rate) {
 
   if (n === 0) return '0%';
   if (n === 13.5) return '13.5%';
+  if (n === 14) return '14%';
   if (n === 23) return '23%';
 
-  // fallback (should rarely happen)
+  // fallback
   return `${n}%`;
 }
 
@@ -58,35 +92,55 @@ function renderHeader() {
   const uninvoicedTotal = num(po.total_amount) - invoicedTotal;
 
   poHeader.innerHTML = `
-    <h2>PO: ${po.po_number}</h2>
-
-    <div class="details-grid">
-      <div><strong>Supplier:</strong> ${po.supplier}</div>
-      <div><strong>Site:</strong> ${po.site}</div>
-      <div><strong>Location:</strong> ${po.location}</div>
-     <div><strong>Stage:</strong> ${po.stage}</div>
-      <div><strong>Net (ex VAT):</strong> ${euro(po.net_amount)}</div>
-      <div><strong>VAT Rate:</strong> ${formatVat(po.vat_rate)}</div>
-      <div><strong>Total (inc VAT):</strong> ${euro(po.total_amount)}</div>
-
-      <div>
-        <strong>Uninvoiced (ex VAT):</strong>
-        <span class="${
-          po.uninvoiced_net < 0 ? 'over' :
-          po.uninvoiced_net === 0 ? 'ok' : 'warn'
-        }">
-          ${euro(po.uninvoiced_net)}
-        </span>
+    <div class="po-header-wrapper">
+      <div class="po-number-section">
+        <h2>PO: ${po.po_number}</h2>
       </div>
 
-      <div>
-        <strong>Uninvoiced (inc VAT):</strong>
-        <span class="${
-          uninvoicedTotal < 0 ? 'over' :
-          uninvoicedTotal === 0 ? 'ok' : 'warn'
-        }">
-          ${euro(uninvoicedTotal)}
-        </span>
+      <div class="po-details-section">
+        <div class="details-group">
+          <h3>Order Details</h3>
+          <div class="details-grid">
+            <div><strong>Supplier:</strong> ${po.supplier}</div>
+            <div><strong>Site:</strong> ${po.site}</div>
+            <div><strong>Location:</strong> ${po.location}</div>
+            <div><strong>Stage:</strong> ${po.stage}</div>
+          </div>
+        </div>
+
+        <div class="details-group">
+          <h3>Financial Summary</h3>
+          <div class="details-grid">
+            <div><strong>Net (ex VAT):</strong> <span class="amount">${euro(po.net_amount)}</span></div>
+            <div><strong>VAT Rate:</strong> <span class="vat-rate">${formatVat(po.vat_rate)}</span></div>
+            <div><strong>Total (inc VAT):</strong> <span class="total-amount">${euro(po.total_amount)}</span></div>
+          </div>
+        </div>
+
+        <div class="details-group">
+          <h3>Invoice Status</h3>
+          <div class="details-grid">
+            <div>
+              <strong>Uninvoiced (ex VAT):</strong>
+              <span class="invoice-status ${
+                po.uninvoiced_net < 0 ? 'over' :
+                po.uninvoiced_net === 0 ? 'ok' : 'warn'
+              }">
+                ${euro(po.uninvoiced_net)}
+              </span>
+            </div>
+
+            <div>
+              <strong>Uninvoiced (inc VAT):</strong>
+              <span class="invoice-status ${
+                uninvoicedTotal < 0 ? 'over' :
+                uninvoicedTotal === 0 ? 'ok' : 'warn'
+              }">
+                ${euro(uninvoicedTotal)}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   `;
@@ -109,14 +163,14 @@ function renderInvoices() {
     if (isCredit) tr.classList.add('credit-invoice');
 
     tr.innerHTML = `
-      <td>${inv.invoice_number}</td>
-      <td>${inv.invoice_date}</td>
-      <td>${euro(inv.net_amount)}</td>
-      <td>${formatVat(inv.vat_rate)}</td>
-      <td>${euro(inv.total_amount)}</td>
-      <td>
+      <td data-label="Invoice No:">${inv.invoice_number}</td>
+      <td data-label="Date:">${inv.invoice_date}</td>
+      <td data-label="Net (ex VAT):">${euro(inv.net_amount)}</td>
+      <td data-label="VAT %:">${formatVat(inv.vat_rate)}</td>
+      <td data-label="Total (inc VAT):">${euro(inv.total_amount)}</td>
+      <td data-label="Actions:">
         <button class="btn-outline" onclick="editInvoice(${inv.id})">Edit</button>
-        ${role === 'admin'
+        ${role === 'admin' || role === 'super_admin'
           ? `<button class="btn-danger" onclick="deleteInvoice(${inv.id})">Delete</button>`
           : ''}
       </td>
@@ -163,22 +217,11 @@ invoiceForm.addEventListener('submit', async e => {
     body: JSON.stringify(payload)
   });
 
-  resetForm();
+  closeInvoiceModal();
   loadPO();
 });
 
-/* ================= Actions ================= */
-function editInvoice(id) {
-  const inv = po.invoices.find(i => i.id === id);
-  invoiceIdInput.value = inv.id;
-  invoiceNumber.value  = inv.invoice_number;
-  invoiceDate.value    = inv.invoice_date;
-  netAmountInput.value = inv.net_amount;
-  vatRateSelect.value = String(num(inv.vat_rate));
-  invoiceFormTitle.textContent = 'Edit Invoice';
-  updateTotals();
-}
-
+/* ================= Delete Invoice ================= */
 async function deleteInvoice(id) {
   if (!(await confirmDialog('Delete this invoice?'))) return;
 
@@ -193,7 +236,6 @@ async function deleteInvoice(id) {
 function resetForm() {
   invoiceForm.reset();
   invoiceIdInput.value = '';
-  invoiceFormTitle.textContent = 'Add Invoice';
   updateTotals();
 }
 

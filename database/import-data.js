@@ -18,7 +18,7 @@ async function importData() {
       multipleStatements: true
     });
 
-    const dataFile = path.join(__dirname, 'po-export-20260203T214327.sql');
+    const dataFile = path.join(__dirname, 'po-export-20260204T151726.sql');
     
     if (!fs.existsSync(dataFile)) {
       console.error('❌ Data file not found:', dataFile);
@@ -28,14 +28,87 @@ async function importData() {
     console.log('📋 Reading data file...');
     let sql = fs.readFileSync(dataFile, 'utf8');
     
-    // Remove duplicate inserts that are already in schema
+    // Convert VAT rates from decimals (0.135, 0.23) to percentages (13.5, 23)
+    // Match invoice INSERT statements and multiply vat_rate values by 100
+    sql = sql.replace(
+      /(INSERT INTO `invoices`[\s\S]*?VALUES[\s\S]*?)(\d+\.\d{4})/g,
+      (match, before, vatRate) => {
+        // Only convert if it looks like a decimal vat_rate (0.xxxx format)
+        const rate = parseFloat(vatRate);
+        if (rate > 0 && rate < 1) {
+          const percentRate = (rate * 100).toFixed(2);
+          return before + percentRate;
+        }
+        return match;
+      }
+    );
+    
+    // Convert VAT rates in purchase_orders if they're in decimal format
+    sql = sql.replace(
+      /(INSERT INTO `purchase_orders`[\s\S]*?VALUES[\s\S]*?)(\d+\.\d{4})/g,
+      (match, before, vatRate) => {
+        const rate = parseFloat(vatRate);
+        if (rate > 0 && rate < 1) {
+          const percentRate = (rate * 100).toFixed(2);
+          return before + percentRate;
+        }
+        return match;
+      }
+    );
+    
+    // Remove duplicate inserts for users and po_stages only (keep suppliers, sites, locations)
     sql = sql.replace(/INSERT INTO `users`.*?;/s, '');
     sql = sql.replace(/INSERT INTO `po_stages`.*?;/s, '');
+    
+    // Replace sites INSERT with proper schema (with site_letter)
+    sql = sql.replace(
+      /INSERT INTO `sites` \(`id`, `name`\) VALUES[\s\S]*?\);/,
+      `INSERT INTO \`sites\` (\`id\`, \`name\`, \`site_letter\`) VALUES
+       (1, 'Bandon Phase 1', 'B'),
+       (2, 'Bandon Phase 2', 'P'),
+       (3, 'Midleton', 'M');`
+    );
+    
+    // Disable foreign key checks at the beginning
+    sql = 'SET FOREIGN_KEY_CHECKS = 0;\n' + sql;
+    
+    // Clear existing data (except users)
+    const clearTables = `
+      DELETE FROM invoices;
+      DELETE FROM purchase_orders;
+      DELETE FROM locations;
+      DELETE FROM suppliers;
+      DELETE FROM sites;
+      DELETE FROM site_letters;
+      ALTER TABLE suppliers AUTO_INCREMENT = 1;
+      ALTER TABLE locations AUTO_INCREMENT = 1;
+      ALTER TABLE sites AUTO_INCREMENT = 1;
+      ALTER TABLE purchase_orders AUTO_INCREMENT = 1;
+      ALTER TABLE invoices AUTO_INCREMENT = 1;
+    `;
+    
+    sql = clearTables + '\n' + sql;
 
     console.log('📋 Importing data (this may take a while)...');
     await connection.query(sql);
 
+    // Set all suppliers to active = 1
     console.log('✅ Data imported successfully!\n');
+    console.log('📋 Activating suppliers and locations...');
+    await connection.query('UPDATE suppliers SET active = 1 WHERE active = 0 OR active IS NULL');
+    await connection.query('UPDATE locations SET active = 1 WHERE active = 0 OR active IS NULL');
+    console.log('✅ Suppliers and locations activated!\n');
+
+    // Insert default site letter mappings
+    console.log('📋 Setting up site letter mappings...');
+    await connection.query(`
+      INSERT INTO site_letters (site_id, letter) VALUES
+      (1, 'B'),
+      (3, 'M'),
+      (2, 'P')
+      ON DUPLICATE KEY UPDATE letter = VALUES(letter)
+    `);
+    console.log('✅ Site letter mappings created!\n');
 
     // Show summary
     const [userCount] = await connection.query('SELECT COUNT(*) as count FROM users');

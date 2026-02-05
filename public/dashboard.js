@@ -69,6 +69,13 @@ async function loadPOs() {
    Default Date Filter
    ============================ */
 function setDefaultDateFilter() {
+  // Skip setting default date filter if coming from supplier report
+  if (clearDateFilter) {
+    dateFrom.value = '';
+    dateTo.value = '';
+    return;
+  }
+
   const today = new Date();
   const from = new Date();
   from.setMonth(today.getMonth() - 1);
@@ -91,6 +98,11 @@ function populateFilters() {
       new Set(allPOs.map((p) => p.stage).filter(Boolean))
     );
   }
+
+  // Apply stored supplier filter if it exists
+  if (storedSupplier) {
+    supplierFilter.value = storedSupplier;
+  }
 }
 
 function fillSelect(select, values) {
@@ -109,6 +121,16 @@ if (storedToast) {
   const { message, type } = JSON.parse(storedToast);
   showToast(message, type);
   sessionStorage.removeItem('toast');
+}
+
+// Check for stored supplier filter from supplier report
+const storedSupplier = sessionStorage.getItem('filterSupplier');
+const clearDateFilter = sessionStorage.getItem('clearDateFilter');
+if (storedSupplier) {
+  sessionStorage.removeItem('filterSupplier');
+}
+if (clearDateFilter) {
+  sessionStorage.removeItem('clearDateFilter');
 }
 
 

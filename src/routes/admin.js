@@ -317,7 +317,7 @@ router.get(
   authorizeRoles('super_admin'),
   async (req, res) => {
     const [rows] = await db.query(
-      `SELECT id, name, address, active
+      `SELECT id, name, site_letter, address, active
        FROM sites
        ORDER BY name`
     );
@@ -535,6 +535,132 @@ router.delete(
 );
 
 /* ======================================================
+   MERGE LOCATIONS – SUPER ADMIN ONLY
+   ====================================================== */
+router.post(
+  '/merge-locations',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const { keep_location_id, merge_location_id } = req.body;
+    let connection;
+
+    try {
+      if (!keep_location_id || !merge_location_id) {
+        return res.status(400).json({
+          error: 'Both keep_location_id and merge_location_id are required'
+        });
+      }
+
+      if (keep_location_id === merge_location_id) {
+        return res.status(400).json({
+          error: 'Cannot merge a location into itself'
+        });
+      }
+
+      connection = await db.getConnection();
+
+      // ✅ Verify both locations exist
+      const [keepLoc] = await connection.query(
+        'SELECT id, name, site_id FROM locations WHERE id = ?',
+        [keep_location_id]
+      );
+
+      const [mergeLoc] = await connection.query(
+        'SELECT id, name, site_id FROM locations WHERE id = ?',
+        [merge_location_id]
+      );
+
+      if (keepLoc.length === 0 || mergeLoc.length === 0) {
+        connection.release();
+        return res.status(404).json({
+          error: 'One or both locations not found'
+        });
+      }
+
+      // 🔄 Start transaction
+      await connection.beginTransaction();
+
+      try {
+        // Step 1: Update all Purchase Orders pointing to merge_location to keep_location
+        console.log(`📝 Updating Purchase Orders from location ${merge_location_id} to ${keep_location_id}`);
+        await connection.query(
+          'UPDATE purchase_orders SET location_id = ? WHERE location_id = ?',
+          [keep_location_id, merge_location_id]
+        );
+
+        // Step 2: Delete location_spread_rule_locations entries for merged location
+        // (rather than updating, since updating would create duplicates)
+        console.log(`🗑️  Deleting location spread rule location entries for ${merge_location_id}`);
+        await connection.query(
+          'DELETE FROM location_spread_rule_locations WHERE location_id = ?',
+          [merge_location_id]
+        );
+
+        // Step 3: Handle location_spread_rules that reference merge_location as source
+        // These rules become invalid, so we delete them
+        console.log(`🗑️  Deleting spread rules that source from location ${merge_location_id}`);
+        const [rulesToDelete] = await connection.query(
+          'SELECT id FROM location_spread_rules WHERE source_location_id = ?',
+          [merge_location_id]
+        );
+
+        for (const rule of rulesToDelete) {
+          await connection.query(
+            'DELETE FROM location_spread_rule_sites WHERE rule_id = ?',
+            [rule.id]
+          );
+          await connection.query(
+            'DELETE FROM location_spread_rules WHERE id = ?',
+            [rule.id]
+          );
+        }
+
+        // Step 4: Delete the merged location
+        console.log(`❌ Deleting location ${merge_location_id}`);
+        await connection.query(
+          'DELETE FROM locations WHERE id = ?',
+          [merge_location_id]
+        );
+
+        // ✅ Commit transaction
+        await connection.commit();
+
+        console.log(`✅ Successfully merged location ${merge_location_id} into ${keep_location_id}`);
+
+        res.json({
+          success: true,
+          message: `Successfully merged "${mergeLoc[0].name}" into "${keepLoc[0].name}"`,
+          merged_into: {
+            id: keep_location_id,
+            name: keepLoc[0].name
+          },
+          deleted: {
+            id: merge_location_id,
+            name: mergeLoc[0].name
+          }
+        });
+
+      } catch (transactionErr) {
+        await connection.rollback();
+        throw transactionErr;
+      }
+
+    } catch (err) {
+      console.error('MERGE LOCATIONS ERROR:', err);
+      res.status(500).json({
+        error: 'Failed to merge locations',
+        details: err.message
+      });
+    } finally {
+      if (connection) {
+        connection.release();
+      }
+    }
+  }
+);
+
+/* ======================================================
    AUTO-POPULATE SITES & LOCATIONS FROM PO DATA
    ====================================================== */
 router.post(
@@ -558,44 +684,52 @@ router.post(
 
       console.log('Found PO site data:', poSiteData);
 
-      // Step 2: Get existing sites
+      // Step 2: Get site letter mappings from database
+      const [siteLetterMappings] = await db.query(`
+        SELECT sl.letter, s.id, s.name
+        FROM site_letters sl
+        JOIN sites s ON sl.site_id = s.id
+      `);
+      
+      const siteLetterMap = {};
+      siteLetterMappings.forEach(mapping => {
+        siteLetterMap[mapping.letter] = mapping;
+      });
+
+      console.log('Site letter mappings:', siteLetterMap);
+
+      // Step 3: Get existing sites
       const [existingSites] = await db.query('SELECT id, name FROM sites');
       const siteMap = {};
       existingSites.forEach(s => {
         siteMap[s.id] = s.name;
       });
 
-      // Step 3: Update site names based on PO letter mapping
-      // NOTE: 'T' (Test Site) is excluded from production
-      const siteLetterMap = {
-        'B': 'Bandon',
-        'M': 'Midleton', 
-        'P': 'Phase 2'
-      };
-
       const updates = [];
       const siteIdToLetter = {};
 
       for (const data of poSiteData) {
-        const siteName = siteLetterMap[data.site_letter] || `Site ${data.site_letter}`;
+        const mapping = siteLetterMap[data.site_letter];
         
-        // Check if this site_id exists
-        if (data.site_id && siteMap[data.site_id]) {
+        // Only process if we have a mapping for this letter
+        if (mapping && data.site_id && siteMap[data.site_id]) {
           // Update the name if it doesn't match
-          if (siteMap[data.site_id] !== siteName) {
+          if (siteMap[data.site_id] !== mapping.name) {
             await db.query(
               'UPDATE sites SET name = ? WHERE id = ?',
-              [siteName, data.site_id]
+              [mapping.name, data.site_id]
             );
             updates.push({
               action: 'updated',
               site_id: data.site_id,
               old_name: siteMap[data.site_id],
-              new_name: siteName,
+              new_name: mapping.name,
               letter: data.site_letter
             });
           }
           siteIdToLetter[data.site_id] = data.site_letter;
+        } else if (!mapping) {
+          console.warn(`⚠️  No mapping found for PO letter: ${data.site_letter}`);
         }
       }
 
@@ -659,6 +793,131 @@ router.post(
         error: 'Failed to auto-populate sites and locations',
         details: err.message
       });
+    }
+  }
+);
+
+/* ======================================================
+   GET SITE LETTER MAPPINGS
+   ====================================================== */
+router.get(
+  '/site-letters',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      const [mappings] = await db.query(`
+        SELECT sl.id, sl.letter, sl.site_id, s.name as site_name
+        FROM site_letters sl
+        JOIN sites s ON sl.site_id = s.id
+        ORDER BY sl.letter
+      `);
+      res.json(mappings);
+    } catch (err) {
+      console.error('Error fetching site letters:', err);
+      res.status(500).json({ error: 'Failed to fetch site letter mappings' });
+    }
+  }
+);
+
+/* ======================================================
+   CREATE SITE LETTER MAPPING
+   ====================================================== */
+router.post(
+  '/site-letters',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const { letter, site_id } = req.body;
+
+    if (!letter || letter.length !== 1 || !site_id) {
+      return res.status(400).json({
+        error: 'Letter (single character) and site_id are required'
+      });
+    }
+
+    try {
+      await db.query(
+        'INSERT INTO site_letters (letter, site_id) VALUES (?, ?)',
+        [letter.toUpperCase(), site_id]
+      );
+      res.json({ success: true, message: `Letter ${letter.toUpperCase()} mapped to site ${site_id}` });
+    } catch (err) {
+      if (err.code === 'ER_DUP_ENTRY') {
+        return res.status(400).json({
+          error: `Letter ${letter.toUpperCase()} is already mapped to another site`
+        });
+      }
+      console.error('Error creating site letter mapping:', err);
+      res.status(500).json({ error: 'Failed to create site letter mapping' });
+    }
+  }
+);
+
+/* ======================================================
+   UPDATE SITE LETTER MAPPING
+   ====================================================== */
+router.put(
+  '/site-letters/:id',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const mappingId = req.params.id;
+    const { letter, site_id } = req.body;
+
+    if (!letter || letter.length !== 1 || !site_id) {
+      return res.status(400).json({
+        error: 'Letter (single character) and site_id are required'
+      });
+    }
+
+    try {
+      const [result] = await db.query(
+        'UPDATE site_letters SET letter = ?, site_id = ? WHERE id = ?',
+        [letter.toUpperCase(), site_id, mappingId]
+      );
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: 'Site letter mapping not found' });
+      }
+
+      res.json({ success: true, message: 'Site letter mapping updated' });
+    } catch (err) {
+      if (err.code === 'ER_DUP_ENTRY') {
+        return res.status(400).json({
+          error: `Letter ${letter.toUpperCase()} is already mapped to another site`
+        });
+      }
+      console.error('Error updating site letter mapping:', err);
+      res.status(500).json({ error: 'Failed to update site letter mapping' });
+    }
+  }
+);
+
+/* ======================================================
+   DELETE SITE LETTER MAPPING
+   ====================================================== */
+router.delete(
+  '/site-letters/:id',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const mappingId = req.params.id;
+
+    try {
+      const [result] = await db.query(
+        'DELETE FROM site_letters WHERE id = ?',
+        [mappingId]
+      );
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: 'Site letter mapping not found' });
+      }
+
+      res.json({ success: true, message: 'Site letter mapping deleted' });
+    } catch (err) {
+      console.error('Error deleting site letter mapping:', err);
+      res.status(500).json({ error: 'Failed to delete site letter mapping' });
     }
   }
 );

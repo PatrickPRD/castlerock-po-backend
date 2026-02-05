@@ -80,27 +80,85 @@ async function setupDatabase() {
     console.log('✅ Locations table created');
 
     await pool.query(`
+      CREATE TABLE IF NOT EXISTS location_spread_rules (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        source_location_id INT NOT NULL,
+        active TINYINT(1) NOT NULL DEFAULT 1,
+        created_by INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_source_location (source_location_id),
+        FOREIGN KEY (source_location_id) REFERENCES locations(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
+        INDEX idx_active (active)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ Location spread rules table created');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS location_spread_rule_sites (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        rule_id INT NOT NULL,
+        site_id INT NOT NULL,
+        spread_all TINYINT(1) NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_rule_site (rule_id, site_id),
+        FOREIGN KEY (rule_id) REFERENCES location_spread_rules(id) ON DELETE CASCADE,
+        FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE RESTRICT
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ Location spread rule sites table created');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS location_spread_rule_locations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        rule_site_id INT NOT NULL,
+        location_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_rule_site_location (rule_site_id, location_id),
+        FOREIGN KEY (rule_site_id) REFERENCES location_spread_rule_sites(id) ON DELETE CASCADE,
+        FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE RESTRICT
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ Location spread rule locations table created');
+
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS purchase_orders (
         id INT AUTO_INCREMENT PRIMARY KEY,
         po_number VARCHAR(100) NOT NULL UNIQUE,
+        po_date DATE NOT NULL,
         supplier_id INT NOT NULL,
+        site_id INT NOT NULL,
         location_id INT,
-        order_date DATE NOT NULL,
-        expected_delivery_date DATE,
+        stage_id INT,
+        description TEXT,
+        net_amount DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+        vat_rate DECIMAL(5, 2) NOT NULL DEFAULT 0.23,
+        vat_amount DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
         total_amount DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
-        status ENUM('draft', 'pending', 'approved', 'received', 'cancelled') NOT NULL DEFAULT 'draft',
-        notes TEXT,
+        status VARCHAR(50) NOT NULL DEFAULT 'draft',
         created_by INT NOT NULL,
         approved_by INT,
         approved_at DATETIME,
+        cancelled_by INT,
+        cancelled_at DATETIME,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT,
+        FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE RESTRICT,
         FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE SET NULL,
         FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
         FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL,
+        FOREIGN KEY (cancelled_by) REFERENCES users(id) ON DELETE SET NULL,
         INDEX idx_po_number (po_number),
-        INDEX idx_status (status)
+        INDEX idx_po_date (po_date),
+        INDEX idx_supplier_id (supplier_id),
+        INDEX idx_site_id (site_id),
+        INDEX idx_location_id (location_id),
+        INDEX idx_status (status),
+        INDEX idx_created_by (created_by)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log('✅ Purchase orders table created');
@@ -165,6 +223,22 @@ async function setupDatabase() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log('✅ Audit log table created');
+
+    // PO sequences table for tracking PO number generation
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS po_sequences (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        site_id INT NOT NULL,
+        year INT NOT NULL,
+        month INT NOT NULL,
+        last_number INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_sequence (site_id, year, month),
+        FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ PO sequences table created');
 
     console.log('\n🎉 Database setup complete!\n');
 

@@ -137,6 +137,10 @@ poVatRate = String(po.vat_rate);
 await loadOptions('/stages', stageSelect, po.stage_id);
 await loadOptions('/suppliers', supplierSelect, po.supplier_id);
 await loadOptions('/sites', siteSelect, po.site_id);
+
+// Lock site selection - cannot change site once PO is created
+siteSelect.disabled = true;
+
 await loadOptions(
   '/locations?siteId=' + po.site_id,
   locationSelect,

@@ -60,6 +60,10 @@ app.use('/backups', backupRoutes);
 const lookupRoutes = require('./routes/lookups');
 app.use('/', lookupRoutes);
 
+// Location Spread Rules
+const locationSpreadRoutes = require('./routes/locationSpread');
+app.use('/location-spread-rules', locationSpreadRoutes);
+
 // Purchase Orders
 const poRoutes = require('./routes/purchaseOrders');
 app.use('/purchase-orders', poRoutes);

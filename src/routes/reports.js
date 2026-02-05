@@ -5,6 +5,269 @@ const db = require('../db');
 const { authenticate } = require('../middleware/auth');
 const authorizeRoles = require('../middleware/authorizeRoles');
 
+/* ======================================================
+   LOCATION SPREAD HELPERS
+   ====================================================== */
+async function getLocationBreakdownData(showSpreadLocations) {
+  const [locations] = await db.query(`
+    SELECT
+      l.id,
+      l.name,
+      l.site_id,
+      s.name AS site
+    FROM locations l
+    JOIN sites s ON s.id = l.site_id
+    ORDER BY s.name, l.name
+  `);
+
+  const locationMap = new Map();
+  const locationsBySite = new Map();
+
+  locations.forEach(l => {
+    locationMap.set(l.id, {
+      id: l.id,
+      name: l.name,
+      site_id: l.site_id,
+      site: l.site
+    });
+
+    if (!locationsBySite.has(l.site_id)) {
+      locationsBySite.set(l.site_id, []);
+    }
+    locationsBySite.get(l.site_id).push(l.id);
+  });
+
+  const [locationTotals] = await db.query(`
+    SELECT
+      si.name AS site,
+      si.id   AS site_id,
+      l.id    AS location_id,
+      l.name  AS location,
+
+      COALESCE(SUM(po.net_amount), 0)        AS total_net,
+      COALESCE(SUM(po.total_amount), 0)      AS total_gross,
+      COALESCE(SUM(i.total_amount), 0)       AS total_invoiced
+
+    FROM purchase_orders po
+    JOIN sites si     ON si.id = po.site_id
+    JOIN locations l  ON l.id  = po.location_id
+    LEFT JOIN invoices i ON i.purchase_order_id = po.id
+
+    WHERE po.status NOT IN ('cancelled', 'draft')
+
+    GROUP BY si.name, si.id, l.id, l.name
+    ORDER BY si.name, l.name
+  `);
+
+  const totalsMap = new Map();
+  locationTotals.forEach(l => {
+    totalsMap.set(l.location_id, {
+      site: l.site,
+      site_id: l.site_id,
+      location: l.location,
+      location_id: l.location_id,
+      total_net: Number(l.total_net),
+      total_gross: Number(l.total_gross),
+      total_invoiced: Number(l.total_invoiced)
+    });
+  });
+
+  const [stages] = await db.query(`
+    SELECT
+      l.id    AS location_id,
+      ps.name AS stage,
+
+      COALESCE(SUM(po.net_amount), 0)     AS net_total,
+      COALESCE(SUM(po.total_amount), 0)   AS gross_total,
+      COALESCE(SUM(i.total_amount), 0)    AS invoiced_total
+
+    FROM purchase_orders po
+    JOIN locations l   ON l.id = po.location_id
+    JOIN po_stages ps  ON ps.id = po.stage_id
+    LEFT JOIN invoices i ON i.purchase_order_id = po.id
+
+    WHERE po.status NOT IN ('cancelled', 'draft')
+
+    GROUP BY l.id, ps.id, ps.name
+    ORDER BY l.id, ps.name
+  `);
+
+  const stageMap = new Map();
+  stages.forEach(s => {
+    if (!stageMap.has(s.location_id)) {
+      stageMap.set(s.location_id, new Map());
+    }
+    stageMap.get(s.location_id).set(s.stage, {
+      stage: s.stage,
+      net: Number(s.net_total),
+      gross: Number(s.gross_total),
+      invoiced: Number(s.invoiced_total)
+    });
+  });
+
+  if (!showSpreadLocations) {
+    console.log('Applying location spread logic...');
+    const [rules] = await db.query(`
+      SELECT id, source_location_id
+      FROM location_spread_rules
+    `);
+    
+    console.log('Found', rules.length, 'spread rules');
+
+    if (rules.length > 0) {
+      // Track all source location IDs to prevent them from being targets
+      const allSourceLocationIds = new Set(rules.map(r => r.source_location_id));
+      console.log('Source location IDs:', Array.from(allSourceLocationIds).join(', '));
+
+      const [ruleSites] = await db.query(`
+        SELECT rs.id, rs.rule_id, rs.site_id, rs.spread_all
+        FROM location_spread_rule_sites rs
+      `);
+
+      const ruleSiteIds = ruleSites.map(rs => rs.id);
+      let ruleSiteLocations = [];
+
+      if (ruleSiteIds.length > 0) {
+        [ruleSiteLocations] = await db.query(`
+          SELECT rsl.rule_site_id, rsl.location_id
+          FROM location_spread_rule_locations rsl
+          JOIN location_spread_rule_sites rs ON rs.id = rsl.rule_site_id
+        `);
+      }
+
+      const ruleSitesByRule = new Map();
+      ruleSites.forEach(rs => {
+        if (!ruleSitesByRule.has(rs.rule_id)) {
+          ruleSitesByRule.set(rs.rule_id, []);
+        }
+        ruleSitesByRule.get(rs.rule_id).push({
+          id: rs.id,
+          site_id: rs.site_id,
+          spread_all: Number(rs.spread_all) === 1,
+          locationIds: []
+        });
+      });
+
+      ruleSiteLocations.forEach(loc => {
+        const ruleSite = ruleSites.find(rs => rs.id === loc.rule_site_id);
+        if (!ruleSite) return;
+        const sites = ruleSitesByRule.get(ruleSite.rule_id) || [];
+        const target = sites.find(s => s.id === ruleSite.id);
+        if (target) target.locationIds.push(loc.location_id);
+      });
+
+      rules.forEach(rule => {
+        const sourceId = rule.source_location_id;
+        const sourceTotals = totalsMap.get(sourceId);
+        console.log('Processing rule', rule.id, 'for source location', sourceId, 'has totals:', !!sourceTotals);
+        if (!sourceTotals) return;
+
+        const siteRules = ruleSitesByRule.get(rule.id) || [];
+        let targets = [];
+
+        siteRules.forEach(sr => {
+          if (sr.spread_all) {
+            const ids = locationsBySite.get(sr.site_id) || [];
+            targets.push(...ids);
+          } else {
+            targets.push(...sr.locationIds);
+          }
+        });
+
+        targets = [...new Set(targets)].filter(id => id && locationMap.has(id) && id !== sourceId);
+
+        if (targets.length === 0) return;
+
+        const shareNet = sourceTotals.total_net / targets.length;
+        const shareGross = sourceTotals.total_gross / targets.length;
+        const shareInvoiced = sourceTotals.total_invoiced / targets.length;
+
+        targets.forEach(targetId => {
+          // Skip if this target is itself a source location in another rule
+          if (allSourceLocationIds.has(targetId)) {
+            console.log('Skipping target', targetId, 'because it is a source location in another rule');
+            return;
+          }
+
+          if (!totalsMap.has(targetId)) {
+            const info = locationMap.get(targetId);
+            totalsMap.set(targetId, {
+              site: info.site,
+              site_id: info.site_id,
+              location: info.name,
+              location_id: info.id,
+              total_net: 0,
+              total_gross: 0,
+              total_invoiced: 0
+            });
+          }
+
+          const targetTotals = totalsMap.get(targetId);
+          targetTotals.total_net += shareNet;
+          targetTotals.total_gross += shareGross;
+          targetTotals.total_invoiced += shareInvoiced;
+        });
+
+        const sourceStages = stageMap.get(sourceId) || new Map();
+        sourceStages.forEach(stage => {
+          const stageNet = stage.net / targets.length;
+          const stageGross = stage.gross / targets.length;
+          const stageInvoiced = stage.invoiced / targets.length;
+
+          targets.forEach(targetId => {
+            // Skip if this target is itself a source location in another rule
+            if (allSourceLocationIds.has(targetId)) return;
+
+            if (!stageMap.has(targetId)) {
+              stageMap.set(targetId, new Map());
+            }
+
+            const targetStages = stageMap.get(targetId);
+            if (!targetStages.has(stage.stage)) {
+              targetStages.set(stage.stage, { stage: stage.stage, net: 0, gross: 0, invoiced: 0 });
+            }
+
+            const targetStage = targetStages.get(stage.stage);
+            targetStage.net += stageNet;
+            targetStage.gross += stageGross;
+            targetStage.invoiced += stageInvoiced;
+          });
+        });
+
+        console.log('Deleting source location', sourceId, 'from maps');
+        totalsMap.delete(sourceId);
+        stageMap.delete(sourceId);
+      });
+    }
+  }
+
+  const result = Array.from(totalsMap.values())
+    .sort((a, b) => {
+      if (a.site < b.site) return -1;
+      if (a.site > b.site) return 1;
+      return a.location.localeCompare(b.location);
+    })
+    .map(loc => ({
+      site: loc.site,
+      location: loc.location,
+      location_id: loc.location_id,
+      totals: {
+        net: Number(loc.total_net),
+        gross: Number(loc.total_gross),
+        uninvoiced: Number(loc.total_gross) - Number(loc.total_invoiced)
+      },
+      stages: Array.from((stageMap.get(loc.location_id) || new Map()).values()).map(s => ({
+        stage: s.stage,
+        net: Number(s.net),
+        gross: Number(s.gross),
+        uninvoiced: Number(s.gross) - Number(s.invoiced)
+      }))
+    }));
+
+  console.log('Returning', result.length, 'locations. Location IDs:', result.map(r => r.location_id).join(', '));
+  return result;
+}
+
 
 
 
@@ -62,72 +325,9 @@ router.get(
   authorizeRoles('super_admin'),
   async (req, res) => {
     try {
-      /* -------- Location totals -------- */
-      const [locations] = await db.query(`
-        SELECT
-          si.name AS site,
-          l.id    AS location_id,
-          l.name  AS location,
-
-          COALESCE(SUM(po.net_amount), 0)        AS total_net,
-          COALESCE(SUM(po.total_amount), 0)      AS total_gross,
-          COALESCE(SUM(i.total_amount), 0)       AS total_invoiced
-
-        FROM purchase_orders po
-        JOIN sites si     ON si.id = po.site_id
-        JOIN locations l  ON l.id  = po.location_id
-        LEFT JOIN invoices i ON i.purchase_order_id = po.id
-
-        WHERE po.status NOT IN ('cancelled', 'draft')
-
-        GROUP BY si.name, l.id, l.name
-        ORDER BY si.name, l.name
-      `);
-
-      /* -------- Stage breakdown -------- */
-      const [stages] = await db.query(`
-        SELECT
-          l.id    AS location_id,
-          ps.name AS stage,
-
-          COALESCE(SUM(po.net_amount), 0)     AS net_total,
-          COALESCE(SUM(po.total_amount), 0)   AS gross_total,
-          COALESCE(SUM(i.total_amount), 0)    AS invoiced_total
-
-        FROM purchase_orders po
-        JOIN locations l   ON l.id = po.location_id
-        JOIN po_stages ps  ON ps.id = po.stage_id
-        LEFT JOIN invoices i ON i.purchase_order_id = po.id
-
-        WHERE po.status NOT IN ('cancelled', 'draft')
-
-        GROUP BY l.id, ps.id, ps.name
-        ORDER BY l.id, ps.name
-      `);
-
-      /* -------- Shape data -------- */
-      const stageMap = {};
-      stages.forEach(s => {
-        if (!stageMap[s.location_id]) stageMap[s.location_id] = [];
-        stageMap[s.location_id].push({
-          stage: s.stage,
-          net: Number(s.net_total),
-          gross: Number(s.gross_total),
-          uninvoiced: Number(s.gross_total) - Number(s.invoiced_total)
-        });
-      });
-
-      const result = locations.map(l => ({
-        site: l.site,
-        location: l.location,
-        totals: {
-          net: Number(l.total_net),
-          gross: Number(l.total_gross),
-          uninvoiced: Number(l.total_gross) - Number(l.total_invoiced)
-        },
-        stages: stageMap[l.location_id] || []
-      }));
-
+      const showSpreadLocations = req.query.showSpread === '1' || req.query.showSpread === 'true';
+      console.log('Location Breakdown - showSpread param:', req.query.showSpread, 'showSpreadLocations:', showSpreadLocations);
+      const result = await getLocationBreakdownData(showSpreadLocations);
       res.json(result);
 
     } catch (err) {
@@ -146,72 +346,8 @@ router.get(
   authorizeRoles('super_admin'),
   async (req, res) => {
     try {
-      /* -------- Location totals -------- */
-      const [locations] = await db.query(`
-        SELECT
-          si.name AS site,
-          l.id    AS location_id,
-          l.name  AS location,
-
-          COALESCE(SUM(po.net_amount), 0)        AS total_net,
-          COALESCE(SUM(po.total_amount), 0)      AS total_gross,
-          COALESCE(SUM(i.total_amount), 0)       AS total_invoiced
-
-        FROM purchase_orders po
-        JOIN sites si     ON si.id = po.site_id
-        JOIN locations l  ON l.id  = po.location_id
-        LEFT JOIN invoices i ON i.purchase_order_id = po.id
-
-        WHERE po.status NOT IN ('cancelled', 'draft')
-
-        GROUP BY si.name, l.id, l.name
-        ORDER BY si.name, l.name
-      `);
-
-      /* -------- Stage breakdown -------- */
-      const [stages] = await db.query(`
-        SELECT
-          l.id    AS location_id,
-          ps.name AS stage,
-
-          COALESCE(SUM(po.net_amount), 0)     AS net_total,
-          COALESCE(SUM(po.total_amount), 0)   AS gross_total,
-          COALESCE(SUM(i.total_amount), 0)    AS invoiced_total
-
-        FROM purchase_orders po
-        JOIN locations l   ON l.id = po.location_id
-        JOIN po_stages ps  ON ps.id = po.stage_id
-        LEFT JOIN invoices i ON i.purchase_order_id = po.id
-
-        WHERE po.status NOT IN ('cancelled', 'draft')
-
-        GROUP BY l.id, ps.id, ps.name
-        ORDER BY l.id, ps.name
-      `);
-
-      /* -------- Shape data -------- */
-      const stageMap = {};
-      stages.forEach(s => {
-        if (!stageMap[s.location_id]) stageMap[s.location_id] = [];
-        stageMap[s.location_id].push({
-          stage: s.stage,
-          net: Number(s.net_total),
-          gross: Number(s.gross_total),
-          uninvoiced: Number(s.gross_total) - Number(s.invoiced_total)
-        });
-      });
-
-      const data = locations.map(l => ({
-        site: l.site,
-        location: l.location,
-        location_id: l.location_id,
-        totals: {
-          net: Number(l.total_net),
-          gross: Number(l.total_gross),
-          uninvoiced: Number(l.total_gross) - Number(l.total_invoiced)
-        },
-        stages: stageMap[l.location_id] || []
-      }));
+      const showSpreadLocations = req.query.showSpread === '1' || req.query.showSpread === 'true';
+      const data = await getLocationBreakdownData(showSpreadLocations);
 
       /* -------- Group by site -------- */
       const sites = {};

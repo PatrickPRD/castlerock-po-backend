@@ -2,6 +2,10 @@ const token = localStorage.getItem('token');
 if (!token) location.href = 'login.html';
 
 const table = document.getElementById('reportTable');
+const showSpreadLocations = document.getElementById('showSpreadLocations');
+const siteFilter = document.getElementById('siteFilter');
+
+let allData = [];
 
 /* =========================
    Helpers
@@ -13,7 +17,8 @@ const euro = v => `€${num(v).toFixed(2)}`;
    Load Report
    ========================= */
 async function loadReport() {
-  const res = await fetch('/reports/po-totals-by-location-breakdown', {
+  const showSpread = showSpreadLocations.checked ? '1' : '0';
+  const res = await fetch(`/reports/po-totals-by-location-breakdown?showSpread=${showSpread}`, {
     headers: { Authorization: 'Bearer ' + token }
   });
 
@@ -22,7 +27,14 @@ async function loadReport() {
     return;
   }
 
-  const data = await res.json();
+  allData = await res.json();
+  renderReport();
+}
+
+function renderReport() {
+  const selectedSite = siteFilter.value;
+  const data = selectedSite ? allData.filter(r => r.site === selectedSite) : allData;
+  
   table.innerHTML = '';
 
   data.forEach((r, index) => {
@@ -112,8 +124,9 @@ table.addEventListener('click', e => {
    Export
    ========================= */
 async function exportExcel() {
+  const showSpread = showSpreadLocations.checked ? '1' : '0';
   const res = await fetch(
-    '/reports/po-totals-by-location-breakdown.xlsx',
+    `/reports/po-totals-by-location-breakdown.xlsx?showSpread=${showSpread}`,
     {
       headers: {
         Authorization: 'Bearer ' + token
@@ -151,4 +164,26 @@ function back() {
 /* =========================
    Init
    ========================= */
+showSpreadLocations.addEventListener('change', loadReport);
+siteFilter.addEventListener('change', renderReport);
+
+async function loadSites() {
+  try {
+    const res = await fetch('/sites', {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    const sites = await res.json();
+    
+    sites.forEach(site => {
+      const opt = document.createElement('option');
+      opt.value = site.name;
+      opt.textContent = site.name;
+      siteFilter.appendChild(opt);
+    });
+  } catch (err) {
+    console.error('Failed to load sites:', err);
+  }
+}
+
+loadSites();
 loadReport();

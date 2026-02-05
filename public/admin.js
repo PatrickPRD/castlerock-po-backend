@@ -529,6 +529,117 @@ function goToBackupManagement() {
   location.href = 'backup-management.html';
 }
 
+function goToLocationSpread() {
+  location.href = 'location-spread.html';
+}
+
+/* ============================
+   SITE LETTER MAPPINGS
+   ============================ */
+async function loadSiteLetterMappings() {
+  try {
+    const mappings = await api("/admin/site-letters");
+    const table = document.getElementById("siteLetterTable");
+    if (!table) return;
+
+    table.innerHTML = "";
+    mappings.forEach(m => {
+      table.innerHTML += `
+        <tr>
+          <td><strong>${m.letter}</strong></td>
+          <td>${m.site_name}</td>
+          <td>
+            <div class="actions-menu">
+              <button class="actions-btn" onclick="toggleActions(this)">⋮</button>
+              <div class="actions-dropdown hidden">
+                <button class="action-item" onclick="editSiteLetterMapping(${m.id}, '${m.letter}', ${m.site_id})">Edit</button>
+                <button class="action-item delete" onclick="deleteSiteLetterMapping(${m.id})">Delete</button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      `;
+    });
+  } catch (err) {
+    alert("Error loading site letter mappings: " + err.message);
+  }
+}
+
+async function addSiteLetterMapping() {
+  const letter = document.getElementById("mappingLetter").value.trim().toUpperCase();
+  const siteId = document.getElementById("mappingSiteSelect").value;
+
+  if (!letter || !siteId) {
+    alert("Letter and site are required");
+    return;
+  }
+
+  if (letter.length !== 1) {
+    alert("Letter must be a single character");
+    return;
+  }
+
+  try {
+    await api("/admin/site-letters", "POST", { letter, site_id: parseInt(siteId) });
+    document.getElementById("mappingLetter").value = "";
+    document.getElementById("mappingSiteSelect").value = "";
+    loadSiteLetterMappings();
+    alert("Site letter mapping created successfully");
+  } catch (err) {
+    alert("Error: " + err.message);
+  }
+}
+
+async function editSiteLetterMapping(id, letter, siteId) {
+  document.getElementById("mappingLetter").value = letter;
+  document.getElementById("mappingSiteSelect").value = siteId;
+  
+  // Store the ID for update
+  const btn = document.getElementById("mappingSiteSelect").nextElementSibling;
+  btn.onclick = () => updateSiteLetterMapping(id);
+  btn.textContent = "Update Mapping";
+}
+
+async function updateSiteLetterMapping(id) {
+  const letter = document.getElementById("mappingLetter").value.trim().toUpperCase();
+  const siteId = document.getElementById("mappingSiteSelect").value;
+
+  if (!letter || !siteId) {
+    alert("Letter and site are required");
+    return;
+  }
+
+  try {
+    await api(`/admin/site-letters/${id}`, "PUT", { letter, site_id: parseInt(siteId) });
+    document.getElementById("mappingLetter").value = "";
+    document.getElementById("mappingSiteSelect").value = "";
+    
+    // Reset button
+    const btn = document.querySelector('[onclick*="addSiteLetterMapping"]');
+    if (btn) {
+      btn.onclick = () => addSiteLetterMapping();
+      btn.textContent = "Add Mapping";
+    }
+    
+    loadSiteLetterMappings();
+    alert("Site letter mapping updated successfully");
+  } catch (err) {
+    alert("Error: " + err.message);
+  }
+}
+
+async function deleteSiteLetterMapping(id) {
+  if (!confirm("Delete this site letter mapping?")) return;
+
+  try {
+    await api(`/admin/site-letters/${id}`, "DELETE");
+    loadSiteLetterMappings();
+    alert("Site letter mapping deleted successfully");
+  } catch (err) {
+    alert("Error: " + err.message);
+  }
+}
+
 /* ============================
    INIT
    ============================ */
@@ -536,8 +647,160 @@ if (role === "super_admin") {
   loadUsers();
   loadSites();
   loadLocations();
+  loadSiteLetterMappings();
+  
+  // Populate the site select for mappings
+  const mappingSiteSelect = document.getElementById("mappingSiteSelect");
+  if (mappingSiteSelect) {
+    fetch("/admin/sites", {
+      headers: { Authorization: "Bearer " + token }
+    })
+      .then(r => r.json())
+      .then(sites => {
+        mappingSiteSelect.innerHTML = '<option value="">Select a site</option>';
+        sites.forEach(s => {
+          mappingSiteSelect.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+        });
+      });
+  }
+  loadLocations();
 }
 
-if (role === "admin") {
-  loadLocations();
+/* ============================
+   MERGE LOCATIONS – SUPER ADMIN ONLY
+   ============================== */
+
+// Show merge button only for super admin
+const mergeBtn = document.getElementById('mergeMergeBtn');
+if (mergeBtn) {
+  if (role === 'super_admin') {
+    mergeBtn.style.display = 'inline-block';
+  } else {
+    mergeBtn.style.display = 'none';
+  }
+}
+
+function openMergeLocationModal() {
+  const modal = document.getElementById('mergeLocationModal');
+  const mergeFromSelect = document.getElementById('mergeFromLocation');
+  const mergeToSelect = document.getElementById('mergeToLocation');
+
+  // Populate location dropdowns
+  api('/admin/locations')
+    .then(locations => {
+      // Store all locations for filtering
+      window.allLocationsForMerge = locations;
+
+      mergeFromSelect.innerHTML = '<option value="">-- Select location --</option>';
+      mergeToSelect.innerHTML = '<option value="">-- Select location --</option>';
+      mergeToSelect.disabled = true;
+
+      locations.forEach(loc => {
+        const opt1 = document.createElement('option');
+        opt1.value = loc.id;
+        opt1.textContent = `${loc.name} (${loc.site})`;
+        mergeFromSelect.appendChild(opt1);
+      });
+
+      modal.style.display = 'flex';
+    });
+
+  // Update button disabled state
+  updateMergeButtonState();
+}
+
+function closeMergeLocationModal() {
+  const modal = document.getElementById('mergeLocationModal');
+  modal.style.display = 'none';
+  document.getElementById('mergeFromLocation').value = '';
+  document.getElementById('mergeToLocation').value = '';
+}
+
+function updateMergeButtonState() {
+  const confirmBtn = document.getElementById('confirmMergeBtn');
+  const fromId = document.getElementById('mergeFromLocation').value;
+  const toId = document.getElementById('mergeToLocation').value;
+
+  // Button enabled only if both locations selected and they're different
+  confirmBtn.disabled = !fromId || !toId || fromId === toId;
+}
+
+// Add event listeners to disable merge if same location selected
+document.addEventListener('DOMContentLoaded', () => {
+  const mergeFromSelect = document.getElementById('mergeFromLocation');
+  const mergeToSelect = document.getElementById('mergeToLocation');
+
+  if (mergeFromSelect) {
+    mergeFromSelect.addEventListener('change', () => {
+      const selectedId = mergeFromSelect.value;
+      const allLocations = window.allLocationsForMerge || [];
+
+      // Enable/disable the second dropdown
+      if (selectedId) {
+        mergeToSelect.disabled = false;
+
+        // Populate second dropdown excluding selected location
+        mergeToSelect.innerHTML = '<option value="">-- Select location --</option>';
+        allLocations.forEach(loc => {
+          if (loc.id !== parseInt(selectedId)) {
+            const opt = document.createElement('option');
+            opt.value = loc.id;
+            opt.textContent = `${loc.name} (${loc.site})`;
+            mergeToSelect.appendChild(opt);
+          }
+        });
+      } else {
+        mergeToSelect.disabled = true;
+        mergeToSelect.innerHTML = '<option value="">-- Select location --</option>';
+      }
+
+      updateMergeButtonState();
+    });
+  }
+
+  if (mergeToSelect) {
+    mergeToSelect.addEventListener('change', updateMergeButtonState);
+  }
+});
+
+async function confirmMergeLocations() {
+  const fromId = document.getElementById('mergeFromLocation').value;
+  const toId = document.getElementById('mergeToLocation').value;
+
+  if (!fromId || !toId || fromId === toId) {
+    alert('Please select two different locations');
+    return;
+  }
+
+  // Get location names for confirmation
+  const mergeFromSelect = document.getElementById('mergeFromLocation');
+  const mergeToSelect = document.getElementById('mergeToLocation');
+  const fromName = mergeFromSelect.options[mergeFromSelect.selectedIndex].text;
+  const toName = mergeToSelect.options[mergeToSelect.selectedIndex].text;
+
+  const confirmed = confirm(
+    `Are you sure you want to merge "${toName}" into "${fromName}"?\n\n` +
+    `This will:\n` +
+    `- Update all Purchase Orders from "${toName}" to "${fromName}"\n` +
+    `- Update all Location Spread Rules\n` +
+    `- Permanently delete "${toName}"\n\n` +
+    `This action cannot be undone.`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    const res = await api('/admin/merge-locations', 'POST', {
+      keep_location_id: parseInt(fromId),
+      merge_location_id: parseInt(toId)
+    });
+
+    alert(`Successfully merged "${toName}" into "${fromName}"`);
+    closeMergeLocationModal();
+    loadLocations();
+
+  } catch (err) {
+    console.error('Merge error:', err);
+    alert(`Failed to merge locations: ${err.message}`);
+  }
 }

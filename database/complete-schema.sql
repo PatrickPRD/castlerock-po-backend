@@ -33,12 +33,29 @@ CREATE TABLE `users` (
 CREATE TABLE `sites` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `name` VARCHAR(255) NOT NULL,
+  `site_letter` VARCHAR(1) NOT NULL,
   `address` TEXT,
   `active` TINYINT(1) NOT NULL DEFAULT 1,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `uniq_site_letter` (`site_letter`),
   INDEX `idx_name` (`name`),
   INDEX `idx_active` (`active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ========================================
+-- SITE LETTERS TABLE (dynamic mapping)
+-- ========================================
+CREATE TABLE `site_letters` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `site_id` INT NOT NULL,
+  `letter` VARCHAR(1) NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `uniq_letter` (`letter`),
+  FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON DELETE CASCADE,
+  INDEX `idx_site_id` (`site_id`),
+  INDEX `idx_letter` (`letter`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ========================================
@@ -55,6 +72,45 @@ CREATE TABLE `locations` (
   INDEX `idx_name` (`name`),
   INDEX `idx_site_id` (`site_id`),
   INDEX `idx_active` (`active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ========================================
+-- LOCATION SPREAD RULES
+-- ========================================
+CREATE TABLE `location_spread_rules` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(255) NOT NULL,
+  `source_location_id` INT NOT NULL,
+  `active` TINYINT(1) NOT NULL DEFAULT 1,
+  `created_by` INT NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `uniq_source_location` (`source_location_id`),
+  FOREIGN KEY (`source_location_id`) REFERENCES `locations`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE RESTRICT,
+  INDEX `idx_active` (`active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `location_spread_rule_sites` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `rule_id` INT NOT NULL,
+  `site_id` INT NOT NULL,
+  `spread_all` TINYINT(1) NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `uniq_rule_site` (`rule_id`, `site_id`),
+  FOREIGN KEY (`rule_id`) REFERENCES `location_spread_rules`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `location_spread_rule_locations` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `rule_site_id` INT NOT NULL,
+  `location_id` INT NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uniq_rule_site_location` (`rule_site_id`, `location_id`),
+  FOREIGN KEY (`rule_site_id`) REFERENCES `location_spread_rule_sites`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`location_id`) REFERENCES `locations`(`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ========================================
@@ -132,7 +188,7 @@ CREATE TABLE `invoices` (
   `invoice_number` VARCHAR(100) NOT NULL,
   `invoice_date` DATE NOT NULL,
   `net_amount` DECIMAL(15, 2) NOT NULL,
-  `vat_rate` DECIMAL(5, 4) NOT NULL DEFAULT 0.2300,
+  `vat_rate` DECIMAL(5, 2) NOT NULL DEFAULT 23.00,
   `vat_amount` DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
   `total_amount` DECIMAL(15, 2) NOT NULL,
   `paid_amount` DECIMAL(15, 2) DEFAULT 0.00,

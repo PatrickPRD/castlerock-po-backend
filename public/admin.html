@@ -37,6 +37,9 @@
     <button class="btn-outline" onclick="goToBackupManagement()" style="margin-right: 1rem;">
       🔄 Backup Management
     </button>
+    <button class="btn-outline" onclick="goToLocationSpread()" style="margin-right: 1rem;">
+      📍 Location Spread
+    </button>
     <button class="btn-outline" onclick="back()">Back</button>
   </div>
 </header>
@@ -116,10 +119,41 @@
   </div>
 
   <!-- =======================
+       SITE LETTER MAPPINGS
+       ======================= -->
+  <div class="card">
+    <h3>Site Letter Mappings</h3>
+    <p style="font-size: 0.9rem; color: #666; margin: 0 0 1rem 0;">
+      Configure which letter (first character of PO number) maps to which site for auto-population
+    </p>
+    <div class="form-row">
+      <input id="mappingLetter" placeholder="Letter" maxlength="1" style="width:80px;text-transform:uppercase">
+      <select id="mappingSiteSelect"></select>
+      <button class="btn-primary" onclick="addSiteLetterMapping()">Add Mapping</button>
+    </div>
+
+    <table class="po-table">
+      <thead>
+        <tr>
+          <th>Letter</th>
+          <th>Site</th>
+          <th style="width:160px">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="siteLetterTable"></tbody>
+    </table>
+  </div>
+
+  <!-- =======================
        LOCATIONS
        ======================= -->
   <div class="card" id="locationsSection">
-    <h3>Locations</h3>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <h3 style="margin: 0;">Locations</h3>
+      <button id="mergeMergeBtn" class="btn-outline" onclick="openMergeLocationModal()" style="background: #ff9800; color: white;">
+        🔀 Merge Locations
+      </button>
+    </div>
     <p id="locationEditNotice" class="edit-notice" style="display:none;">
   Editing existing item — changes affect all Purchase Orders
 </p>
@@ -148,6 +182,51 @@
       </thead>
       <tbody id="locationTable"></tbody>
     </table>
+  </div>
+
+  <!-- =======================
+       MERGE LOCATIONS MODAL
+       ======================= -->
+  <div id="mergeLocationModal" class="modal" style="display:none;">
+    <div class="modal-content" style="width: 500px;">
+      <h2>Merge Locations</h2>
+      <p style="color: #666; font-size: 0.9rem; margin-bottom: 1.5rem;">
+        Select two locations. The second location will be merged into the first, and all records will be updated.
+      </p>
+
+      <div class="form-row">
+        <div>
+          <label>Location to Keep (Merge Into)</label>
+          <select id="mergeFromLocation">
+            <option value="">-- Select location --</option>
+          </select>
+        </div>
+
+        <div>
+          <label>Location to Merge (Remove)</label>
+          <select id="mergeToLocation">
+            <option value="">-- Select location --</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 1rem; margin: 1.5rem 0; border-radius: 4px;">
+        <strong>⚠️ Warning:</strong> This operation will:
+        <ul style="margin: 0.5rem 0 0 0; padding-left: 1.5rem;">
+          <li>Update all Purchase Orders from the second location to the first</li>
+          <li>Update all Location Spread Rules</li>
+          <li>Permanently delete the second location</li>
+          <li>This action cannot be undone</li>
+        </ul>
+      </div>
+
+      <div class="form-row">
+        <button class="btn-outline" onclick="closeMergeLocationModal()">Cancel</button>
+        <button class="btn-danger" id="confirmMergeBtn" onclick="confirmMergeLocations()" style="background: #f44336; color: white;" disabled>
+          Merge Locations
+        </button>
+      </div>
+    </div>
   </div>
 
 </main>

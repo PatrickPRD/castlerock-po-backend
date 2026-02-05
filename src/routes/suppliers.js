@@ -22,10 +22,10 @@ router.get(
       SELECT
         id,
         name,
-        main_contact,
+        contact_person,
         email,
         phone,
-        notes
+        address
       FROM suppliers
       WHERE active = 1
         AND name LIKE ?
@@ -52,10 +52,10 @@ router.get(
       SELECT
         id,
         name,
-        main_contact,
+        contact_person,
         email,
         phone,
-        notes
+        address
       FROM suppliers
       WHERE id = ?
       `,
@@ -79,7 +79,7 @@ router.post(
   authorizeRoles('admin', 'super_admin'),
   async (req, res) => {
 
-    const { name, main_contact, email, phone, notes } = req.body;
+    const { name, contact_person, email, phone, address } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Supplier name is required' });
@@ -89,15 +89,15 @@ router.post(
       const [result] = await db.query(
         `
         INSERT INTO suppliers
-          (name, main_contact, email, phone, notes)
+          (name, contact_person, email, phone, address)
         VALUES (?, ?, ?, ?, ?)
         `,
         [
           name.trim(),
-          main_contact || null,
+          contact_person || null,
           email || null,
           phone || null,
-          notes || null
+          address || null
         ]
       );
 
@@ -106,7 +106,7 @@ router.post(
         record_id: result.insertId,
         action: 'INSERT',
         old_data: null,
-        new_data: { name, main_contact, email, phone, notes },
+        new_data: { name, contact_person, email, phone, address },
         changed_by: req.user.id
       });
 
@@ -132,7 +132,7 @@ router.put(
   authorizeRoles('super_admin'),
   async (req, res) => {
 
-    const { name, main_contact, email, phone, notes } = req.body;
+    const { name, contact_person, email, phone, address } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Supplier name is required' });
@@ -152,18 +152,18 @@ router.put(
       UPDATE suppliers
       SET
         name = ?,
-        main_contact = ?,
+        contact_person = ?,
         email = ?,
         phone = ?,
-        notes = ?
+        address = ?
       WHERE id = ?
       `,
       [
         name.trim(),
-        main_contact || null,
+        contact_person || null,
         email || null,
         phone || null,
-        notes || null,
+        address || null,
         req.params.id
       ]
     );
@@ -173,7 +173,7 @@ router.put(
       record_id: req.params.id,
       action: 'UPDATE',
       old_data: oldSupplier,
-      new_data: { name, main_contact, email, phone, notes },
+      new_data: { name, contact_person, email, phone, address },
       changed_by: req.user.id
     });
 

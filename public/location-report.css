@@ -82,6 +82,13 @@ background-color: #8d888841;
   display: table-row;
 }
 
+.checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+}
+
 
 @media (max-width: 768px) {
 

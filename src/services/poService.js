@@ -49,7 +49,7 @@ async function generatePONumber(conn, siteId) {
   return (
     site.site_letter +
     yearDigit +
-    String(month).padStart(2, '0') +
+    String(month) +
     String(seq.last_number).padStart(3, '0')
   );
 }
