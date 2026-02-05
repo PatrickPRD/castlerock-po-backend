@@ -1,0 +1,37 @@
+<%- include('partials/head', { title: 'Users | Castlerock Homes', styles: ['admin.css'] }) %>
+<%- include('partials/header', { pageTitle: 'Users' }) %>
+
+<main class="container">
+
+  <div class="card" id="usersSection">
+    <h3>Users</h3>
+
+    <div class="form-row">
+      <input id="firstName" placeholder="First name">
+      <input id="lastName" placeholder="Last name">
+      <input id="userEmail" placeholder="Email">
+      <select id="userRole">
+        <option value="admin">Admin</option>
+        <option value="staff">Staff</option>
+        <option value="viewer">Viewer</option>
+      </select>
+      <button class="btn-primary" onclick="addUser()">Add User</button>
+    </div>
+
+    <table class="po-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Status</th>
+          <th class="actions-col"></th>
+        </tr>
+      </thead>
+      <tbody id="userTable"></tbody>
+    </table>
+  </div>
+
+</main>
+
+<%- include('partials/footer', { scripts: ['/ui.js', 'users.js'], includeNavScript: true }) %>

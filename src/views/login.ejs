@@ -1,0 +1,41 @@
+<%- include('partials/head', { title: 'Login | Castlerock Homes', styles: ['login.css'] }) %>
+<%- include('partials/header', { pageTitle: 'Purchase Order System', showNav: false }) %>
+
+<main class="container">
+  <div class="card" style="max-width:420px;margin:auto">
+
+    <h3 style="text-align:center;margin-bottom:16px">
+      Sign in
+    </h3>
+
+    <input
+      id="email"
+      type="email"
+      placeholder="Email"
+      autocomplete="username"
+    >
+
+    <input
+      id="password"
+      type="password"
+      placeholder="Password"
+      autocomplete="current-password"
+    >
+
+    <button
+      class="btn-primary"
+      type="button"
+      onclick="login()"
+      style="width:100%"
+    >
+      Login
+    </button>
+
+    <div style="margin-top:16px;text-align:center">
+      <a href="#" onclick="forgotPassword()">Forgot password?</a>
+    </div>
+
+  </div>
+</main>
+
+<%- include('partials/footer', { scripts: ['/ui.js', 'login.js'], includeNavScript: false }) %>

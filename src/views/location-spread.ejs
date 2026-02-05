@@ -1,0 +1,65 @@
+<%- include('partials/head', { title: 'Location Spread | Castlerock Homes', styles: ['location-spread.css'] }) %>
+<%- include('partials/header', { pageTitle: 'Location Spread' }) %>
+
+<main class="container">
+  <div class="card">
+    <div class="table-header">
+      <h3>Location Spread Rules</h3>
+      <div class="table-actions">
+        <button class="btn-primary" onclick="openAddRuleModal()">+ Add Rule</button>
+      </div>
+    </div>
+
+    <table class="po-table">
+      <thead>
+        <tr>
+          <th>Location</th>
+          <th>Rule Name</th>
+        </tr>
+      </thead>
+      <tbody id="rulesTable"></tbody>
+    </table>
+  </div>
+</main>
+
+<div id="spreadModal" class="modal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="spreadModalTitle">Add Location Spread Rule</h2>
+      <button class="modal-close" onclick="closeRuleModal()">&times;</button>
+    </div>
+
+    <form id="spreadForm">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="sourceLocation">Location to spread</label>
+          <select id="sourceLocation" required></select>
+          <div id="sourceLocationLabel" style="display: none; padding: 0.5rem; background-color: #f3f4f6; border-radius: 6px; border: 1.5px solid #d1d5db;"></div>
+        </div>
+
+        <div class="form-group">
+          <label for="ruleName">Rule name</label>
+          <input id="ruleName" placeholder="e.g. The Oaks Spread">
+        </div>
+      </div>
+
+      <div id="siteSpreadContainer"></div>
+
+      <div class="add-site-row">
+        <button type="button" id="addSiteBtn" class="btn-outline">Spread Across Another Site</button>
+        <div id="addSiteSelector" class="add-site-selector hidden">
+          <select id="addSiteSelect"></select>
+          <button type="button" class="btn-primary" id="confirmAddSiteBtn">Add Site</button>
+          <button type="button" class="btn-outline" id="cancelAddSiteBtn">Cancel</button>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="submit" class="btn-primary">Save Rule</button>
+        <button type="button" class="btn-outline" onclick="closeRuleModal()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('partials/footer', { scripts: ['/ui.js', 'location-spread.js'], includeNavScript: true }) %>

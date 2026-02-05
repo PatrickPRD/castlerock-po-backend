@@ -1,0 +1,66 @@
+<%- include('partials/head', { title: 'Sites | Castlerock Homes', styles: ['admin.css'] }) %>
+<%- include('partials/header', { pageTitle: 'Sites' }) %>
+
+<main class="container">
+
+  <div class="card" id="sitesSection">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <h3 style="margin: 0;">Sites</h3>
+      <button class="btn-outline" onclick="autoPopulateSites()" style="background: #4CAF50; color: white;">
+        🔄 Auto-Populate from POs
+      </button>
+    </div>
+    <p id="siteEditNotice" class="edit-notice" style="display:none;">
+      Editing existing item — changes affect all Purchase Orders - Site Letter cannot be changed
+    </p>
+    <div class="form-row">
+      <input id="siteName" placeholder="Site name">
+      <input
+        id="siteLetter"
+        placeholder="Letter"
+        maxlength="1"
+        style="width:80px;text-transform:uppercase"
+      >
+      <button id="saveSiteBtn" class="btn-primary" onclick="saveSite()">
+        Add Site
+      </button>
+    </div>
+
+    <table class="po-table">
+      <thead>
+        <tr>
+          <th>Site</th>
+          <th>Site Letter</th>
+          <th style="width:160px">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="siteTable"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Site Letter Mappings</h3>
+    <p style="font-size: 0.9rem; color: #666; margin: 0 0 1rem 0;">
+      Configure which letter (first character of PO number) maps to which site for auto-population
+    </p>
+    <div class="form-row">
+      <input id="mappingLetter" placeholder="Letter" maxlength="1" style="width:80px;text-transform:uppercase">
+      <select id="mappingSiteSelect"></select>
+      <button class="btn-primary" onclick="addSiteLetterMapping()">Add Mapping</button>
+    </div>
+
+    <table class="po-table">
+      <thead>
+        <tr>
+          <th>Letter</th>
+          <th>Site</th>
+          <th style="width:160px">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="siteLetterTable"></tbody>
+    </table>
+  </div>
+
+</main>
+
+<%- include('partials/footer', { scripts: ['/ui.js', 'sites.js'], includeNavScript: true }) %>

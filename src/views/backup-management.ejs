@@ -1,0 +1,191 @@
+<%- include('partials/head', { title: 'Backup Management | Castlerock Homes', styles: ['admin.css'] }) %>
+<style>
+  .backup-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-bottom: 2rem;
+  }
+  @media (max-width: 768px) {
+    .backup-section {
+      grid-template-columns: 1fr;
+    }
+  }
+  .backup-card {
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    padding: 2rem;
+    background: #f9f9f9;
+  }
+  .backup-card h3 {
+    margin-top: 0;
+    color: #333;
+  }
+  .backup-card p {
+    color: #666;
+    line-height: 1.5;
+  }
+  .backup-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .btn-backup {
+    flex: 1;
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+  }
+  .modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal.active {
+    display: flex;
+  }
+  .modal-content {
+    background: white;
+    border-radius: 8px;
+    padding: 2rem;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+  .modal-header h2 {
+    margin: 0;
+  }
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+  }
+  .close-btn:hover {
+    color: #000;
+  }
+  .form-group {
+    margin-bottom: 1rem;
+  }
+  .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: bold;
+    color: #333;
+  }
+  .form-group input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+  }
+  .warning-box {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 4px;
+    padding: 1rem;
+    margin: 1rem 0;
+    color: #856404;
+  }
+  .info-box {
+    background: #e7f3ff;
+    border: 1px solid #b3d9ff;
+    border-radius: 4px;
+    padding: 1rem;
+    margin: 1rem 0;
+    color: #004085;
+  }
+  .modal-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    justify-content: flex-end;
+  }
+</style>
+
+<%- include('partials/header', { pageTitle: 'Backup Management' }) %>
+
+<main class="container">
+
+  <div class="backup-section">
+    <div class="backup-card">
+      <h3>📥 Create Backup</h3>
+      <p>Export all data (excluding user accounts) from the database. Users will remain unaffected.</p>
+      <div class="info-box">
+        <strong>Note:</strong> The backup file includes all POs, invoices, sites, locations, and suppliers.
+      </div>
+      <div class="backup-actions">
+        <button class="btn-primary btn-backup" onclick="createBackup()">
+          Create & Download Backup
+        </button>
+      </div>
+    </div>
+
+    <div class="backup-card">
+      <h3>📤 Restore Backup</h3>
+      <p>Import data from a previous backup file. This will replace all existing data (excluding users).</p>
+      <div class="warning-box">
+        <strong>⚠️ Warning:</strong> This action cannot be undone. All current data will be overwritten.
+      </div>
+      <div class="backup-actions">
+        <button class="btn-primary btn-backup" onclick="openRestoreModal()">
+          Restore from Backup
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="restoreModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Restore Backup</h2>
+        <button class="close-btn" onclick="closeRestoreModal()">&times;</button>
+      </div>
+
+      <div class="warning-box">
+        <strong>⚠️ Warning:</strong> This will delete all existing data and replace it with the backup contents.
+      </div>
+
+      <div class="form-group">
+        <label for="backupFile">Select backup file (JSON)</label>
+        <input type="file" id="backupFile" accept=".json">
+      </div>
+
+      <div id="backupPreview" style="display: none;">
+        <h4>Backup Contents Preview:</h4>
+        <p id="backupDetails"></p>
+      </div>
+
+      <div id="parseError" style="display: none;">
+        <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; padding: 1rem; color: #721c24;">
+          <strong>Error parsing backup file:</strong>
+          <p id="parseErrorMsg"></p>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-outline" onclick="closeRestoreModal()">Cancel</button>
+        <button class="btn-primary" id="restoreBtn" onclick="restoreBackup()" disabled>
+          Restore Backup
+        </button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<%- include('partials/footer', { scripts: ['/ui.js', 'backup-management.js'], includeNavScript: true }) %>

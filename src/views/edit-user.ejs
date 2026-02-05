@@ -1,0 +1,26 @@
+<%- include('partials/head', { title: 'Edit User | Castlerock Homes', styles: ['admin.css'] }) %>
+<%- include('partials/header', { pageTitle: 'Edit User' }) %>
+
+<main class="container">
+  <div class="card form-card">
+    <h3>Edit User</h3>
+
+    <form id="userForm">
+      <div class="form-row">
+        <input id="firstName" placeholder="First name" required>
+        <input id="lastName" placeholder="Last name" required>
+      </div>
+
+      <div class="form-row">
+        <input id="email" placeholder="Email" type="email" required disabled>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn-outline" type="button" onclick="cancel()">Cancel</button>
+        <button class="btn-primary" type="submit">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</main>
+
+<%- include('partials/footer', { scripts: ['/ui.js', 'edit-user.js'], includeNavScript: true }) %>

@@ -1,0 +1,34 @@
+<%- include('partials/head', { title: 'Add / Edit Supplier | Castlerock Homes', styles: ['suppliers.css'] }) %>
+<%- include('partials/header', { pageTitle: 'Suppliers' }) %>
+
+<main class="container">
+
+  <div class="card form-card">
+    <h3 id="pageTitle" style="margin-bottom: 1rem;">Add Supplier</h3>
+
+    <form id="supplierForm">
+      <div class="form-row">
+        <input id="name" placeholder="Supplier name" required>
+        <input id="contact" placeholder="Main contact">
+      </div>
+
+      <div class="form-row">
+        <input id="email" placeholder="Email">
+        <input id="phone" placeholder="Phone">
+      </div>
+
+      <textarea
+        id="notes"
+        placeholder="Notes"
+        rows="4"></textarea>
+
+      <div class="form-actions">
+        <button class="btn-outline" type="button" onclick="back()">Cancel</button>
+        <button class="btn-primary" type="submit">Save Supplier</button>
+      </div>
+    </form>
+  </div>
+
+</main>
+
+<%- include('partials/footer', { scripts: ['/ui.js', 'edit-supplier.js'], includeNavScript: true }) %>

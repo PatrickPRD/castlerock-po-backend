@@ -1,0 +1,89 @@
+<%- include('partials/head', { title: 'Add / Edit Invoice | Castlerock Homes', styles: ['invoice-entry.css'] }) %>
+<%- include('partials/header', { pageTitle: 'Add/Edit Invoices' }) %>
+
+<main class="container">
+
+  <div class="card">
+    <div id="poHeader"></div>
+  </div>
+
+  <div class="card">
+    <h3>Invoices</h3>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Invoice No</th>
+          <th>Date</th>
+          <th>Net (ex VAT)</th>
+          <th>VAT %</th>
+          <th>Total (inc VAT)</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="invoiceList"></tbody>
+    </table>
+
+    <div style="margin-top: 1rem;">
+      <button id="addInvoiceBtn" class="btn-primary" onclick="openAddInvoiceModal()">+ Add Invoice</button>
+    </div>
+  </div>
+
+  <div id="invoiceModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modalTitle">Add Invoice</h2>
+        <button class="modal-close" onclick="closeInvoiceModal()">&times;</button>
+      </div>
+
+      <form id="invoiceForm">
+        <input type="hidden" id="invoiceId">
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="invoiceNumber">Invoice Number</label>
+            <input id="invoiceNumber" required>
+          </div>
+
+          <div class="form-group">
+            <label for="invoiceDate">Invoice Date</label>
+            <input id="invoiceDate" type="date" required>
+          </div>
+
+          <div class="form-group">
+            <label for="netAmount">Net Amount (ex VAT)</label>
+            <input id="netAmount" type="number" step="0.01" inputmode="decimal" required>
+          </div>
+
+          <div class="form-group">
+            <label for="vatRate">VAT Rate</label>
+            <select id="vatRate">
+              <option value="0">0%</option>
+              <option value="13.5">13.5%</option>
+              <option value="23">23%</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="details-grid">
+          <div>
+            <strong>VAT Amount:</strong>
+            <span id="vatAmount">€0.00</span>
+          </div>
+          <div>
+            <strong>Total (inc VAT):</strong>
+            <span id="totalAmount">€0.00</span>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="submit" class="btn-primary">Save Invoice</button>
+          <button type="button" class="btn-outline" onclick="closeInvoiceModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</main>
+
+<%- include('partials/footer', { scripts: ['/ui.js', 'invoice-entry.js'], includeNavScript: true }) %>

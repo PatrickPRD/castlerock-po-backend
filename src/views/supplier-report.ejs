@@ -1,0 +1,35 @@
+<%- include('partials/head', { title: 'PO Totals by Supplier | Castlerock Homes', styles: ['supplier-report.css'] }) %>
+<%- include('partials/header', { pageTitle: 'PO Totals by Supplier' }) %>
+
+<main class="container">
+  <div class="card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="form-row" style="margin-bottom:0;">
+        <select id="siteFilter">
+          <option value="">All Sites</option>
+        </select>
+        <input type="text" id="searchInput" placeholder="Search suppliers..." class="search-input">
+      </div>
+      <button class="btn-outline" onclick="exportExcel()">Export Excel</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <table class="po-table">
+      <thead>
+        <tr>
+          <th onclick="sortTable('supplier')" class="sortable">Supplier <span class="sort-indicator"></span></th>
+          <th onclick="sortTable('total_po_net')" class="sortable">PO Net (€) <span class="sort-indicator"></span></th>
+          <th onclick="sortTable('total_po_vat')" class="sortable">PO VAT (€) <span class="sort-indicator"></span></th>
+          <th onclick="sortTable('total_po_gross')" class="sortable">PO Gross (€) <span class="sort-indicator"></span></th>
+          <th onclick="sortTable('total_invoiced_net')" class="sortable">Invoiced Net (€) <span class="sort-indicator"></span></th>
+          <th onclick="sortTable('uninvoiced_net')" class="sortable">Uninvoiced Net (€) <span class="sort-indicator"></span></th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="reportTable"></tbody>
+    </table>
+  </div>
+</main>
+
+<%- include('partials/footer', { scripts: ['/ui.js', 'supplier-report.js'], includeNavScript: true }) %>

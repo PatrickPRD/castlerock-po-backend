@@ -1,0 +1,34 @@
+<%- include('partials/head', { title: 'Create Purchase Order | Castlerock Homes' }) %>
+<%- include('partials/header', { pageTitle: 'Create Purchase Order' }) %>
+
+<main class="container">
+  <div class="card">
+    <form id="poForm">
+      <select id="supplier"></select>
+      <select id="site"></select>
+      <select id="location"></select>
+      <select id="stage" required></select>
+      <input type="date" id="poDate" required>
+      <textarea id="description" placeholder="Description"></textarea>
+      <input
+        type="number"
+        id="netAmount"
+        placeholder="Net Value"
+        step="0.01"
+        min="0"
+        inputmode="decimal"
+      />
+
+      <select id="vatRate">
+        <option value="0">0%</option>
+        <option value="13.5">13.5%</option>
+        <option value="23">23%</option>
+      </select>
+      <p>VAT: <span id="vatAmount">0.00</span></p>
+      <p><b>Total: <span id="totalAmount">0.00</span></b></p>
+      <button class="btn-primary">Save PO</button>
+    </form>
+  </div>
+</main>
+
+<%- include('partials/footer', { scripts: ['/ui.js', 'create-po.js'], includeNavScript: true }) %>

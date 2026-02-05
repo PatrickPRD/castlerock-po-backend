@@ -1,0 +1,27 @@
+<%- include('partials/head', { title: 'Suppliers | Castlerock Homes', styles: ['suppliers.css'] }) %>
+<%- include('partials/header', { pageTitle: 'Suppliers' }) %>
+
+<main class="container">
+  <div class="card form-card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <input
+        id="filterInput"
+        class="filter-input"
+        placeholder="Search suppliers..."
+      />
+      <button class="btn-primary" onclick="addSupplier()">Add Supplier</button>
+    </div>
+
+    <table class="suppliers-table">
+      <thead>
+        <tr>
+          <th>Supplier</th>
+          <th>Main Contact</th>
+        </tr>
+      </thead>
+      <tbody id="supplierTable"></tbody>
+    </table>
+  </div>
+</main>
+
+<%- include('partials/footer', { scripts: ['/ui.js', 'suppliers.js'], includeNavScript: true }) %>

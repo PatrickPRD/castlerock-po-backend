@@ -1,0 +1,63 @@
+<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm">
+  <div class="container-fluid">
+    <a class="navbar-brand d-flex align-items-center gap-2" href="dashboard.html">
+      <img src="assets/Logo.png" alt="Castlerock Homes" height="32">
+      <span class="fw-semibold"><%= pageTitle %></span>
+    </a>
+
+    <% if (showNav !== false) { %>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="mainNav">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item">
+            <a class="nav-link" href="dashboard.html">Dashboard</a>
+          </li>
+
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              Actions
+            </a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="create-po.html">Create Purchase Order</a></li>
+              <li><a class="dropdown-item" href="suppliers.html">Suppliers</a></li>
+            </ul>
+          </li>
+
+          <li class="nav-item dropdown" data-roles="admin,super_admin">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              Admin
+            </a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" data-roles="super_admin" href="users.html">Users</a></li>
+              <li><a class="dropdown-item" href="locations.html">Locations</a></li>
+              <li><a class="dropdown-item" data-roles="super_admin" href="sites.html">Sites</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="location-spread.html">Location Spread</a></li>
+              <li><a class="dropdown-item" data-roles="super_admin" href="backup-management.html">Backup Management</a></li>
+            </ul>
+          </li>
+
+          <li class="nav-item dropdown" data-roles="super_admin">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              Reports
+            </a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="location-report.html">By Location</a></li>
+              <li><a class="dropdown-item" href="supplier-report.html">By Supplier</a></li>
+            </ul>
+          </li>
+        </ul>
+
+        <div class="d-flex align-items-center gap-2">
+          <% if (showFiltersButton) { %>
+            <button class="btn btn-outline-secondary" type="button" onclick="toggleFilters()">Filters</button>
+          <% } %>
+          <button class="btn btn-outline-secondary" type="button" onclick="logout()">Logout</button>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</nav>

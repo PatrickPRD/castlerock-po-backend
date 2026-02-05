@@ -1,0 +1,38 @@
+<%- include('partials/head', { title: 'PO Totals by Location | Castlerock Homes', styles: ['location-report.css'] }) %>
+<%- include('partials/header', { pageTitle: 'PO Totals by Location' }) %>
+
+<main class="container">
+  <div class="card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="form-row" style="margin-bottom:0;">
+        <div class="form-group">
+          <label for="siteFilter">Site</label>
+          <select id="siteFilter">
+            <option value="">All Sites</option>
+          </select>
+        </div>
+        <label class="checkbox-row" style="white-space: nowrap; margin-left: 1rem;">
+          <input type="checkbox" id="showSpreadLocations">
+          Show Spread Locations
+        </label>
+      </div>
+      <button class="btn-outline" onclick="exportExcel()">Export to Excel</button>
+    </div>
+  </div>
+  <div class="card">
+    <table class="po-table">
+      <thead>
+        <tr>
+          <th>Site</th>
+          <th>Location</th>
+          <th>Total Net (€)</th>
+          <th>Total Gross (€)</th>
+          <th>Uninvoiced (€)</th>
+        </tr>
+      </thead>
+      <tbody id="reportTable"></tbody>
+    </table>
+  </div>
+</main>
+
+<%- include('partials/footer', { scripts: ['/ui.js', 'location-report.js'], includeNavScript: true }) %>

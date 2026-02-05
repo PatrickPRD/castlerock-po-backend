@@ -1,20 +1,42 @@
 
 require('dotenv').config();
 const express = require('express');
+const path = require('path');
 const pool = require('./db');
 
 const app = express();
 
+// Configure EJS view engine
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-const path = require('path');
 app.use(express.static(path.join(__dirname, '../public')));
 
 // Root route → login page
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/login.html'));
+  res.render('login');
 });
+
+// Page routes using EJS templates
+app.get('/login.html', (req, res) => res.render('login'));
+app.get('/reset-password.html', (req, res) => res.render('reset-password'));
+app.get('/dashboard.html', (req, res) => res.render('dashboard'));
+app.get('/suppliers.html', (req, res) => res.render('suppliers'));
+app.get('/create-po.html', (req, res) => res.render('create-po'));
+app.get('/edit-po.html', (req, res) => res.render('edit-po'));
+app.get('/invoice-entry.html', (req, res) => res.render('invoice-entry'));
+app.get('/edit-supplier.html', (req, res) => res.render('edit-supplier'));
+app.get('/edit-user.html', (req, res) => res.render('edit-user'));
+app.get('/users.html', (req, res) => res.render('users'));
+app.get('/locations.html', (req, res) => res.render('locations'));
+app.get('/sites.html', (req, res) => res.render('sites'));
+app.get('/location-spread.html', (req, res) => res.render('location-spread'));
+app.get('/backup-management.html', (req, res) => res.render('backup-management'));
+app.get('/location-report.html', (req, res) => res.render('location-report'));
+app.get('/supplier-report.html', (req, res) => res.render('supplier-report'));
 
 // Health check with database connectivity test
 app.get('/health', async (req, res) => {
