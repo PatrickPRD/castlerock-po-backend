@@ -82,10 +82,16 @@ function closeRestoreModal() {
 }
 
 function resetRestoreForm() {
-  document.getElementById('backupFile').value = '';
-  document.getElementById('backupInfo').style.display = 'none';
-  document.getElementById('parseError').style.display = 'none';
-  document.getElementById('restoreBtn').disabled = true;
+  const fileInput = document.getElementById('backupFile');
+  const preview = document.getElementById('backupPreview');
+  const errorDiv = document.getElementById('parseError');
+  const restoreBtn = document.getElementById('restoreBtn');
+  
+  if (fileInput) fileInput.value = '';
+  if (preview) preview.style.display = 'none';
+  if (errorDiv) errorDiv.style.display = 'none';
+  if (restoreBtn) restoreBtn.disabled = true;
+  
   backupData = null;
   backupMode = null;
 }
@@ -113,10 +119,15 @@ async function validateBackupFile(event) {
         <strong>Size:</strong> ${sizeKb} KB<br>
         <strong>Lines:</strong> ${lineCount}
       `;
-      document.getElementById('backupDetails').innerHTML = details;
-      document.getElementById('backupInfo').style.display = 'block';
-      document.getElementById('parseError').style.display = 'none';
-      document.getElementById('restoreBtn').disabled = false;
+      const detailsEl = document.getElementById('backupDetails');
+      const previewEl = document.getElementById('backupPreview');
+      const errorEl = document.getElementById('parseError');
+      const restoreBtn = document.getElementById('restoreBtn');
+      
+      if (detailsEl) detailsEl.innerHTML = details;
+      if (previewEl) previewEl.style.display = 'block';
+      if (errorEl) errorEl.style.display = 'none';
+      if (restoreBtn) restoreBtn.disabled = false;
       return;
     }
 
@@ -141,16 +152,26 @@ async function validateBackupFile(event) {
         )
         .join(', ')}
     `;
-    document.getElementById('backupDetails').innerHTML = details;
-    document.getElementById('backupInfo').style.display = 'block';
-    document.getElementById('parseError').style.display = 'none';
-    document.getElementById('restoreBtn').disabled = false;
+    const detailsEl = document.getElementById('backupDetails');
+    const previewEl = document.getElementById('backupPreview');
+    const errorEl = document.getElementById('parseError');
+    const restoreBtn = document.getElementById('restoreBtn');
+    
+    if (detailsEl) detailsEl.innerHTML = details;
+    if (previewEl) previewEl.style.display = 'block';
+    if (errorEl) errorEl.style.display = 'none';
+    if (restoreBtn) restoreBtn.disabled = false;
   } catch (err) {
     console.error('Backup validation error:', err);
-    document.getElementById('parseErrorMsg').textContent = err.message;
-    document.getElementById('parseError').style.display = 'block';
-    document.getElementById('backupInfo').style.display = 'none';
-    document.getElementById('restoreBtn').disabled = true;
+    const errorMsgEl = document.getElementById('parseErrorMsg');
+    const errorEl = document.getElementById('parseError');
+    const previewEl = document.getElementById('backupPreview');
+    const restoreBtn = document.getElementById('restoreBtn');
+    
+    if (errorMsgEl) errorMsgEl.textContent = err.message;
+    if (errorEl) errorEl.style.display = 'block';
+    if (previewEl) previewEl.style.display = 'none';
+    if (restoreBtn) restoreBtn.disabled = true;
     backupData = null;
   }
 }
@@ -202,10 +223,132 @@ function back() {
   location.href = 'dashboard.html';
 }
 
+/* ============================
+   SETUP WIZARD
+   ============================ */
+function startSetupWizard() {
+  document.getElementById('setupWizardModal').style.display = 'flex';
+  document.getElementById('wizardStep1').style.display = 'block';
+  document.getElementById('wizardStep2').style.display = 'none';
+}
+
+function closeSetupWizard() {
+  document.getElementById('setupWizardModal').style.display = 'none';
+  document.getElementById('wizardStep1').style.display = 'block';
+  document.getElementById('wizardStep2').style.display = 'none';
+}
+
+async function executeAutoPopulate() {
+  if (!confirm('This will auto-populate sites and locations from your Purchase Orders. Continue?')) return;
+
+  try {
+    showToast('Auto-populating sites and locations...', 'info');
+    await api('/admin/auto-populate-sites', 'POST', {});
+    showToast('Sites and locations auto-populated successfully!', 'success');
+    
+    // Move to step 2
+    document.getElementById('wizardStep1').style.display = 'none';
+    document.getElementById('wizardStep2').style.display = 'block';
+    
+    // Load sites for mappings
+    loadSitesForWizard();
+    loadSiteLetterMappingsWizard();
+  } catch (err) {
+    showToast('Error: ' + err.message, 'error');
+  }
+}
+
+function wizardPreviousStep() {
+  document.getElementById('wizardStep1').style.display = 'block';
+  document.getElementById('wizardStep2').style.display = 'none';
+}
+
+async function loadSitesForWizard() {
+  try {
+    const sites = await api('/admin/sites');
+    const select = document.getElementById('mappingSiteSelect');
+    select.innerHTML = '<option value="">Select site</option>';
+    sites.forEach(s => {
+      select.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+    });
+  } catch (err) {
+    showToast('Error loading sites: ' + err.message, 'error');
+  }
+}
+
+async function loadSiteLetterMappingsWizard() {
+  try {
+    const mappings = await api('/admin/site-letters');
+    const table = document.getElementById('siteLetterTable');
+    table.innerHTML = '';
+    mappings.forEach(m => {
+      table.innerHTML += `
+        <tr>
+          <td><strong>${m.letter}</strong></td>
+          <td>${m.site_name}</td>
+          <td>
+            <button class="btn-outline" onclick="deleteSiteLetterMappingWizard(${m.id})">Delete</button>
+          </td>
+        </tr>
+      `;
+    });
+  } catch (err) {
+    showToast('Error loading mappings: ' + err.message, 'error');
+  }
+}
+
+async function addSiteLetterMappingWizard() {
+  const letter = document.getElementById('mappingLetter').value.trim().toUpperCase();
+  const siteId = document.getElementById('mappingSiteSelect').value;
+
+  if (!letter || !siteId) {
+    showToast('Letter and site are required', 'warning');
+    return;
+  }
+
+  if (letter.length !== 1) {
+    showToast('Letter must be a single character', 'warning');
+    return;
+  }
+
+  try {
+    await api('/admin/site-letters', 'POST', { letter, site_id: parseInt(siteId) });
+    document.getElementById('mappingLetter').value = '';
+    document.getElementById('mappingSiteSelect').value = '';
+    loadSiteLetterMappingsWizard();
+    showToast('Site letter mapping added successfully', 'success');
+  } catch (err) {
+    showToast('Error: ' + err.message, 'error');
+  }
+}
+
+async function deleteSiteLetterMappingWizard(id) {
+  if (!confirm('Delete this site letter mapping?')) return;
+
+  try {
+    await api(`/admin/site-letters/${id}`, 'DELETE');
+    loadSiteLetterMappingsWizard();
+    showToast('Site letter mapping deleted successfully', 'success');
+  } catch (err) {
+    showToast('Error: ' + err.message, 'error');
+  }
+}
+
 // Close modal when clicking outside
 document.addEventListener('click', function (event) {
-  const modal = document.getElementById('restoreModal');
-  if (event.target === modal) {
+  const restoreModal = document.getElementById('restoreModal');
+  const wizardModal = document.getElementById('setupWizardModal');
+  
+  if (event.target === restoreModal) {
     closeRestoreModal();
   }
+  if (event.target === wizardModal) {
+    closeSetupWizard();
+  }
 });
+
+// Add file input listener for backup file validation
+const backupFileInput = document.getElementById('backupFile');
+if (backupFileInput) {
+  backupFileInput.addEventListener('change', validateBackupFile);
+}

@@ -6,7 +6,6 @@ if (!token || role !== "super_admin") {
 }
 
 const siteTable = document.getElementById("siteTable");
-const siteSelect = document.getElementById("mappingSiteSelect");
 
 let editingSiteId = null;
 
@@ -33,7 +32,6 @@ async function api(url, method = "GET", body) {
 async function loadSites() {
   const sites = await api("/admin/sites");
   siteTable.innerHTML = "";
-  siteSelect.innerHTML = '<option value="">Select site</option>';
 
   sites.forEach((s) => {
     siteTable.innerHTML += `
@@ -46,8 +44,6 @@ async function loadSites() {
         </td>
       </tr>
     `;
-
-    siteSelect.innerHTML += `<option value="${s.id}">${s.name}</option>`;
   });
 }
 
@@ -119,126 +115,6 @@ async function deleteSite(id) {
   }
 }
 
-/* ============================
-   AUTO-POPULATE SITES
-   ============================ */
-async function autoPopulateSites() {
-  if (!confirm("This will auto-populate sites and locations from your Purchase Orders. Continue?")) return;
-
-  try {
-    const res = await api("/admin/auto-populate-sites", "POST", {});
-    alert("Sites and locations auto-populated successfully!");
-    loadSites();
-  } catch (err) {
-    alert("Error: " + err.message);
-  }
-}
-
-/* ============================
-   SITE LETTER MAPPINGS
-   ============================ */
-async function loadSiteLetterMappings() {
-  try {
-    const mappings = await api("/admin/site-letters");
-    const table = document.getElementById("siteLetterTable");
-    if (!table) return;
-
-    table.innerHTML = "";
-    mappings.forEach(m => {
-      table.innerHTML += `
-        <tr>
-          <td><strong>${m.letter}</strong></td>
-          <td>${m.site_name}</td>
-          <td>
-            <div class="actions-menu">
-              <button class="actions-btn" onclick="toggleActions(this)">⋮</button>
-              <div class="actions-dropdown hidden">
-                <button class="action-item" onclick="editSiteLetterMapping(${m.id}, '${m.letter}', ${m.site_id})">Edit</button>
-                <button class="action-item delete" onclick="deleteSiteLetterMapping(${m.id})">Delete</button>
-              </div>
-            </div>
-          </td>
-        </tr>
-      `;
-    });
-  } catch (err) {
-    alert("Error loading site letter mappings: " + err.message);
-  }
-}
-
-async function addSiteLetterMapping() {
-  const letter = document.getElementById("mappingLetter").value.trim().toUpperCase();
-  const siteId = document.getElementById("mappingSiteSelect").value;
-
-  if (!letter || !siteId) {
-    alert("Letter and site are required");
-    return;
-  }
-
-  if (letter.length !== 1) {
-    alert("Letter must be a single character");
-    return;
-  }
-
-  try {
-    await api("/admin/site-letters", "POST", { letter, site_id: parseInt(siteId) });
-    document.getElementById("mappingLetter").value = "";
-    document.getElementById("mappingSiteSelect").value = "";
-    loadSiteLetterMappings();
-    alert("Site letter mapping created successfully");
-  } catch (err) {
-    alert("Error: " + err.message);
-  }
-}
-
-async function editSiteLetterMapping(id, letter, siteId) {
-  document.getElementById("mappingLetter").value = letter;
-  document.getElementById("mappingSiteSelect").value = siteId;
-  
-  const btn = document.querySelector('[onclick="addSiteLetterMapping()"]');
-  btn.onclick = () => updateSiteLetterMapping(id);
-  btn.textContent = "Update Mapping";
-}
-
-async function updateSiteLetterMapping(id) {
-  const letter = document.getElementById("mappingLetter").value.trim().toUpperCase();
-  const siteId = document.getElementById("mappingSiteSelect").value;
-
-  if (!letter || !siteId) {
-    alert("Letter and site are required");
-    return;
-  }
-
-  try {
-    await api(`/admin/site-letters/${id}`, "PUT", { letter, site_id: parseInt(siteId) });
-    document.getElementById("mappingLetter").value = "";
-    document.getElementById("mappingSiteSelect").value = "";
-    
-    const btn = document.querySelector('[onclick*="addSiteLetterMapping"]');
-    if (btn) {
-      btn.onclick = () => addSiteLetterMapping();
-      btn.textContent = "Add Mapping";
-    }
-    
-    loadSiteLetterMappings();
-    alert("Site letter mapping updated successfully");
-  } catch (err) {
-    alert("Error: " + err.message);
-  }
-}
-
-async function deleteSiteLetterMapping(id) {
-  if (!confirm("Delete this site letter mapping?")) return;
-
-  try {
-    await api(`/admin/site-letters/${id}`, "DELETE");
-    loadSiteLetterMappings();
-    alert("Site letter mapping deleted successfully");
-  } catch (err) {
-    alert("Error: " + err.message);
-  }
-}
-
 function back() {
   location.href = "dashboard.html";
 }
@@ -247,4 +123,3 @@ function back() {
    INIT
    ============================ */
 loadSites();
-loadSiteLetterMappings();

@@ -1,62 +1,95 @@
-<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm">
-  <div class="container-fluid">
-    <a class="navbar-brand d-flex align-items-center gap-2" href="dashboard.html">
-      <img src="assets/Logo.png" alt="Castlerock Homes" height="32">
-      <span class="fw-semibold"><%= pageTitle %></span>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand d-flex align-items-center" href="dashboard.html">
+      <img src="assets/Logo.png" alt="Castlerock Homes" height="40" class="me-3">
+      <span class="fw-bold"><%= pageTitle %></span>
     </a>
 
-    <% if (showNav !== false) { %>
+    <% if (typeof showNav === 'undefined' || showNav !== false) { %>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
 
       <div class="collapse navbar-collapse" id="mainNav">
-        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
           <li class="nav-item">
-            <a class="nav-link" href="dashboard.html">Dashboard</a>
+            <a class="nav-link px-3" href="dashboard.html">
+              <i class="bi bi-receipt me-1"></i>Purchase Orders
+            </a>
           </li>
 
+          <% if (typeof showFiltersButton !== 'undefined' && showFiltersButton) { %>
+            <li class="nav-item">
+              <a class="nav-link px-3" href="#" onclick="toggleFilters(); return false;">
+                <i class="bi bi-funnel me-1"></i>Filters
+              </a>
+            </li>
+          <% } %>
+
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-              Actions
+            <a class="nav-link dropdown-toggle px-3" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-lightning-fill me-1"></i>Actions
             </a>
             <ul class="dropdown-menu">
-              <li><a class="dropdown-item" href="create-po.html">Create Purchase Order</a></li>
-              <li><a class="dropdown-item" href="suppliers.html">Suppliers</a></li>
+              <li><a class="dropdown-item" href="create-po.html">
+                <i class="bi bi-plus-circle me-2"></i>Create Purchase Order
+              </a></li>
+              <li><a class="dropdown-item" href="suppliers.html">
+                <i class="bi bi-building me-2"></i>Suppliers
+              </a></li>
             </ul>
           </li>
 
           <li class="nav-item dropdown" data-roles="admin,super_admin">
-            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-              Admin
+            <a class="nav-link dropdown-toggle px-3" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-gear-fill me-1"></i>Admin
             </a>
             <ul class="dropdown-menu">
-              <li><a class="dropdown-item" data-roles="super_admin" href="users.html">Users</a></li>
-              <li><a class="dropdown-item" href="locations.html">Locations</a></li>
-              <li><a class="dropdown-item" data-roles="super_admin" href="sites.html">Sites</a></li>
+              <li><a class="dropdown-item" data-roles="super_admin" href="users.html">
+                <i class="bi bi-people me-2"></i>Users
+              </a></li>
+              <li><a class="dropdown-item" href="locations.html">
+                <i class="bi bi-geo-alt me-2"></i>Locations
+              </a></li>
+              <li><a class="dropdown-item" data-roles="super_admin" href="sites.html">
+                <i class="bi bi-pin-map me-2"></i>Sites
+              </a></li>
               <li><hr class="dropdown-divider"></li>
-              <li><a class="dropdown-item" href="location-spread.html">Location Spread</a></li>
-              <li><a class="dropdown-item" data-roles="super_admin" href="backup-management.html">Backup Management</a></li>
+              <li><a class="dropdown-item" href="location-spread.html">
+                <i class="bi bi-diagram-3 me-2"></i>Location Spread
+              </a></li>
+              <li><a class="dropdown-item" data-roles="super_admin" href="backup-management.html">
+                <i class="bi bi-database me-2"></i>Backup Management
+              </a></li>
             </ul>
           </li>
 
           <li class="nav-item dropdown" data-roles="super_admin">
-            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-              Reports
+            <a class="nav-link dropdown-toggle px-3" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-bar-chart-fill me-1"></i>Reports
             </a>
             <ul class="dropdown-menu">
-              <li><a class="dropdown-item" href="location-report.html">By Location</a></li>
-              <li><a class="dropdown-item" href="supplier-report.html">By Supplier</a></li>
+              <li><a class="dropdown-item" href="location-report.html">
+                <i class="bi bi-pin-map-fill me-2"></i>By Location
+              </a></li>
+              <li><a class="dropdown-item" href="supplier-report.html">
+                <i class="bi bi-building me-2"></i>By Supplier
+              </a></li>
+            </ul>
+          </li>
+
+          <li class="nav-item dropdown ms-3">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-person-circle"></i>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item text-danger" href="#" onclick="logout(); return false;">
+                <i class="bi bi-box-arrow-right me-2"></i>Logout
+              </a></li>
             </ul>
           </li>
         </ul>
-
-        <div class="d-flex align-items-center gap-2">
-          <% if (showFiltersButton) { %>
-            <button class="btn btn-outline-secondary" type="button" onclick="toggleFilters()">Filters</button>
-          <% } %>
-          <button class="btn btn-outline-secondary" type="button" onclick="logout()">Logout</button>
-        </div>
       </div>
     <% } %>
   </div>

@@ -3,20 +3,6 @@
 const token = localStorage.getItem("token");
 const role = localStorage.getItem("role");
 
-// Admin dropdown visibility
-const adminDropdown = document.getElementById("adminDropdown");
-if (!["admin", "super_admin"].includes(role)) {
-  adminDropdown?.remove();
-} else {
-  adminDropdown.style.display = "block";
-
-  if (role !== "super_admin") {
-    document.getElementById("adminUsersBtn")?.remove();
-    document.getElementById("adminSitesBtn")?.remove();
-    document.getElementById("adminBackupBtn")?.remove();
-  }
-}
-
 if (!token) location.href = "login.html";
 
 const poTable = document.getElementById("poTable");
@@ -37,6 +23,16 @@ const poCountEl = document.getElementById("poCount");
 let openDetailsRow = null;
 
 let allPOs = [];
+
+/* ============================
+   Filter Panel Toggle
+   ============================ */
+function toggleFilters() {
+  const panel = document.getElementById("filterPanel");
+  if (panel) {
+    panel.style.display = panel.style.display === "none" ? "block" : "none";
+  }
+}
 
 /* ============================
    Utilities
@@ -417,10 +413,6 @@ function clearFilters() {
   valueMin.value = "";
   valueMax.value = "";
   applyFilters();
-}
-
-if (role === "super_admin") {
-  document.getElementById("reportsDropdown").style.display = "block";
 }
 
 /* ============================
