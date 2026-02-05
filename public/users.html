@@ -2,29 +2,34 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Location Spread</title>
+  <title>Users | Castlerock Homes</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" href="https://castlerock-po-assets-eu.s3.eu-north-1.amazonaws.com/POTrackerAssets/favicon.ico">
+
   <link rel="icon" type="image/png" sizes="32x32"
         href="https://castlerock-po-assets-eu.s3.eu-north-1.amazonaws.com/POTrackerAssets/favicon-32x32.png">
+
   <link rel="icon" type="image/png" sizes="16x16"
         href="https://castlerock-po-assets-eu.s3.eu-north-1.amazonaws.com/POTrackerAssets/favicon-16x16.png">
+
   <link rel="apple-touch-icon" sizes="180x180"
         href="https://castlerock-po-assets-eu.s3.eu-north-1.amazonaws.com/POTrackerAssets/apple-touch-icon.png">
+
   <link rel="icon" type="image/png" sizes="192x192"
         href="https://castlerock-po-assets-eu.s3.eu-north-1.amazonaws.com/POTrackerAssets/android-chrome-192x192.png">
+
   <link rel="icon" type="image/png" sizes="512x512"
         href="https://castlerock-po-assets-eu.s3.eu-north-1.amazonaws.com/POTrackerAssets/android-chrome-512x512.png">
 
   <link rel="stylesheet" href="theme.css">
-  <link rel="stylesheet" href="location-spread.css">
+  <link rel="stylesheet" href="admin.css">
 </head>
 <body>
 
 <header class="app-header">
   <div class="brand">
     <img src="assets/Logo.png" alt="Castlerock Homes">
-    <span><h1>Location Spread</h1></span>
+    <span><h1>Users</h1></span>
   </div>
 
   <div class="header-actions">
@@ -61,70 +66,44 @@
 </header>
 
 <main class="container">
-  <div class="card">
-    <div class="table-header">
-      <h3>Location Spread Rules</h3>
-      <div class="table-actions">
-        <button class="btn-primary" onclick="openAddRuleModal()">+ Add Rule</button>
-      </div>
+
+  <!-- =======================
+     USERS
+     ======================= -->
+  <div class="card" id="usersSection">
+    <h3>Users</h3>
+
+    <div class="form-row">
+      <input id="firstName" placeholder="First name">
+      <input id="lastName" placeholder="Last name">
+      <input id="userEmail" placeholder="Email">
+      <select id="userRole">
+        <option value="admin">Admin</option>
+        <option value="staff">Staff</option>
+        <option value="viewer">Viewer</option>
+      </select>
+      <button class="btn-primary" onclick="addUser()">Add User</button>
     </div>
 
     <table class="po-table">
       <thead>
         <tr>
-          <th>Location</th>
-          <th>Rule Name</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Status</th>
+          <th class="actions-col"></th>
         </tr>
       </thead>
-      <tbody id="rulesTable"></tbody>
+      <tbody id="userTable"></tbody>
     </table>
   </div>
+
 </main>
-
-<!-- Modal -->
-<div id="spreadModal" class="modal" style="display: none;">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h2 id="spreadModalTitle">Add Location Spread Rule</h2>
-      <button class="modal-close" onclick="closeRuleModal()">&times;</button>
-    </div>
-
-    <form id="spreadForm">
-      <div class="form-grid">
-        <div class="form-group">
-          <label for="sourceLocation">Location to spread</label>
-          <select id="sourceLocation" required></select>
-          <div id="sourceLocationLabel" style="display: none; padding: 0.5rem; background-color: #f3f4f6; border-radius: 6px; border: 1.5px solid #d1d5db;"></div>
-        </div>
-
-        <div class="form-group">
-          <label for="ruleName">Rule name</label>
-          <input id="ruleName" placeholder="e.g. The Oaks Spread">
-        </div>
-      </div>
-
-      <div id="siteSpreadContainer"></div>
-
-      <div class="add-site-row">
-        <button type="button" id="addSiteBtn" class="btn-outline">Spread Across Another Site</button>
-        <div id="addSiteSelector" class="add-site-selector hidden">
-          <select id="addSiteSelect"></select>
-          <button type="button" class="btn-primary" id="confirmAddSiteBtn">Add Site</button>
-          <button type="button" class="btn-outline" id="cancelAddSiteBtn">Cancel</button>
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <button type="submit" class="btn-primary">Save Rule</button>
-        <button type="button" class="btn-outline" onclick="closeRuleModal()">Cancel</button>
-      </div>
-    </form>
-  </div>
-</div>
 
 <script src="/ui.js"></script>
 <script src="admin-nav.js"></script>
-<script src="location-spread.js"></script>
+<script src="users.js"></script>
 
 </body>
 </html>

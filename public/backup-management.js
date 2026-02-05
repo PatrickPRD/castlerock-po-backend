@@ -199,7 +199,7 @@ async function restoreBackup() {
    NAVIGATION
    ============================ */
 function back() {
-  location.href = 'admin.html';
+  location.href = 'dashboard.html';
 }
 
 // Close modal when clicking outside

@@ -3,9 +3,18 @@
 const token = localStorage.getItem("token");
 const role = localStorage.getItem("role");
 
-// Hide Admin menu item unless super_admin
-if (role !== "super_admin") {
-  document.getElementById("adminMenuBtn")?.remove();
+// Admin dropdown visibility
+const adminDropdown = document.getElementById("adminDropdown");
+if (!["admin", "super_admin"].includes(role)) {
+  adminDropdown?.remove();
+} else {
+  adminDropdown.style.display = "block";
+
+  if (role !== "super_admin") {
+    document.getElementById("adminUsersBtn")?.remove();
+    document.getElementById("adminSitesBtn")?.remove();
+    document.getElementById("adminBackupBtn")?.remove();
+  }
 }
 
 if (!token) location.href = "login.html";
@@ -470,6 +479,10 @@ function toggleActionsMenu(btn) {
 
 function toggleReportsMenu(btn) {
   openMenu(btn, "reportsMenu");
+}
+
+function toggleAdminMenu(btn) {
+  openMenu(btn, "adminMenu");
 }
 
 function scrollExpandedRowIntoView(detailsRow) {

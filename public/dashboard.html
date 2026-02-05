@@ -39,7 +39,19 @@
     <button onclick="createPO()">Create Purchase Order</button>
     <button onclick="location.href='suppliers.html'">Suppliers</button>
     <div class="divider"></div>
-    <button id="adminMenuBtn" onclick="location.href='admin.html'">Admin</button>
+  </div>
+</div>
+
+<!-- ADMIN (ADMIN + SUPER ADMIN) -->
+<div class="dropdown" id="adminDropdown" style="display:none">
+  <button class="btn-outline" onclick="toggleAdminMenu(this, event)">Admin ▾</button>
+  <div id="adminMenu" class="dropdown-menu">
+    <button id="adminUsersBtn" onclick="location.href='users.html'">Users</button>
+    <button id="adminLocationsBtn" onclick="location.href='locations.html'">Locations</button>
+    <button id="adminSitesBtn" onclick="location.href='sites.html'">Sites</button>
+    <div class="divider"></div>
+    <button id="adminLocationSpreadBtn" onclick="location.href='location-spread.html'">Location Spread</button>
+    <button id="adminBackupBtn" onclick="location.href='backup-management.html'">Backup Management</button>
   </div>
 </div>
 

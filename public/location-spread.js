@@ -52,7 +52,7 @@ async function api(url, method = 'GET', body) {
 }
 
 function back() {
-  location.href = 'admin.html';
+  location.href = 'dashboard.html';
 }
 
 /* =========================

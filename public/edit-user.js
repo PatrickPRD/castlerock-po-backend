@@ -7,7 +7,7 @@ if (!token || role !== 'super_admin') {
 
 const params = new URLSearchParams(location.search);
 const userId = params.get('id');
-if (!userId) location.href = 'admin.html';
+if (!userId) location.href = 'users.html';
 
 const el = id => document.getElementById(id);
 
@@ -65,11 +65,11 @@ const payload = {
   }
 
   showToast('User updated', 'success');
-  location.href = 'admin.html';
+  location.href = 'users.html';
 });
 
 function back() {
-  location.href = 'admin.html';
+  location.href = 'users.html';
 }
 
 loadUser();

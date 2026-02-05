@@ -134,7 +134,35 @@
   </div>
 
   <div class="header-actions">
-    <button class="btn-outline" onclick="back()">Back to Admin</button>
+    <div class="dropdown">
+      <button class="btn-outline" onclick="toggleActionsMenu(this, event)">Actions ▾</button>
+      <div id="actionsMenu" class="dropdown-menu">
+        <button onclick="createPO()">Create Purchase Order</button>
+        <button onclick="location.href='suppliers.html'">Suppliers</button>
+      </div>
+    </div>
+
+    <div class="dropdown" id="adminDropdown" style="display:none">
+      <button class="btn-outline" onclick="toggleAdminMenu(this, event)">Admin ▾</button>
+      <div id="adminMenu" class="dropdown-menu">
+        <button id="adminUsersBtn" onclick="location.href='users.html'">Users</button>
+        <button id="adminLocationsBtn" onclick="location.href='locations.html'">Locations</button>
+        <button id="adminSitesBtn" onclick="location.href='sites.html'">Sites</button>
+        <div class="divider"></div>
+        <button id="adminLocationSpreadBtn" onclick="location.href='location-spread.html'">Location Spread</button>
+        <button id="adminBackupBtn" onclick="location.href='backup-management.html'">Backup Management</button>
+      </div>
+    </div>
+
+    <div class="dropdown" id="reportsDropdown" style="display:none">
+      <button class="btn-outline" onclick="toggleReportsMenu(this, event)">Reports ▾</button>
+      <div id="reportsMenu" class="dropdown-menu">
+        <button onclick="location.href='location-report.html'">By Location</button>
+        <button onclick="location.href='supplier-report.html'">By Supplier</button>
+      </div>
+    </div>
+
+    <button class="btn-outline" onclick="logout()">Logout</button>
   </div>
 </header>
 
@@ -218,6 +246,7 @@
 </div>
 
 <script src="/ui.js"></script>
+<script src="admin-nav.js"></script>
 <script src="backup-management.js"></script>
 
 </body>
