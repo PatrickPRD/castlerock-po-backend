@@ -39,8 +39,8 @@ async function loadSites() {
         <td>${s.name}</td>
         <td><strong>${s.site_letter}</strong></td>
         <td>
-          <button class="btn-outline" onclick="editSite(${s.id}, '${s.name}')">Edit</button>
-          <button class="btn-danger" onclick="deleteSite(${s.id})">Delete</button>
+          <button class="btn btn-outline-primary" onclick="editSite(${s.id}, '${s.name}')">Edit</button>
+          <button class="btn btn-danger" onclick="deleteSite(${s.id})">Delete</button>
         </td>
       </tr>
     `;

@@ -62,17 +62,20 @@ async function loadLocations() {
   locationTable.innerHTML = "";
 
   locations.forEach((l) => {
+    const escapedName = (l.name || '').replace(/'/g, "\\'");
+    const escapedType = (l.type || '').replace(/'/g, "\\'");
+    
     locationTable.innerHTML += `
       <tr>
         <td>${l.name}</td>
-        <td>${l.type}</td>
+        <td>${l.type || ''}</td>
         <td>${l.site}</td>
         <td>
-          <button class="btn-outline"
-            onclick="editLocation(${l.id}, '${l.name}', ${l.site_id})">
+          <button class="btn btn-outline-primary"
+            onclick="editLocation(${l.id}, '${escapedName}', '${escapedType}', ${l.site_id})">
             Edit
           </button>
-          <button class="btn-danger" onclick="deleteLocation(${l.id})">
+          <button class="btn btn-danger" onclick="deleteLocation(${l.id})">
             Delete
           </button>
         </td>
@@ -81,18 +84,37 @@ async function loadLocations() {
   });
 }
 
-function editLocation(id, name, siteId) {
+function openLocationModal() {
+  resetLocationForm();
+  const modal = document.getElementById("locationModal");
+  modal.style.display = "flex";
+  document.getElementById("locationName").focus();
+}
+
+function closeLocationModal() {
+  const modal = document.getElementById("locationModal");
+  modal.style.display = "none";
+  resetLocationForm();
+}
+
+function editLocation(id, name, type, siteId) {
   document.getElementById("locationName").value = name;
+  document.getElementById("locationType").value = type || "";
   document.getElementById("siteSelect").value = siteId;
 
   editingLocationId = id;
 
   document.getElementById("locationEditNotice").style.display = "block";
+  document.getElementById("locationModalTitle").textContent = "Edit Location";
 
   const btn = document.getElementById("saveLocationBtn");
   btn.textContent = "Save Changes";
+  btn.classList.remove("btn-primary");
   btn.classList.add("btn-warning");
 
+  const modal = document.getElementById("locationModal");
+  modal.style.display = "flex";
+  
   document.getElementById("locationName").focus();
 }
 
@@ -105,43 +127,48 @@ async function saveLocation() {
     showToast("Location name is required", "error");
     return;
   }
-  if (!type) {
-    showToast("Location type is required", "error");
-    return;
-  }
   if (!siteId) {
     showToast("Please select a site", "error");
     return;
   }
 
-  if (editingLocationId) {
-    await api(`/admin/locations/${editingLocationId}`, "PUT", {
-      name,
-      type,
-      site_id: siteId,
-    });
-  } else {
-    await api("/admin/locations", "POST", {
-      name,
-      type,
-      site_id: siteId,
-    });
-  }
+  try {
+    if (editingLocationId) {
+      await api(`/admin/locations/${editingLocationId}`, "PUT", {
+        name,
+        type,
+        site_id: siteId,
+      });
+      showToast("Location updated successfully", "success");
+    } else {
+      await api("/admin/locations", "POST", {
+        name,
+        type,
+        site_id: siteId,
+      });
+      showToast("Location added successfully", "success");
+    }
 
-  resetLocationForm();
-  loadLocations();
+    closeLocationModal();
+    loadLocations();
+  } catch (err) {
+    showToast(err.message, "error");
+  }
 }
 
 function resetLocationForm() {
   editingLocationId = null;
   document.getElementById("locationName").value = "";
+  document.getElementById("locationType").value = "";
   document.getElementById("siteSelect").value = "";
 
   document.getElementById("locationEditNotice").style.display = "none";
+  document.getElementById("locationModalTitle").textContent = "Add Location";
 
   const btn = document.getElementById("saveLocationBtn");
   btn.textContent = "Add Location";
   btn.classList.remove("btn-warning");
+  btn.classList.add("btn-primary");
 }
 
 async function deleteLocation(id) {
@@ -280,7 +307,7 @@ async function confirmMergeLocations() {
   const fromName = mergeFromSelect.options[mergeFromSelect.selectedIndex].text;
   const toName = mergeToSelect.options[mergeToSelect.selectedIndex].text;
 
-  const confirmed = confirm(
+  const confirmed = await confirmDialog(
     `Are you sure you want to merge "${toName}" into "${fromName}"?\n\n` +
     `This will:\n` +
     `- Update all Purchase Orders from "${toName}" to "${fromName}"\n` +
@@ -297,12 +324,12 @@ async function confirmMergeLocations() {
       merge_location_id: parseInt(toId)
     });
 
-    alert(`Successfully merged "${toName}" into "${fromName}"`);
+    showToast(`Successfully merged "${toName}" into "${fromName}"`, 'success');
     closeMergeLocationModal();
     loadLocations();
 
   } catch (err) {
     console.error('Merge error:', err);
-    alert(`Failed to merge locations: ${err.message}`);
+    showToast(`Failed to merge locations: ${err.message}`, 'error');
   }
 }

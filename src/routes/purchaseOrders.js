@@ -159,8 +159,9 @@ router.post(
     }
     try {
       const net = Number(netAmount) || 0;
-      const vat = Number(vatRate) || 0;
-      const total = net + (net * vat / 100);
+      const vatPercent = Number(vatRate) || 0;
+      const vatDecimal = vatPercent / 100; // Convert percentage to decimal (13.5 -> 0.135)
+      const total = net + (net * vatPercent / 100);
 
       const poNumber = await generatePONumber(db, siteId);
 
@@ -189,7 +190,7 @@ router.post(
         poDate,
         description || '',
         net,
-        vat,
+        vatDecimal,
         total,
         req.user.id,
         'Issued',
@@ -226,8 +227,9 @@ router.put(
     } = req.body;
 
     const net = Number(netAmount) || 0;
-    const vat = Number(vatRate) || 0;
-    const total = net + (net * vat / 100);
+    const vatPercent = Number(vatRate) || 0;
+    const vatDecimal = vatPercent / 100; // Convert percentage to decimal (13.5 -> 0.135)
+    const total = net + (net * vatPercent / 100);
 
     await db.query(`
       UPDATE purchase_orders
@@ -249,7 +251,7 @@ router.put(
       poDate,
       description || '',
       net,
-      vat,
+      vatDecimal,
       total,
       stageId,
       id

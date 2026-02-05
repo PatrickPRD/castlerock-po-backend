@@ -73,12 +73,12 @@ function render() {
           ${
             role === "super_admin"
               ? `
-            <button class="btn-outline"
+            <button class="btn btn-outline-primary"
   onclick="event.stopPropagation(); editSupplier(${s.id})">
   Edit
 </button>
 
-<button class="btn-danger"
+<button class="btn btn-danger"
   onclick="event.stopPropagation(); deleteSupplier(${s.id}, '${s.name.replace(
                   /'/g,
                   "\\'"
@@ -87,7 +87,7 @@ function render() {
 </button>
 
 
-            <button class="btn-outline"
+            <button class="btn btn-outline-primary"
   onclick="event.stopPropagation(); mergeSupplier(${s.id})">
   Merge
 </button>
@@ -101,6 +101,15 @@ function render() {
     `;
 
     main.onclick = () => {
+      // Close all other details rows first
+      const allDetailsRows = table.querySelectorAll('.details-row');
+      allDetailsRows.forEach(row => {
+        if (row !== details) {
+          row.style.display = 'none';
+        }
+      });
+      
+      // Toggle current details row
       details.style.display =
         details.style.display === "none" ? "table-row" : "none";
     };
@@ -178,8 +187,8 @@ modal.innerHTML = `
   </p>
 
   <div class="ui-confirm-actions">
-    <button class="btn-outline" id="mergeCancel">Cancel</button>
-    <button class="btn-danger" id="mergeConfirm">Merge</button>
+    <button class="btn btn-outline-primary" id="mergeCancel">Cancel</button>
+    <button class="btn btn-danger" id="mergeConfirm">Merge</button>
   </div>
 `;
 

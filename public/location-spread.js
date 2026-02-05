@@ -150,8 +150,8 @@ function renderRules() {
         <td colspan="2">
           <div class="details-wrapper">
             <div class="spread-actions">
-              <button class="btn-outline" onclick="event.stopPropagation(); openEditRuleModal(${rule.id});">Edit</button>
-              <button class="btn-danger" onclick="event.stopPropagation(); deleteRule(${rule.id});">Delete</button>
+              <button class="btn btn-outline-primary" onclick="event.stopPropagation(); openEditRuleModal(${rule.id});">Edit</button>
+              <button class="btn btn-danger" onclick="event.stopPropagation(); deleteRule(${rule.id});">Delete</button>
             </div>
             <div>
               ${renderRuleTargets(rule)}
@@ -293,7 +293,7 @@ function renderSiteSections() {
     section.innerHTML = `
       <div class="site-spread-header">
         <h4>${site.name}</h4>
-        ${!isSourceSite ? '<button type="button" class="btn-outline remove-site-btn">Remove site from spread</button>' : ''}
+        ${!isSourceSite ? '<button type="button" class="btn btn-outline-primary remove-site-btn">Remove site from spread</button>' : ''}
       </div>
       <label class="checkbox-row">
         <input type="checkbox" class="spread-all-checkbox" ${siteRule.spreadAll ? 'checked' : ''}>
@@ -305,8 +305,8 @@ function renderSiteSections() {
           <select multiple class="selected-locations"></select>
         </div>
         <div class="list-buttons">
-          <button type="button" class="btn-outline add-location-btn">+</button>
-          <button type="button" class="btn-outline remove-location-btn">−</button>
+          <button type="button" class="btn btn-outline-primary add-location-btn">+</button>
+          <button type="button" class="btn btn-outline-primary remove-location-btn">−</button>
         </div>
         <div class="list-box">
           <label>Available locations</label>

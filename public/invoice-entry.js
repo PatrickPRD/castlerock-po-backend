@@ -41,7 +41,10 @@ function editInvoice(id) {
   invoiceNumber.value  = inv.invoice_number;
   invoiceDate.value    = inv.invoice_date;
   netAmountInput.value = inv.net_amount;
-  vatRateSelect.value = String(num(inv.vat_rate));
+  
+  // Convert decimal VAT rate to percentage for dropdown (0.135 -> 13.5)
+  const vatRatePercent = inv.vat_rate < 1 ? inv.vat_rate * 100 : inv.vat_rate;
+  vatRateSelect.value = String(vatRatePercent);
   
   modalTitle.textContent = 'Edit Invoice';
   invoiceModal.style.display = 'flex';
@@ -64,8 +67,13 @@ function formatVat(rate) {
 
   if (n === 0) return '0%';
   if (n === 13.5) return '13.5%';
-  if (n === 14) return '14%';
   if (n === 23) return '23%';
+  
+  // Handle decimal format (0.135 -> 13.5%, 0.23 -> 23%)
+  if (n < 1) {
+    const percentage = Math.round(n * 1000) / 10; // Avoid floating point errors
+    return `${percentage}%`;
+  }
 
   // fallback
   return `${n}%`;
@@ -169,9 +177,9 @@ function renderInvoices() {
       <td data-label="VAT %:">${formatVat(inv.vat_rate)}</td>
       <td data-label="Total (inc VAT):">${euro(inv.total_amount)}</td>
       <td data-label="Actions:">
-        <button class="btn-outline" onclick="editInvoice(${inv.id})">Edit</button>
+        <button class="btn btn-outline-primary" onclick="editInvoice(${inv.id})">Edit</button>
         ${role === 'admin' || role === 'super_admin'
-          ? `<button class="btn-danger" onclick="deleteInvoice(${inv.id})">Delete</button>`
+          ? `<button class="btn btn-danger" onclick="deleteInvoice(${inv.id})">Delete</button>`
           : ''}
       </td>
     `;
@@ -240,4 +248,10 @@ function resetForm() {
 }
 
 /* ================= Init ================= */
+// Update navigation link text
+const purchaseOrdersTextEl = document.getElementById('purchaseOrdersText');
+if (purchaseOrdersTextEl) {
+  purchaseOrdersTextEl.textContent = 'Back to Purchase Orders';
+}
+
 loadPO();

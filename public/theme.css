@@ -67,51 +67,14 @@ html, body {
 .brand img { height: 72px; }
 
 /* =========================================================
-   BUTTONS
+   BUTTONS - Bootstrap handles most button styles
    ========================================================= */
-button { cursor: pointer; }
 
-.text-btn {
-  background: none;
-  border: none;
-  color: var(--md-primary);
-  font-weight: 600;
+/* Keep custom button for actions trigger if needed */
+.actions-trigger {
+  /* Specific styling handled in admin.css if needed */
 }
 
-.btn-primary,
-.btn-outline,
-.btn-danger,
-.btn-warning {
-  border-radius: 999px;
-  font-weight: 600;
-  padding: 10px 16px;
-  border: none;
-}
-
-.btn-primary {
-  background: var(--md-primary);
-  color: #fff;
-}
-.btn-primary:hover { background: var(--md-primary-dark); }
-
-.btn-outline {
-  background: transparent;
-  border: 2px solid var(--md-primary);
-  color: var(--md-primary);
-}
-.btn-outline:hover { background: rgba(198,40,40,0.08); }
-
-.btn-danger {
-  background: #d32f2f;
-  color: #fff;
-  padding: 6px 12px;
-}
-
-.btn-warning {
-  background: #f59e0b;
-  color: #fff;
-}
-.btn-warning:hover { background: #d97706; }
 
 /* =========================================================
    FORMS
@@ -593,6 +556,10 @@ tr:hover { background: #f9f9f9; }
 /* =========================
    Active PO highlight
    ========================= */
+
+.po-row {
+  cursor: pointer;
+}
 
 .po-row.active {
   border-left: #0100ff 5px solid;

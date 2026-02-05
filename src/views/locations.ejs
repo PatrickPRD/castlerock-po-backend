@@ -6,24 +6,14 @@
   <div class="card" id="locationsSection">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
       <h3 style="margin: 0;">Locations</h3>
-      <button id="mergeMergeBtn" class="btn-outline" onclick="openMergeLocationModal()" style="background: #ff9800; color: white;">
-        🔀 Merge Locations
-      </button>
-    </div>
-    <p id="locationEditNotice" class="edit-notice" style="display:none;">
-      Editing existing item — changes affect all Purchase Orders
-    </p>
-    <div class="form-row">
-      <input id="locationName" placeholder="Location name">
-      <input id="locationType" placeholder="Location type">
-      <select id="siteSelect"></select>
-      <button
-        type="button"
-        id="saveLocationBtn"
-        class="btn-primary"
-        onclick="saveLocation()">
-        Add Location
-      </button>
+      <div style="display: flex; gap: 0.5rem;">
+        <button class="btn btn-primary" onclick="openLocationModal()">
+          + Add Location
+        </button>
+        <button id="mergeMergeBtn" class="btn btn-outline-primary" onclick="openMergeLocationModal()" style="background: #ff9800; color: white;">
+          🔀 Merge Locations
+        </button>
+      </div>
     </div>
 
     <table class="po-table">
@@ -72,10 +62,46 @@
         </ul>
       </div>
 
-      <div class="form-row">
-        <button class="btn-outline" onclick="closeMergeLocationModal()">Cancel</button>
-        <button class="btn-danger" id="confirmMergeBtn" onclick="confirmMergeLocations()" style="background: #f44336; color: white;" disabled>
+      <div class="form-row" style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+        <button class="btn btn-secondary" onclick="closeMergeLocationModal()">Cancel</button>
+        <button class="btn btn-danger" id="confirmMergeBtn" onclick="confirmMergeLocations()" disabled>
           Merge Locations
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Location Modal -->
+  <div id="locationModal" class="modal" style="display:none;">
+    <div class="modal-content" style="width: 500px;">
+      <h2 id="locationModalTitle">Add Location</h2>
+      <p id="locationEditNotice" class="edit-notice" style="display:none; color: #666; font-size: 0.9rem; margin-bottom: 1rem;">
+        ⚠️ Editing existing item — changes affect all Purchase Orders
+      </p>
+
+      <div class="form-row" style="display: flex; flex-direction: column; gap: 1rem;">
+        <div>
+          <label for="locationName" style="display: block; margin-bottom: 0.25rem; font-weight: 500;">Location Name *</label>
+          <input id="locationName" placeholder="Enter location name" class="form-control" style="width: 100%;">
+        </div>
+
+        <div>
+          <label for="locationType" style="display: block; margin-bottom: 0.25rem; font-weight: 500;">Location Type</label>
+          <input id="locationType" placeholder="Enter location type" class="form-control" style="width: 100%;">
+        </div>
+
+        <div>
+          <label for="siteSelect" style="display: block; margin-bottom: 0.25rem; font-weight: 500;">Site *</label>
+          <select id="siteSelect" class="form-select" style="width: 100%;">
+            <option value="">Select site</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row" style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1.5rem;">
+        <button class="btn btn-secondary" onclick="closeLocationModal()">Cancel</button>
+        <button class="btn btn-primary" id="saveLocationBtn" onclick="saveLocation()">
+          Add Location
         </button>
       </div>
     </div>

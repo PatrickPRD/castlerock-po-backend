@@ -427,6 +427,157 @@ router.delete(
 );
 
 /* ======================================================
+   STAGES – SUPER ADMIN
+   ====================================================== */
+
+router.get(
+  '/stages',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const [rows] = await db.query(
+      `SELECT s.id, s.name, s.active,
+              COUNT(CASE WHEN po.status IN ('Issued', 'open', 'approved', 'received') THEN 1 END) AS po_count
+       FROM po_stages s
+       LEFT JOIN purchase_orders po ON s.id = po.stage_id
+       GROUP BY s.id, s.name, s.active
+       ORDER BY s.name`
+    );
+    res.json(rows);
+  }
+);
+
+router.post(
+  '/stages',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const { name, active } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        error: 'Stage name is required'
+      });
+    }
+
+    await db.query(
+      `INSERT INTO po_stages (name, active)
+       VALUES (?, ?)`,
+      [name.trim(), active ? 1 : 0]
+    );
+
+    res.json({ success: true });
+  }
+);
+
+router.put(
+  '/stages/:id',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const stageId = req.params.id;
+    const { name, active } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        error: 'Stage name is required'
+      });
+    }
+
+    await db.query(
+      `UPDATE po_stages
+       SET name = ?, active = ?
+       WHERE id = ?`,
+      [name.trim(), active ? 1 : 0, stageId]
+    );
+
+    res.json({ success: true });
+  }
+);
+
+router.delete(
+  '/stages/:id',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const stageId = req.params.id;
+
+    const [rows] = await db.query(
+      `SELECT COUNT(*) AS count
+       FROM purchase_orders
+       WHERE stage_id = ?`,
+      [stageId]
+    );
+
+    if (rows[0].count > 0) {
+      return res.status(400).json({
+        error: 'This stage cannot be deleted because it has associated Purchase Orders. Please use the merge feature to move POs to another stage first.'
+      });
+    }
+
+    await db.query(
+      `DELETE FROM po_stages WHERE id = ?`,
+      [stageId]
+    );
+
+    res.json({ success: true });
+  }
+);
+
+/* ======================================================
+   MERGE STAGES – SUPER ADMIN ONLY
+   ====================================================== */
+router.post(
+  '/merge-stages',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const { keep_stage_id, merge_stage_id } = req.body;
+    let connection;
+
+    try {
+      if (!keep_stage_id || !merge_stage_id) {
+        return res.status(400).json({
+          error: 'Both stages are required'
+        });
+      }
+
+      if (keep_stage_id === merge_stage_id) {
+        return res.status(400).json({
+          error: 'Cannot merge a stage into itself'
+        });
+      }
+
+      connection = await db.getConnection();
+      await connection.beginTransaction();
+
+      // Update all POs from merge_stage to keep_stage
+      await connection.query(
+        `UPDATE purchase_orders
+         SET stage_id = ?
+         WHERE stage_id = ?`,
+        [keep_stage_id, merge_stage_id]
+      );
+
+      // Delete the merged stage
+      await connection.query(
+        `DELETE FROM po_stages WHERE id = ?`,
+        [merge_stage_id]
+      );
+
+      await connection.commit();
+
+      res.json({ success: true });
+    } catch (error) {
+      if (connection) await connection.rollback();
+      throw error;
+    } finally {
+      if (connection) connection.release();
+    }
+  }
+);
+
+/* ======================================================
    LOCATIONS – SUPER ADMIN
    ====================================================== */
 
@@ -436,7 +587,7 @@ router.get(
   authorizeRoles('super_admin'),
   async (req, res) => {
     const [rows] = await db.query(
-      `SELECT l.id, l.name, l.site_id, s.name AS site
+      `SELECT l.id, l.name, l.type, l.site_id, s.name AS site
        FROM locations l
        JOIN sites s ON l.site_id = s.id
        ORDER BY s.name, l.name`
@@ -448,20 +599,20 @@ router.get(
 router.post(
   '/locations',
   authenticate,
-  authorizeRoles('admin', 'super_admin'),
+  authorizeRoles('super_admin'),
   async (req, res) => {
-    const { name, site_id, type } = req.body;
+    const { name, type, site_id } = req.body;
 
-    if (!name || !site_id || !type) {
+    if (!name || !site_id) {
       return res.status(400).json({
-        error: 'Location name, site and type are required'
+        error: 'Location name and site are required'
       });
     }
 
     await db.query(
-      `INSERT INTO locations (name, site_id, type)
+      `INSERT INTO locations (name, type, site_id)
        VALUES (?, ?, ?)`,
-      [name.trim(), site_id, type.trim()]
+      [name.trim(), type || null, site_id]
     );
 
     res.json({ success: true });

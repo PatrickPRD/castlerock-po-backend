@@ -47,8 +47,9 @@ router.post(
     const { purchaseOrderId, invoiceNumber, invoiceDate, netAmount, vatRate } = req.body;
 
     const net = Number(netAmount) || 0;
-    const rate = Number(vatRate) || 0;
-    const vat = +(net * rate / 100).toFixed(2);
+    const ratePercent = Number(vatRate) || 0;
+    const rateDecimal = ratePercent / 100; // Convert percentage to decimal (13.5 -> 0.135)
+    const vat = +(net * ratePercent / 100).toFixed(2);
     const total = +(net + vat).toFixed(2);
 
     await pool.query(
@@ -71,7 +72,7 @@ router.post(
         invoiceNumber,
         invoiceDate,
         net,
-        rate,
+        rateDecimal,
         vat,
         total,
         req.user.id
@@ -94,8 +95,9 @@ router.put(
     const { invoiceNumber, invoiceDate, netAmount, vatRate } = req.body;
 
     const net = Number(netAmount) || 0;
-    const rate = Number(vatRate) || 0;
-    const vat = +(net * rate / 100).toFixed(2);
+    const ratePercent = Number(vatRate) || 0;
+    const rateDecimal = ratePercent / 100; // Convert percentage to decimal (13.5 -> 0.135)
+    const vat = +(net * ratePercent / 100).toFixed(2);
     const total = +(net + vat).toFixed(2);
 
     await pool.query(
@@ -114,7 +116,7 @@ router.put(
         invoiceNumber,
         invoiceDate,
         net,
-        rate,
+        rateDecimal,
         vat,
         total,
         req.params.id

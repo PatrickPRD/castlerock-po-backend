@@ -6,7 +6,7 @@
     <div class="table-header">
       <h3>Location Spread Rules</h3>
       <div class="table-actions">
-        <button class="btn-primary" onclick="openAddRuleModal()">+ Add Rule</button>
+        <button class="btn btn-primary" onclick="openAddRuleModal()">+ Add Rule</button>
       </div>
     </div>
 
@@ -46,17 +46,17 @@
       <div id="siteSpreadContainer"></div>
 
       <div class="add-site-row">
-        <button type="button" id="addSiteBtn" class="btn-outline">Spread Across Another Site</button>
+        <button type="button" id="addSiteBtn" class="btn btn-outline-primary">Spread Across Another Site</button>
         <div id="addSiteSelector" class="add-site-selector hidden">
           <select id="addSiteSelect"></select>
-          <button type="button" class="btn-primary" id="confirmAddSiteBtn">Add Site</button>
-          <button type="button" class="btn-outline" id="cancelAddSiteBtn">Cancel</button>
+          <button type="button" class="btn btn-primary" id="confirmAddSiteBtn">Add Site</button>
+          <button type="button" class="btn btn-outline-secondary" id="cancelAddSiteBtn">Cancel</button>
         </div>
       </div>
 
       <div class="modal-footer">
-        <button type="submit" class="btn-primary">Save Rule</button>
-        <button type="button" class="btn-outline" onclick="closeRuleModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Rule</button>
+        <button type="button" class="btn btn-outline-secondary" onclick="closeRuleModal()">Cancel</button>
       </div>
     </form>
   </div>

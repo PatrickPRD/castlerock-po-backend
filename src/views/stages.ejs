@@ -1,0 +1,100 @@
+<%- include('partials/head', { title: 'Stages | Castlerock Homes', styles: ['admin.css'] }) %>
+<%- include('partials/header', { pageTitle: 'Stages' }) %>
+
+<main class="container">
+
+  <div class="card" id="stagesSection">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <h3 style="margin: 0;">Stages</h3>
+      <div style="display: flex; gap: 0.5rem;">
+        <button class="btn btn-primary" onclick="openStageModal()">
+          + Add Stage
+        </button>
+        <button id="mergeStagesBtn" class="btn btn-outline-primary" onclick="openMergeStageModal()" style="background: #ff9800; color: white;">
+          🔀 Merge Stages
+        </button>
+      </div>
+    </div>
+
+    <table class="po-table">
+      <thead>
+        <tr>
+          <th>Stage Name</th>
+          <th>Active</th>
+          <th>Associated POs</th>
+          <th style="width:160px">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="stageTable"></tbody>
+    </table>
+  </div>
+
+  <!-- Merge Stages Modal -->
+  <div id="mergeStageModal" class="modal" style="display:none;">
+    <div class="modal-content" style="width: 500px;">
+      <h2>Merge Stages</h2>
+      <p style="color: #666; font-size: 0.9rem; margin-bottom: 1.5rem;">
+        Select two stages. The second stage will be merged into the first, and all associated POs will be updated.
+      </p>
+
+      <div class="form-row">
+        <div>
+          <label>Stage to Keep (Merge Into)</label>
+          <select id="mergeKeepStage">
+            <option value="">-- Select stage --</option>
+          </select>
+        </div>
+
+        <div>
+          <label>Stage to Merge (Remove)</label>
+          <select id="mergeMergeStage">
+            <option value="">-- Select stage --</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem; justify-content: flex-end;">
+        <button class="btn btn-secondary" onclick="closeMergeStageModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="mergeStages()">Merge Stages</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Stage Modal -->
+  <div id="stageModal" class="modal" style="display:none;">
+    <div class="modal-content" style="width: 500px;">
+      <h2 id="stageModalTitle">Add Stage</h2>
+      
+      <form id="stageForm">
+        <input type="hidden" id="stageId">
+
+        <div class="form-row">
+          <div>
+            <label for="stageName">Stage Name</label>
+            <input type="text" id="stageName" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div>
+            <label for="stageActive">Active</label>
+            <select id="stageActive">
+              <option value="1">Yes</option>
+              <option value="0">No</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem; justify-content: flex-end;">
+          <button type="button" class="btn btn-secondary" onclick="closeStageModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Stage</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</main>
+
+<script src="stages.js"></script>
+
+<%- include('partials/footer') %>

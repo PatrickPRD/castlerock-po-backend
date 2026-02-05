@@ -287,7 +287,7 @@ async function loadSiteLetterMappingsWizard() {
           <td><strong>${m.letter}</strong></td>
           <td>${m.site_name}</td>
           <td>
-            <button class="btn-outline" onclick="deleteSiteLetterMappingWizard(${m.id})">Delete</button>
+            <button class="btn btn-outline-primary" onclick="deleteSiteLetterMappingWizard(${m.id})">Delete</button>
           </td>
         </tr>
       `;

@@ -89,14 +89,15 @@ async function loadUsers() {
   users.forEach((u) => {
     const userRole = u.role || "viewer";
     const isActive = Number(u.active) === 1;
+    const isSystemUser = u.id === 99;
 
     userTable.innerHTML += `
-      <tr>
+      <tr ${isSystemUser ? 'style="opacity: 0.6;"' : ''}>
         <td>${u.first_name || ""} ${u.last_name || ""}</td>
         <td>${u.email}</td>
 
         <td>
-          <select onchange="updateUserRole(${u.id}, this.value)">
+          <select onchange="updateUserRole(${u.id}, this.value)" ${isSystemUser ? 'disabled' : ''}>
             <option value="super_admin" ${
               userRole === "super_admin" ? "selected" : ""
             }>Super Admin</option>
@@ -115,33 +116,36 @@ async function loadUsers() {
         <td>${isActive ? "Active" : "Disabled"}</td>
 
         <td class="user-actions">
-          <div class="actions-menu">
-              <button class="actions-trigger" onclick="toggleActions(this)">
-                Actions
-              </button>
-              <div class="actions-dropdown hidden">
-
-                <button class="btn-outline"
-                  onclick="toggleUser(${u.id}, ${isActive ? 0 : 1})">
+          ${!isSystemUser ? `
+          <div class="dropdown">
+            <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+              Actions
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li>
+                <a class="dropdown-item" href="#" onclick="toggleUser(${u.id}, ${isActive ? 0 : 1}); return false;">
                   ${isActive ? "Disable" : "Enable"}
-                </button>
-
-                <button class="btn-outline"
-                  onclick="sendInvite('${u.email}')">
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item" href="#" onclick="sendInvite('${u.email}'); return false;">
                   Reset Password
-                </button>
-
-                <button class="btn-outline"
-                  onclick="editUser(${u.id})">
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item" href="#" onclick="editUser(${u.id}); return false;">
                   Edit
-                </button>
-                <hr>
-                <button class="btn-danger"
-                  onclick="deleteUser(${u.id}, '${u.email}')">
+                </a>
+              </li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <a class="dropdown-item text-danger" href="#" onclick="deleteUser(${u.id}, '${u.email}'); return false;">
                   Delete
-                </button>
-              </div>
+                </a>
+              </li>
+            </ul>
           </div>
+          ` : ''}
         </td>
 
       </tr>
@@ -266,11 +270,11 @@ async function loadLocations() {
         <td>${l.type}</td>
         <td>${l.site}</td>
         <td>
-          <button class="btn-outline"
+          <button class="btn btn-outline-primary"
             onclick="editLocation(${l.id}, '${l.name}', ${l.site_id})">
             Edit
           </button>
-          <button class="btn-danger" onclick="deleteLocation(${l.id})">
+          <button class="btn btn-danger" onclick="deleteLocation(${l.id})">
             Delete
           </button>
         </td>

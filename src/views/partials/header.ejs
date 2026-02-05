@@ -13,53 +13,34 @@
 
       <div class="collapse navbar-collapse" id="mainNav">
         <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
-          <li class="nav-item">
-            <a class="nav-link px-3" href="dashboard.html">
-              <i class="bi bi-receipt me-1"></i>Purchase Orders
+          <li class="nav-item" id="purchaseOrdersNavItem">
+            <a class="nav-link px-3" href="dashboard.html" id="purchaseOrdersNavLink">
+              <i class="bi bi-receipt me-1"></i><span id="purchaseOrdersText">Purchase Orders</span>
             </a>
           </li>
 
-          <% if (typeof showFiltersButton !== 'undefined' && showFiltersButton) { %>
-            <li class="nav-item">
-              <a class="nav-link px-3" href="#" onclick="toggleFilters(); return false;">
-                <i class="bi bi-funnel me-1"></i>Filters
-              </a>
-            </li>
-          <% } %>
-
-          <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle px-3" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-              <i class="bi bi-lightning-fill me-1"></i>Actions
-            </a>
-            <ul class="dropdown-menu">
-              <li><a class="dropdown-item" href="create-po.html">
-                <i class="bi bi-plus-circle me-2"></i>Create Purchase Order
-              </a></li>
-              <li><a class="dropdown-item" href="suppliers.html">
-                <i class="bi bi-building me-2"></i>Suppliers
-              </a></li>
-            </ul>
-          </li>
-
-          <li class="nav-item dropdown" data-roles="admin,super_admin">
+          <li class="nav-item dropdown" data-roles="super_admin">
             <a class="nav-link dropdown-toggle px-3" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
               <i class="bi bi-gear-fill me-1"></i>Admin
             </a>
             <ul class="dropdown-menu">
-              <li><a class="dropdown-item" data-roles="super_admin" href="users.html">
+              <li><a class="dropdown-item" href="users.html">
                 <i class="bi bi-people me-2"></i>Users
               </a></li>
               <li><a class="dropdown-item" href="locations.html">
                 <i class="bi bi-geo-alt me-2"></i>Locations
               </a></li>
-              <li><a class="dropdown-item" data-roles="super_admin" href="sites.html">
+              <li><a class="dropdown-item" href="sites.html">
                 <i class="bi bi-pin-map me-2"></i>Sites
+              </a></li>
+              <li><a class="dropdown-item" href="stages.html">
+                <i class="bi bi-list-check me-2"></i>Stages
               </a></li>
               <li><hr class="dropdown-divider"></li>
               <li><a class="dropdown-item" href="location-spread.html">
                 <i class="bi bi-diagram-3 me-2"></i>Location Spread
               </a></li>
-              <li><a class="dropdown-item" data-roles="super_admin" href="backup-management.html">
+              <li><a class="dropdown-item" href="backup-management.html">
                 <i class="bi bi-database me-2"></i>Backup Management
               </a></li>
             </ul>
@@ -94,3 +75,20 @@
     <% } %>
   </div>
 </nav>
+
+<script>
+  // Handle Purchase Orders nav item visibility and text based on current page
+  (function() {
+    const currentPage = window.location.pathname.split('/').pop();
+    const navItem = document.getElementById('purchaseOrdersNavItem');
+    const navText = document.getElementById('purchaseOrdersText');
+    
+    if (currentPage === 'dashboard.html' || currentPage === '') {
+      // Hide on dashboard
+      if (navItem) navItem.style.display = 'none';
+    } else if (currentPage === 'suppliers.html') {
+      // Change text on suppliers page
+      if (navText) navText.textContent = 'Back to Purchase Orders';
+    }
+  })();
+</script>

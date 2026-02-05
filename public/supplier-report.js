@@ -139,7 +139,7 @@ function renderTable() {
           </span>
         </td>
         <td>
-          <button class="btn-outline" onclick="viewSupplierPOs('${r.supplier.replace(/'/g, "\\'")}')">View</button>
+          <button class="btn btn-outline-primary" onclick="viewSupplierPOs('${r.supplier.replace(/'/g, "\\'")}')">View</button>
         </td>
       </tr>
     `;

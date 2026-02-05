@@ -10,7 +10,7 @@ const authorizeRoles = require('../middleware/authorizeRoles');
 router.get(
   '/',
   authenticate,
-  authorizeRoles('admin', 'super_admin'),
+  authorizeRoles('super_admin'),
   async (req, res) => {
     try {
       const [rules] = await db.query(`
@@ -115,7 +115,7 @@ router.get(
 router.post(
   '/',
   authenticate,
-  authorizeRoles('admin', 'super_admin'),
+  authorizeRoles('super_admin'),
   async (req, res) => {
     const { name, sourceLocationId, sites } = req.body;
 
@@ -184,7 +184,7 @@ router.post(
 router.put(
   '/:id',
   authenticate,
-  authorizeRoles('admin', 'super_admin'),
+  authorizeRoles('super_admin'),
   async (req, res) => {
     const ruleId = Number(req.params.id);
     const { name, sourceLocationId, sites } = req.body;
@@ -256,7 +256,7 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
-  authorizeRoles('admin', 'super_admin'),
+  authorizeRoles('super_admin'),
   async (req, res) => {
     const ruleId = Number(req.params.id);
 

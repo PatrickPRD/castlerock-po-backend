@@ -18,8 +18,8 @@ function ensureUI() {
     <div id="ui-confirm" class="ui-confirm hidden">
       <p id="ui-confirm-message"></p>
       <div class="ui-confirm-actions">
-        <button id="ui-confirm-cancel" class="btn-outline">Cancel</button>
-        <button id="ui-confirm-ok" class="btn-danger">Confirm</button>
+        <button id="ui-confirm-cancel" class="btn btn-secondary">Cancel</button>
+        <button id="ui-confirm-ok" class="btn btn-danger">Confirm</button>
       </div>
     </div>
   `;
@@ -142,8 +142,8 @@ function ensureUI() {
     <div id="ui-confirm" class="ui-confirm hidden">
       <p id="ui-confirm-message"></p>
       <div class="ui-confirm-actions">
-        <button id="ui-confirm-cancel" class="btn-outline">Cancel</button>
-        <button id="ui-confirm-ok" class="btn-danger">Confirm</button>
+        <button id="ui-confirm-cancel" class="btn btn-secondary">Cancel</button>
+        <button id="ui-confirm-ok" class="btn btn-danger">Confirm</button>
       </div>
     </div>
   `;

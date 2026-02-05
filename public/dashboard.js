@@ -49,9 +49,15 @@ function euro(v) {
 function formatVat(rate) {
   const n = Number(rate);
 
-  if (n === 0) return "0%";
-  if (n === 13.5) return "13.5%";
-  if (n === 23) return "23%";
+  if (n === 0) return '0%';
+  if (n === 13.5) return '13.5%';
+  if (n === 23) return '23%';
+  
+  // Handle decimal format (0.1350 -> 13.5%, 0.2300 -> 23%)
+  if (n < 1) {
+    const percentage = Math.round(n * 1000) / 10; // Avoid floating point errors
+    return `${percentage}%`;
+  }
 
   // fallback (should rarely happen)
   return `${n}%`;
@@ -250,15 +256,15 @@ function renderPO(po) {
       </div>
 
       <div class="details-actions">
-        <button class="btn-outline" onclick="editPO(${po.id})">Edit PO</button>
+        <button class="btn btn-outline-primary" onclick="editPO(${po.id})">Edit PO</button>
         ${
           role !== "viewer"
-            ? `<button class="btn-primary" onclick="addInvoice(${po.id})">Invoices</button>`
+            ? `<button class="btn btn-primary" onclick="addInvoice(${po.id})">Invoices</button>`
             : ""
         }
         ${
           role === "admin" || role === "super_admin"
-            ? `<button class="btn-danger" onclick="deletePO(${po.id})">Delete</button>`
+            ? `<button class="btn btn-danger" onclick="deletePO(${po.id})">Delete</button>`
             : ""
         }
       </div>
@@ -362,8 +368,62 @@ async function loadInvoices(poId, container) {
 /* ============================
    Actions
    ============================ */
-function editPO(id) {
-  location.href = `edit-po.html?id=${id}`;
+async function editPO(id) {
+  const modal = document.getElementById("editPOModal");
+  modal.style.display = "flex";
+  
+  // Load PO data
+  try {
+    const res = await fetch(`/purchase-orders/${id}`, {
+      headers: { Authorization: "Bearer " + token }
+    });
+    
+    if (!res.ok) {
+      showToast("Failed to load purchase order", "error");
+      closeEditPOModal();
+      return;
+    }
+    
+    const po = await res.json();
+    
+    // Populate form
+    document.getElementById("editPONumber").value = po.po_number;
+    document.getElementById("editPOSite").value = po.site; // Display site name as text
+    document.getElementById("editPODate").value = po.po_date.split('T')[0];
+    document.getElementById("editPODescription").value = po.description || "";
+    document.getElementById("editPONetAmount").value = po.net_amount;
+    
+    // Convert decimal VAT rate to percentage for dropdown (0.135 -> 13.5)
+    const vatRatePercent = po.vat_rate < 1 ? po.vat_rate * 100 : po.vat_rate;
+    document.getElementById("editPOVatRate").value = vatRatePercent;
+    
+    // Store the PO ID and site ID for submission
+    document.getElementById("editPOForm").dataset.poId = id;
+    document.getElementById("editPOForm").dataset.siteId = po.site_id;
+    
+    // Load dropdowns with selected values
+    await loadEditPOSuppliers(po.supplier_id);
+    await loadEditPOStages(po.stage_id);
+    
+    // Load locations for the selected site
+    if (po.site_id) {
+      await loadEditPOLocations(po.site_id, po.location_id);
+    }
+    
+    // Recalculate totals
+    recalcEditPO();
+    
+  } catch (err) {
+    showToast("Failed to load purchase order", "error");
+    console.error(err);
+    closeEditPOModal();
+  }
+}
+
+function closeEditPOModal() {
+  const modal = document.getElementById("editPOModal");
+  modal.style.display = "none";
+  document.getElementById("editPOForm").reset();
 }
 
 function addInvoice(id) {
@@ -495,6 +555,415 @@ function scrollExpandedRowIntoView(detailsRow) {
     });
   }
 }
+
+/* ============================
+   Create PO Modal Functions
+   ============================ */
+
+function openCreatePOModal() {
+  const modal = document.getElementById("createPOModal");
+  modal.style.display = "flex";
+  
+  // Set default date to today
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById("poDate").value = today;
+  
+  // Load dropdown options
+  loadPOSuppliers();
+  loadPOSites();
+  loadPOStages();
+  
+  // Reset form
+  document.getElementById("poForm").reset();
+  document.getElementById("poDate").value = today;
+  document.getElementById("poVatAmount").textContent = "0.00";
+  document.getElementById("poTotalAmount").textContent = "0.00";
+  document.getElementById("poSupplierSearch").value = "";
+  document.getElementById("poSupplier").value = "";
+}
+
+function closeCreatePOModal() {
+  const modal = document.getElementById("createPOModal");
+  modal.style.display = "none";
+  document.getElementById("poForm").reset();
+}
+
+async function loadPOSuppliers() {
+  try {
+    const res = await fetch("/suppliers", {
+      headers: { Authorization: "Bearer " + token }
+    });
+    const suppliers = await res.json();
+    
+    // Store suppliers globally for search
+    window.poSuppliers = suppliers;
+    
+    // Set up searchable supplier input
+    const searchInput = document.getElementById("poSupplierSearch");
+    const dropdown = document.getElementById("poSupplierDropdown");
+    const hiddenInput = document.getElementById("poSupplier");
+    
+    // Show all suppliers initially when focusing
+    searchInput.addEventListener("focus", () => {
+      filterAndShowSuppliers("");
+    });
+    
+    // Filter as user types
+    searchInput.addEventListener("input", (e) => {
+      const query = e.target.value;
+      filterAndShowSuppliers(query);
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener("click", (e) => {
+      if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.style.display = "none";
+      }
+    });
+    
+    function filterAndShowSuppliers(query) {
+      const filtered = window.poSuppliers.filter(s => 
+        s.name.toLowerCase().includes(query.toLowerCase())
+      );
+      
+      if (filtered.length === 0) {
+        dropdown.innerHTML = '<div style="padding: 10px; color: #999;">No suppliers found</div>';
+      } else {
+        dropdown.innerHTML = filtered.map(s => 
+          `<div class="supplier-option" data-id="${s.id}" data-name="${s.name}" style="padding: 10px; cursor: pointer; border-bottom: 1px solid #eee;">${s.name}</div>`
+        ).join('');
+        
+        // Add click handlers
+        dropdown.querySelectorAll('.supplier-option').forEach(opt => {
+          opt.addEventListener('click', () => {
+            hiddenInput.value = opt.dataset.id;
+            searchInput.value = opt.dataset.name;
+            dropdown.style.display = 'none';
+          });
+          
+          opt.addEventListener('mouseenter', () => {
+            opt.style.backgroundColor = '#f0f0f0';
+          });
+          
+          opt.addEventListener('mouseleave', () => {
+            opt.style.backgroundColor = 'white';
+          });
+        });
+      }
+      
+      dropdown.style.display = 'block';
+      dropdown.style.width = searchInput.offsetWidth + 'px';
+    }
+    
+  } catch (err) {
+    console.error("Failed to load suppliers:", err);
+  }
+}
+
+async function loadPOSites() {
+  try {
+    const res = await fetch("/sites", {
+      headers: { Authorization: "Bearer " + token }
+    });
+    const sites = await res.json();
+    
+    const select = document.getElementById("poSite");
+    select.innerHTML = '<option value="">Select Site</option>';
+    sites.forEach(s => {
+      const opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = s.name;
+      select.appendChild(opt);
+    });
+  } catch (err) {
+    console.error("Failed to load sites:", err);
+  }
+}
+
+async function loadPOStages() {
+  try {
+    const res = await fetch("/stages", {
+      headers: { Authorization: "Bearer " + token }
+    });
+    const stages = await res.json();
+    
+    const select = document.getElementById("poStage");
+    select.innerHTML = '<option value="">Select Stage</option>';
+    stages.forEach(s => {
+      const opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = s.name;
+      select.appendChild(opt);
+    });
+  } catch (err) {
+    console.error("Failed to load stages:", err);
+  }
+}
+
+// Site → Location cascade
+document.addEventListener("DOMContentLoaded", () => {
+  const poSiteSelect = document.getElementById("poSite");
+  const poLocationSelect = document.getElementById("poLocation");
+  
+  if (poSiteSelect) {
+    poSiteSelect.addEventListener("change", async () => {
+      const siteId = poSiteSelect.value;
+      poLocationSelect.innerHTML = '<option value="">Select Location</option>';
+      
+      if (!siteId) {
+        poLocationSelect.disabled = true;
+        return;
+      }
+      
+      try {
+        const res = await fetch(`/locations?siteId=${siteId}`, {
+          headers: { Authorization: "Bearer " + token }
+        });
+        const locations = await res.json();
+        
+        locations.forEach(l => {
+          const opt = document.createElement("option");
+          opt.value = l.id;
+          opt.textContent = l.name;
+          poLocationSelect.appendChild(opt);
+        });
+        
+        poLocationSelect.disabled = false;
+      } catch (err) {
+        console.error("Failed to load locations:", err);
+      }
+    });
+  }
+  
+  // VAT calculation
+  const netAmount = document.getElementById("poNetAmount");
+  const vatRate = document.getElementById("poVatRate");
+  const vatAmount = document.getElementById("poVatAmount");
+  const totalAmount = document.getElementById("poTotalAmount");
+  
+  function recalcPO() {
+    const net = Number(netAmount.value) || 0;
+    const rate = Number(vatRate.value) || 0;
+    const vat = net * (rate / 100);
+    const total = net + vat;
+    
+    vatAmount.textContent = vat.toFixed(2);
+    totalAmount.textContent = total.toFixed(2);
+  }
+  
+  if (netAmount) netAmount.addEventListener("input", recalcPO);
+  if (vatRate) vatRate.addEventListener("change", recalcPO);
+  
+  // Form submission
+  const poForm = document.getElementById("poForm");
+  if (poForm) {
+    poForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      
+      const payload = {
+        supplierId: document.getElementById("poSupplier").value,
+        siteId: document.getElementById("poSite").value,
+        locationId: document.getElementById("poLocation").value,
+        stageId: document.getElementById("poStage").value,
+        poDate: document.getElementById("poDate").value,
+        description: document.getElementById("poDescription").value || "",
+        netAmount: Number(document.getElementById("poNetAmount").value) || 0,
+        vatRate: Number(document.getElementById("poVatRate").value) || 0
+      };
+      
+      if (!payload.supplierId || !payload.siteId || !payload.locationId || !payload.poDate || !payload.stageId) {
+        showToast("Supplier, site, location, stage and date are required", "error");
+        return;
+      }
+      
+      try {
+        const res = await fetch("/purchase-orders", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token
+          },
+          body: JSON.stringify(payload)
+        });
+        
+        if (!res.ok) {
+          const err = await res.json();
+          showToast(err.error || "Failed to create purchase order", "error");
+          return;
+        }
+        
+        const data = await res.json();
+        showToast(`Purchase Order ${data.poNumber} created successfully`, "success");
+        closeCreatePOModal();
+        loadPOs(); // Reload the PO list
+      } catch (err) {
+        showToast("Failed to create purchase order", "error");
+        console.error(err);
+      }
+    });
+  }
+});
+
+/* ============================
+   Edit PO Modal Functions
+   ============================ */
+
+async function loadEditPOSuppliers(selectedId) {
+  try {
+    const res = await fetch("/suppliers", {
+      headers: { Authorization: "Bearer " + token }
+    });
+    const suppliers = await res.json();
+    
+    const select = document.getElementById("editPOSupplier");
+    select.innerHTML = '<option value="">Select Supplier</option>';
+    suppliers.forEach(s => {
+      const opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = s.name;
+      if (s.id === selectedId) opt.selected = true;
+      select.appendChild(opt);
+    });
+  } catch (err) {
+    console.error("Failed to load suppliers:", err);
+  }
+}
+
+async function loadEditPOSites(selectedId) {
+  try {
+    const res = await fetch("/sites", {
+      headers: { Authorization: "Bearer " + token }
+    });
+    const sites = await res.json();
+    
+    const select = document.getElementById("editPOSite");
+    select.innerHTML = '<option value="">Select Site</option>';
+    sites.forEach(s => {
+      const opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = s.name;
+      if (s.id === selectedId) opt.selected = true;
+      select.appendChild(opt);
+    });
+  } catch (err) {
+    console.error("Failed to load sites:", err);
+  }
+}
+
+async function loadEditPOStages(selectedId) {
+  try {
+    const res = await fetch("/stages", {
+      headers: { Authorization: "Bearer " + token }
+    });
+    const stages = await res.json();
+    
+    const select = document.getElementById("editPOStage");
+    select.innerHTML = '<option value="">Select Stage</option>';
+    stages.forEach(s => {
+      const opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = s.name;
+      if (s.id === selectedId) opt.selected = true;
+      select.appendChild(opt);
+    });
+  } catch (err) {
+    console.error("Failed to load stages:", err);
+  }
+}
+
+async function loadEditPOLocations(siteId, selectedId) {
+  try {
+    const res = await fetch(`/locations?siteId=${siteId}`, {
+      headers: { Authorization: "Bearer " + token }
+    });
+    const locations = await res.json();
+    
+    const select = document.getElementById("editPOLocation");
+    select.innerHTML = '<option value="">Select Location</option>';
+    locations.forEach(l => {
+      const opt = document.createElement("option");
+      opt.value = l.id;
+      opt.textContent = l.name;
+      if (l.id === selectedId) opt.selected = true;
+      select.appendChild(opt);
+    });
+  } catch (err) {
+    console.error("Failed to load locations:", err);
+  }
+}
+
+function recalcEditPO() {
+  const net = Number(document.getElementById("editPONetAmount").value) || 0;
+  const rate = Number(document.getElementById("editPOVatRate").value) || 0;
+  const vat = net * (rate / 100);
+  const total = net + vat;
+  
+  document.getElementById("editPOVatAmount").textContent = vat.toFixed(2);
+  document.getElementById("editPOTotalAmount").textContent = total.toFixed(2);
+}
+
+// Set up edit modal event listeners
+document.addEventListener("DOMContentLoaded", () => {
+  // Note: Site is not editable in edit modal, so no site change listener needed
+  
+  // VAT calculation for edit modal
+  const editNetAmount = document.getElementById("editPONetAmount");
+  const editVatRate = document.getElementById("editPOVatRate");
+  
+  if (editNetAmount) editNetAmount.addEventListener("input", recalcEditPO);
+  if (editVatRate) editVatRate.addEventListener("change", recalcEditPO);
+  
+  // Edit form submission
+  const editPOForm = document.getElementById("editPOForm");
+  if (editPOForm) {
+    editPOForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      
+      const poId = e.target.dataset.poId;
+      const siteId = e.target.dataset.siteId; // Get stored site ID
+      
+      const payload = {
+        supplierId: document.getElementById("editPOSupplier").value,
+        siteId: siteId, // Use stored site ID
+        locationId: document.getElementById("editPOLocation").value,
+        stageId: document.getElementById("editPOStage").value,
+        poDate: document.getElementById("editPODate").value,
+        description: document.getElementById("editPODescription").value || "",
+        netAmount: Number(document.getElementById("editPONetAmount").value) || 0,
+        vatRate: Number(document.getElementById("editPOVatRate").value) || 0
+      };
+      
+      if (!payload.supplierId || !payload.siteId || !payload.locationId || !payload.poDate || !payload.stageId) {
+        showToast("Supplier, site, location, stage and date are required", "error");
+        return;
+      }
+      
+      try {
+        const res = await fetch(`/purchase-orders/${poId}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token
+          },
+          body: JSON.stringify(payload)
+        });
+        
+        if (!res.ok) {
+          const err = await res.json();
+          showToast(err.error || "Failed to update purchase order", "error");
+          return;
+        }
+        
+        showToast("Purchase order updated successfully", "success");
+        closeEditPOModal();
+        loadPOs(); // Reload the PO list
+      } catch (err) {
+        showToast("Failed to update purchase order", "error");
+        console.error(err);
+      }
+    });
+  }
+});
 
 /* ============================
    Init

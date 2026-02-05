@@ -33,6 +33,7 @@ app.get('/edit-user.html', (req, res) => res.render('edit-user'));
 app.get('/users.html', (req, res) => res.render('users'));
 app.get('/locations.html', (req, res) => res.render('locations'));
 app.get('/sites.html', (req, res) => res.render('sites'));
+app.get('/stages.html', (req, res) => res.render('stages'));
 app.get('/location-spread.html', (req, res) => res.render('location-spread'));
 app.get('/backup-management.html', (req, res) => res.render('backup-management'));
 app.get('/location-report.html', (req, res) => res.render('location-report'));
