@@ -1,10 +1,44 @@
 require('dotenv').config();
-const pool = require('../src/db');
+const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
 
 async function setupDatabase() {
+  let pool;
+  let adminConn;
+
   try {
     console.log('🔧 Setting up database...\n');
+
+    const dbName = process.env.DB_NAME;
+    if (!dbName) {
+      throw new Error('DB_NAME is not set in the environment');
+    }
+
+    const baseConfig = {
+      host: process.env.DB_HOST,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      port: process.env.DB_PORT,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+      multipleStatements: true,
+      enableKeepAlive: true
+    };
+
+    // Create database if it does not exist before connecting to it.
+    adminConn = await mysql.createConnection({
+      host: baseConfig.host,
+      user: baseConfig.user,
+      password: baseConfig.password,
+      port: baseConfig.port
+    });
+    await adminConn.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
+
+    pool = mysql.createPool({
+      ...baseConfig,
+      database: dbName
+    });
 
     // Create users table
     await pool.query(`
@@ -25,6 +59,22 @@ async function setupDatabase() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log('✅ Users table created');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS sites (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        site_letter VARCHAR(1) NOT NULL,
+        address TEXT,
+        active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_site_letter (site_letter),
+        INDEX idx_name (name),
+        INDEX idx_active (active)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ Sites table created');
 
     // Check if super admin exists
     const [[existingAdmin]] = await pool.query(
@@ -66,15 +116,30 @@ async function setupDatabase() {
     console.log('✅ Suppliers table created');
 
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS locations (
+      CREATE TABLE IF NOT EXISTS po_stages (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
-        code VARCHAR(50),
-        address TEXT,
         active TINYINT(1) NOT NULL DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_code (code)
+        INDEX idx_name (name)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ PO stages table created');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS locations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        type VARCHAR(100) DEFAULT NULL,
+        site_id INT NOT NULL,
+        active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE RESTRICT,
+        INDEX idx_name (name),
+        INDEX idx_site_id (site_id),
+        INDEX idx_active (active)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log('✅ Locations table created');
@@ -184,11 +249,12 @@ async function setupDatabase() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS invoices (
         id INT AUTO_INCREMENT PRIMARY KEY,
+        purchase_order_id INT NOT NULL,
         invoice_number VARCHAR(100) NOT NULL UNIQUE,
-        po_id INT,
-        supplier_id INT NOT NULL,
         invoice_date DATE NOT NULL,
-        due_date DATE,
+        net_amount DECIMAL(15, 2) NOT NULL,
+        vat_rate DECIMAL(5, 4) NOT NULL DEFAULT 0.2300,
+        vat_amount DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
         total_amount DECIMAL(15, 2) NOT NULL,
         paid_amount DECIMAL(15, 2) DEFAULT 0.00,
         status ENUM('pending', 'partial', 'paid', 'overdue', 'cancelled') NOT NULL DEFAULT 'pending',
@@ -196,11 +262,12 @@ async function setupDatabase() {
         created_by INT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (po_id) REFERENCES purchase_orders(id) ON DELETE SET NULL,
-        FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT,
+        FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id) ON DELETE RESTRICT,
         FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
         INDEX idx_invoice_number (invoice_number),
-        INDEX idx_status (status)
+        INDEX idx_purchase_order_id (purchase_order_id),
+        INDEX idx_status (status),
+        INDEX idx_invoice_date (invoice_date)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log('✅ Invoices table created');
@@ -246,7 +313,12 @@ async function setupDatabase() {
     console.error('❌ Database setup failed:', error);
     process.exit(1);
   } finally {
-    await pool.end();
+    if (pool) {
+      await pool.end();
+    }
+    if (adminConn) {
+      await adminConn.end();
+    }
   }
 }
 

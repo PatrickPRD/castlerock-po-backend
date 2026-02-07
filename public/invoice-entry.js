@@ -160,7 +160,7 @@ function renderInvoices() {
   invoiceList.innerHTML = '';
 
   if (!po.invoices || po.invoices.length === 0) {
-    invoiceList.innerHTML = `<tr><td colspan="6">No invoices yet</td></tr>`;
+    invoiceList.innerHTML = `<tr><td colspan="7">No invoices yet</td></tr>`;
     return;
   }
 
@@ -171,6 +171,7 @@ function renderInvoices() {
     if (isCredit) tr.classList.add('credit-invoice');
 
     tr.innerHTML = `
+      <td data-label="ID:">${inv.id}</td>
       <td data-label="Invoice No:">${inv.invoice_number}</td>
       <td data-label="Date:">${inv.invoice_date}</td>
       <td data-label="Net (ex VAT):">${euro(inv.net_amount)}</td>

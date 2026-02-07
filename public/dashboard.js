@@ -156,9 +156,11 @@ function applyFilters() {
 
   const filtered = allPOs.filter((po) => {
     const uninvoiced = num(po.uninvoiced_total);
+    const invoiced = num(po.invoiced_total);
 
     if (statusFilter.value === "outstanding" && uninvoiced <= 0) return false;
     if (statusFilter.value === "complete" && uninvoiced !== 0) return false;
+    if (statusFilter.value === "over-invoiced" && invoiced <= num(po.total_amount)) return false;
 
     if (supplierFilter.value && po.supplier !== supplierFilter.value)
       return false;
@@ -334,6 +336,7 @@ async function loadInvoices(poId, container) {
     <table class="data-table">
       <thead>
         <tr>
+          <th>ID</th>
           <th>Invoice #</th>
           <th>Date</th>
           <th>Net (ex VAT)</th>
@@ -347,6 +350,7 @@ async function loadInvoices(poId, container) {
   invoices.forEach((i) => {
     html += `
     <tr>
+      <td>${i.id}</td>
       <td>${i.invoice_number}</td>
       <td>${i.invoice_date}</td>
       <td>€${Number(i.net_amount).toFixed(2)}</td>

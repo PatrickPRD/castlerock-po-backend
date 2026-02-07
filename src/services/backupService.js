@@ -10,12 +10,52 @@ async function clearDatabaseExceptUsers(connection) {
     `
   );
 
-  for (const { tableName } of tables) {
-    if (tableName === 'users') {
+  // Clear in reverse order of creation (respecting foreign keys)
+  const clearOrder = [
+    'invoices',
+    'location_spread_rule_locations',
+    'location_spread_rule_sites',
+    'location_spread_rules',
+    'purchase_orders',
+    'po_sequences',
+    'locations',
+    'sites',
+    'suppliers',
+    'po_stages',
+    'audit_log'
+  ];
+
+  for (const table of clearOrder) {
+    const exists = tables.some(t => t.tableName === table);
+    if (!exists || table === 'users') {
       continue;
     }
 
-    await connection.query(`DELETE FROM \`${tableName}\` WHERE 1=1`);
+    try {
+      // Get count before clear
+      const [[{ countBefore }]] = await connection.query(
+        `SELECT COUNT(*) as countBefore FROM \`${table}\``
+      );
+      
+      // Delete all rows
+      const deleteResult = await connection.query(
+        `DELETE FROM \`${table}\` WHERE 1=1`
+      );
+      
+      // Verify deletion
+      const [[{ countAfter }]] = await connection.query(
+        `SELECT COUNT(*) as countAfter FROM \`${table}\``
+      );
+      
+      console.log(`📝 Cleared table ${table}: ${countBefore} → ${countAfter} rows`);
+      
+      if (countAfter > 0) {
+        throw new Error(`Failed to completely clear table ${table}. Rows remaining: ${countAfter}`);
+      }
+    } catch (err) {
+      console.error(`❌ Error clearing table ${table}:`, err.message);
+      throw new Error(`Failed to clear table ${table}: ${err.message}`);
+    }
   }
 }
 
@@ -58,6 +98,94 @@ async function createBackup() {
 }
 
 /**
+ * Validate a backup and generate a restoration report
+ * Checks for schema mismatches and counts records to be restored
+ */
+async function validateBackup(backupData) {
+  const connection = await pool.getConnection();
+
+  try {
+    // Validate backup structure
+    if (!backupData.metadata || !backupData.tables) {
+      throw new Error('Invalid backup format: missing metadata or tables');
+    }
+
+    const report = {
+      metadata: backupData.metadata,
+      tables: {},
+      warnings: [],
+      errors: [],
+      totalRecords: 0
+    };
+
+    const restoreOrder = [
+      'po_stages',
+      'suppliers',
+      'sites',
+      'locations',
+      'purchase_orders',
+      'invoices'
+    ];
+
+    // Get current database schema
+    const [dbTables] = await connection.query(
+      `SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()`
+    );
+    const existingTables = new Set(dbTables.map(t => t.table_name));
+
+    // Validate each table
+    for (const table of restoreOrder) {
+      const rows = backupData.tables[table];
+
+      if (!rows) {
+        report.warnings.push(`Table '${table}' not found in backup`);
+        continue;
+      }
+
+      if (rows.length === 0) {
+        report.tables[table] = { rowCount: 0, status: 'EMPTY' };
+        continue;
+      }
+
+      // Check if table exists in current database
+      if (!existingTables.has(table)) {
+        report.errors.push(`Table '${table}' does not exist in current database`);
+        report.tables[table] = { rowCount: rows.length, status: 'ERROR_TABLE_MISSING' };
+        continue;
+      }
+
+      // Get current table columns
+      const [columns] = await connection.query(`SHOW COLUMNS FROM \`${table}\``);
+      const currentColumns = new Set(columns.map(c => c.Field));
+      const backupColumns = Object.keys(rows[0]);
+
+      // Check for missing columns in current schema
+      const missingColumns = backupColumns.filter(col => !currentColumns.has(col));
+      const validColumns = backupColumns.filter(col => currentColumns.has(col));
+
+      if (missingColumns.length > 0) {
+        report.warnings.push(
+          `Table '${table}': columns missing from current schema: ${missingColumns.join(', ')}`
+        );
+      }
+
+      report.tables[table] = {
+        rowCount: rows.length,
+        status: missingColumns.length > 0 ? 'WARNING' : 'OK',
+        validColumns: validColumns,
+        skippedColumns: missingColumns
+      };
+
+      report.totalRecords += rows.length;
+    }
+
+    return report;
+  } finally {
+    connection.release();
+  }
+}
+
+/**
  * Restore a backup
  * Clears all data except users, then restores from backup
  */
@@ -76,9 +204,12 @@ async function restoreBackup(backupData) {
     try {
       // Disable foreign key checks
       await connection.query('SET FOREIGN_KEY_CHECKS=0');
+      console.log('🔓 Foreign key checks disabled');
 
       // Clear all tables except users
+      console.log('🧹 Clearing database...');
       await clearDatabaseExceptUsers(connection);
+      console.log('✅ Database cleared');
 
       // Restore data
       const restoreOrder = [
@@ -90,20 +221,76 @@ async function restoreBackup(backupData) {
         'invoices'
       ];
 
+      const restoreReport = {
+        restored: {},
+        skipped: {},
+        errors: []
+      };
+
       for (const table of restoreOrder) {
         const rows = backupData.tables[table];
 
         if (!rows || rows.length === 0) {
+          restoreReport.skipped[table] = 'No data';
           continue;
         }
 
-        const columns = Object.keys(rows[0]);
-        const placeholders = columns.map(() => '?').join(',');
-        const sql = `INSERT INTO ${table} (${columns.join(',')}) VALUES (${placeholders})`;
+        try {
+          console.log(`📥 Restoring table ${table} with ${rows.length} rows...`);
+          
+          // Get current table columns to filter backup columns
+          const [columns] = await connection.query(`SHOW COLUMNS FROM \`${table}\``);
+          const currentColumns = new Set(columns.map(c => c.Field));
+          const backupColumns = Object.keys(rows[0]).filter(col => currentColumns.has(col));
 
-        for (const row of rows) {
-          const values = columns.map(col => row[col]);
-          await connection.query(sql, values);
+          if (backupColumns.length === 0) {
+            restoreReport.errors.push({
+              table,
+              error: 'No valid columns to restore'
+            });
+            continue;
+          }
+
+          const placeholders = backupColumns.map(() => '?').join(',');
+          // Use REPLACE instead of INSERT to handle duplicates automatically
+          // REPLACE will delete any existing row with the same unique key and insert the new one
+          const sql = `REPLACE INTO \`${table}\` (\`${backupColumns.join('`,`')}\`) VALUES (${placeholders})`;
+
+          let insertedCount = 0;
+          let replacedCount = 0;
+          for (const row of rows) {
+            try {
+              const values = backupColumns.map(col => row[col]);
+              const result = await connection.query(sql, values);
+              // result[0] has affectedRows: 1 for INSERT, 2 for REPLACE
+              if (result[0].affectedRows === 2) {
+                replacedCount++;
+              } else {
+                insertedCount++;
+              }
+            } catch (rowErr) {
+              console.warn(`Warning: Failed to restore row in ${table}:`, rowErr.message);
+              restoreReport.errors.push({
+                table,
+                row: Object.keys(row).slice(0, 3).join(', '),
+                error: rowErr.message
+              });
+            }
+          }
+
+          restoreReport.restored[table] = insertedCount;
+          if (replacedCount > 0) {
+            restoreReport.skipped[table] = `${replacedCount} duplicate entries replaced`;
+          }
+          
+          console.log(`✅ Restored table ${table}: ${insertedCount} inserted, ${replacedCount} replaced`);
+        } catch (tableErr) {
+          console.error(`❌ Error restoring table ${table}:`, tableErr.message);
+          restoreReport.errors.push({
+            table,
+            error: tableErr.message
+          });
+          throw tableErr;
         }
       }
 
@@ -113,7 +300,11 @@ async function restoreBackup(backupData) {
       // Commit transaction
       await connection.commit();
 
-      return { success: true, message: 'Backup restored successfully' };
+      return { 
+        success: true, 
+        message: 'Backup restored successfully',
+        report: restoreReport
+      };
     } catch (err) {
       await connection.rollback();
       throw err;
@@ -135,13 +326,35 @@ async function restoreBackupSql(sqlText) {
   const connection = await pool.getConnection();
 
   try {
+    console.log('🔓 Foreign key checks disabled (SQL restore)');
     await connection.query('SET FOREIGN_KEY_CHECKS=0');
+    
+    console.log('🧹 Clearing database before SQL restore...');
     await clearDatabaseExceptUsers(connection);
-    await connection.query(sqlText);
+    console.log('✅ Database cleared');
+
+    // Process SQL to handle duplicates: replace INSERT with REPLACE
+    let processedSql = sqlText;
+    
+    // Replace INSERT INTO with REPLACE INTO for duplicate handling
+    // This will delete old rows with same unique keys and insert new ones
+    processedSql = processedSql.replace(/INSERT\s+INTO\s+/gi, 'REPLACE INTO ');
+    
+    // Also handle INSERT IGNORE
+    processedSql = processedSql.replace(/INSERT\s+IGNORE\s+/gi, 'REPLACE INTO ');
+    
+    console.log('📥 Executing SQL restore (duplicates will replace)...');
+    await connection.query(processedSql);
+    console.log('✅ SQL restore completed');
+    
     await connection.query('SET FOREIGN_KEY_CHECKS=1');
 
-    return { success: true, message: 'SQL backup restored successfully' };
+    return { 
+      success: true, 
+      message: 'SQL backup restored successfully (duplicates replaced)' 
+    };
   } catch (err) {
+    console.error('❌ SQL restore error:', err.message);
     try {
       await connection.query('SET FOREIGN_KEY_CHECKS=1');
     } catch (restoreErr) {
@@ -155,6 +368,7 @@ async function restoreBackupSql(sqlText) {
 
 module.exports = {
   createBackup,
+  validateBackup,
   restoreBackup,
   restoreBackupSql
 };

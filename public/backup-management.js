@@ -185,21 +185,181 @@ async function restoreBackup() {
     return;
   }
 
-  const confirmed = await confirm(
-    '⚠️ WARNING: This will replace all POs, invoices, sites, locations, and suppliers with the backup data. User accounts will NOT be affected.\n\nThis action CANNOT be undone.\n\nContinue?'
-  );
+  try {
+    showToast('Validating backup...', 'info');
 
-  if (!confirmed) return;
+    // For SQL backups, skip validation and go straight to confirmation
+    if (backupMode === 'sql') {
+      const confirmed = await confirm(
+        '⚠️ WARNING: SQL Backup\n\nThis will replace all POs, invoices, sites, locations, and suppliers with the backup data. User accounts will NOT be affected.\n\nThis action CANNOT be undone.\n\nContinue?'
+      );
+      if (!confirmed) return;
+      
+      return await executeRestore(false);
+    }
 
+    // For JSON backups, validate first
+    const validationResponse = await api('/backups/validate', 'POST', { 
+      backup: backupData 
+    });
+
+    const report = validationResponse.report;
+
+    // Show validation report
+    showValidationReport(report, async () => {
+      // User confirmed, proceed with restore
+      return await executeRestore(false);
+    });
+
+  } catch (err) {
+    console.error('Validation/Restore error:', err);
+    
+    // If validation failed, ask if user wants to force restore
+    if (err.message.includes('Validation') || err.message.includes('validation')) {
+      const forceRestore = await confirm(
+        '⚠️ Validation error: ' + err.message + '\n\nDo you want to force restore anyway? This may result in data inconsistencies.\n\nContinue?'
+      );
+      
+      if (forceRestore) {
+        return await executeRestore(true);
+      }
+    } else {
+      showToast('❌ Error: ' + err.message, 'error');
+    }
+  }
+}
+
+/* ============================
+   SHOW VALIDATION REPORT
+   ============================ */
+function showValidationReport(report, onConfirm) {
+  let html = '<div style="max-height: 400px; overflow-y: auto; margin-bottom: 20px;">';
+  
+  html += '<h4>📊 Backup Validation Report</h4>';
+  html += `<p><strong>Backup Date:</strong> ${new Date(report.metadata.createdAt).toLocaleString()}</p>`;
+  html += `<p><strong>Total Records:</strong> ${report.totalRecords}</p>`;
+  
+  // Table breakdown
+  html += '<h5>Tables to be restored:</h5>';
+  html += '<ul>';
+  for (const [table, info] of Object.entries(report.tables)) {
+    const statusIcon = 
+      info.status === 'OK' ? '✅' : 
+      info.status === 'WARNING' ? '⚠️' : 
+      '❌';
+    html += `<li>${statusIcon} <strong>${table}:</strong> ${info.rowCount} records`;
+    
+    if (info.skippedColumns && info.skippedColumns.length > 0) {
+      html += ` <em>(skipping columns: ${info.skippedColumns.join(', ')})</em>`;
+    }
+    html += '</li>';
+  }
+  html += '</ul>';
+  
+  // Warnings
+  if (report.warnings && report.warnings.length > 0) {
+    html += '<h5>⚠️ Warnings:</h5>';
+    html += '<ul>';
+    report.warnings.forEach(w => html += `<li>${w}</li>`);
+    html += '</ul>';
+  }
+  
+  // Errors
+  if (report.errors && report.errors.length > 0) {
+    html += '<h5>❌ Errors:</h5>';
+    html += '<ul>';
+    report.errors.forEach(e => html += `<li>${e}</li>`);
+    html += '</ul>';
+    html += '<p style="color: #d32f2f;"><strong>⚠️ Note:</strong> Some data may not be restored due to schema mismatches.</p>';
+  }
+  
+  html += '</div>';
+  html += '<p style="margin-bottom: 20px;"><strong>This will replace all POs, invoices, sites, locations, and suppliers with the backup data. User accounts will NOT be affected.</strong></p>';
+  html += '<p style="margin-bottom: 20px; color: #d32f2f;"><strong>This action CANNOT be undone.</strong></p>';
+
+  // Create a custom confirmation modal
+  const modalHtml = `
+    <div id="validationReportModal" style="
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+    ">
+      <div style="
+        background: white;
+        padding: 30px;
+        border-radius: 8px;
+        max-width: 600px;
+        width: 90%;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      ">
+        ${html}
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button onclick="closeValidationReport()" style="
+            padding: 10px 20px;
+            border: 1px solid #ccc;
+            background: #f5f5f5;
+            border-radius: 4px;
+            cursor: pointer;
+          ">Cancel</button>
+          <button onclick="confirmAndRestore()" style="
+            padding: 10px 20px;
+            background: #d32f2f;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+          ">Continue & Restore</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+  
+  // Store the confirmation callback
+  window.restoreConfirmCallback = onConfirm;
+}
+
+function closeValidationReport() {
+  const modal = document.getElementById('validationReportModal');
+  if (modal) modal.remove();
+}
+
+async function confirmAndRestore() {
+  closeValidationReport();
+  if (window.restoreConfirmCallback) {
+    await window.restoreConfirmCallback();
+  }
+}
+
+/* ============================
+   EXECUTE RESTORE
+   ============================ */
+async function executeRestore(force = false) {
   try {
     showToast('Restoring backup...', 'info');
 
     const payload =
       backupMode === 'sql'
         ? { sql: backupData }
-        : { backup: backupData };
+        : { backup: backupData, force };
 
     const response = await api('/backups/restore', 'POST', payload);
+
+    // Check if validation is required
+    if (response.requiresConfirmation && !force) {
+      showValidationReport(response.report, async () => {
+        return await executeRestore(true);
+      });
+      return;
+    }
 
     closeRestoreModal();
     showToast(
