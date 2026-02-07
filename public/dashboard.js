@@ -231,26 +231,35 @@ function renderPO(po) {
   detailsRow.innerHTML = `
     <td colspan="6">
     <div class="details-wrapper">
-<div class="details-grid">
-  <div><strong>Site:</strong> ${po.site}</div>
-  <div><strong>VAT Rate:</strong> ${formatVat(po.vat_rate)}</div>
-  <div><strong>Total (inc VAT):</strong> €${Number(po.total_amount).toFixed(
-    2
-  )}</div>
+      <div style="display: flex; gap: 2rem;">
+        <div class="details-grid" style="flex: 0 0 auto;">
+          <div><strong>Site:</strong> ${po.site}</div>
+          <div><strong>VAT Rate:</strong> ${formatVat(po.vat_rate)}</div>
+          <div><strong>Total (inc VAT):</strong> €${Number(po.total_amount).toFixed(
+            2
+          )}</div>
 
-  <div>
-    <strong>Uninvoiced (inc VAT):</strong>
-    <span class="${
-      po.uninvoiced_total < 0
-        ? "over"
-        : po.uninvoiced_total === 0
-        ? "ok"
-        : "warn"
-    }">
-      €${Number(po.uninvoiced_total).toFixed(2)}
-    </span>
-  </div>
-</div>
+          <div>
+            <strong>Uninvoiced (inc VAT):</strong>
+            <span class="${
+              po.uninvoiced_total < 0
+                ? "over"
+                : po.uninvoiced_total === 0
+                ? "ok"
+                : "warn"
+            }">
+              €${Number(po.uninvoiced_total).toFixed(2)}
+            </span>
+          </div>
+        </div>
+        
+        <div style="flex: 1; min-width: 0;">
+          <div><strong>Description:</strong></div>
+          <div style="padding: 0.75rem; background: #f9f9f9; border-radius: 4px; border-left: 3px solid #007bff; word-wrap: break-word;">
+            ${po.description || '<span style="color: #999;">No description</span>'}
+          </div>
+        </div>
+      </div>
 
 
       <div class="invoice-container" id="inv-${po.id}">
@@ -476,7 +485,199 @@ function clearFilters() {
   dateTo.value = "";
   valueMin.value = "";
   valueMax.value = "";
+  
+  // Reset supplier dropdown button text
+  const supplierBtn = document.querySelector('.searchable-select-btn');
+  if (supplierBtn) {
+    supplierBtn.innerHTML = 'Select Supplier <span style="color: #666;">▼</span>';
+  }
+  
   applyFilters();
+}
+
+/* ============================
+   Searchable Supplier Filter
+   ============================ */
+function setupSearchableSupplierFilter() {
+  // Create a wrapper for the custom dropdown
+  const originalSelect = supplierFilter;
+  const wrapper = document.createElement('div');
+  wrapper.style.position = 'relative';
+  originalSelect.parentNode.insertBefore(wrapper, originalSelect);
+  wrapper.appendChild(originalSelect);
+  
+  // Create button that shows current selection
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'searchable-select-btn';
+  button.style.cssText = `
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+    text-align: left;
+    font-size: 0.95rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  `;
+  button.innerHTML = 'Select Supplier <span style="color: #666;">▼</span>';
+  
+  // Hide the original select
+  originalSelect.style.display = 'none';
+  
+  // Create dropdown menu
+  const dropdown = document.createElement('div');
+  dropdown.className = 'searchable-select-dropdown';
+  dropdown.style.cssText = `
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-top: 4px;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  `;
+  
+  // Create search input
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.placeholder = 'Type to filter...';
+  searchInput.style.cssText = `
+    width: 100%;
+    padding: 0.5rem;
+    border: none;
+    border-bottom: 1px solid #eee;
+    box-sizing: border-box;
+    font-size: 0.9rem;
+  `;
+  
+  // Create options container
+  const optionsContainer = document.createElement('div');
+  optionsContainer.className = 'searchable-select-options';
+  optionsContainer.style.cssText = `
+    max-height: 200px;
+    overflow-y: auto;
+  `;
+  
+  dropdown.appendChild(searchInput);
+  dropdown.appendChild(optionsContainer);
+  
+  wrapper.appendChild(button);
+  wrapper.appendChild(dropdown);
+  
+  // Get all suppliers from original select options
+  function getSuppliers() {
+    const options = [...originalSelect.options];
+    return options
+      .filter(opt => opt.value !== '')
+      .map(opt => ({ value: opt.value, text: opt.textContent }))
+      .sort((a, b) => a.text.localeCompare(b.text));
+  }
+  
+  // Render options
+  function renderOptions(filter = '') {
+    optionsContainer.innerHTML = '';
+    const suppliers = getSuppliers();
+    const filtered = suppliers.filter(s => 
+      s.text.toLowerCase().includes(filter.toLowerCase())
+    );
+    
+    // "All" option
+    const allDiv = document.createElement('div');
+    allDiv.style.cssText = `
+      padding: 0.5rem;
+      cursor: pointer;
+      border-bottom: 1px solid #f0f0f0;
+      transition: background 0.2s;
+    `;
+    allDiv.textContent = 'All';
+    allDiv.onmouseenter = () => allDiv.style.background = '#f5f5f5';
+    allDiv.onmouseleave = () => allDiv.style.background = '';
+    allDiv.onclick = () => {
+      originalSelect.value = '';
+      button.innerHTML = 'Select Supplier <span style="color: #666;">▼</span>';
+      dropdown.style.display = 'none';
+      applyFilters();
+    };
+    optionsContainer.appendChild(allDiv);
+    
+    if (filtered.length === 0) {
+      const noResults = document.createElement('div');
+      noResults.style.cssText = 'padding: 0.5rem; color: #999; text-align: center;';
+      noResults.textContent = 'No suppliers found';
+      optionsContainer.appendChild(noResults);
+      return;
+    }
+    
+    filtered.forEach(supplier => {
+      const div = document.createElement('div');
+      div.style.cssText = `
+        padding: 0.5rem;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+        transition: background 0.2s;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      `;
+      
+      const count = allPOs.filter(po => po.supplier === supplier.text).length;
+      div.innerHTML = `
+        <strong>${supplier.text}</strong>
+        <span style="color: #999; font-size: 0.85rem;">(${count})</span>
+      `;
+      
+      div.onmouseenter = () => div.style.background = '#f5f5f5';
+      div.onmouseleave = () => div.style.background = '';
+      div.onclick = () => {
+        originalSelect.value = supplier.value;
+        button.innerHTML = `${supplier.text} <span style="color: #666;">▼</span>`;
+        dropdown.style.display = 'none';
+        applyFilters();
+      };
+      
+      optionsContainer.appendChild(div);
+    });
+  }
+  
+  // Toggle dropdown
+  button.onclick = (e) => {
+    e.preventDefault();
+    dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    if (dropdown.style.display === 'block') {
+      searchInput.focus();
+      renderOptions();
+    }
+  };
+  
+  // Filter on input
+  searchInput.addEventListener('input', (e) => {
+    renderOptions(e.target.value);
+  });
+  
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!wrapper.contains(e.target)) {
+      dropdown.style.display = 'none';
+    }
+  });
+  
+  // Sync with original select changes
+  originalSelect.addEventListener('change', () => {
+    const selected = originalSelect.querySelector('option:checked');
+    if (selected) {
+      button.innerHTML = selected.value 
+        ? `${selected.textContent} <span style="color: #666;">▼</span>`
+        : 'Select Supplier <span style="color: #666;">▼</span>';
+    }
+  });
 }
 
 /* ============================
@@ -972,5 +1173,8 @@ document.addEventListener("DOMContentLoaded", () => {
 /* ============================
    Init
    ============================ */
-setDefaultDateFilter();
-loadPOs();
+(async () => {
+  setDefaultDateFilter();
+  await loadPOs();
+  setupSearchableSupplierFilter();
+})();
