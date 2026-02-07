@@ -38,6 +38,7 @@ app.get('/location-spread.html', (req, res) => res.render('location-spread'));
 app.get('/backup-management.html', (req, res) => res.render('backup-management'));
 app.get('/location-report.html', (req, res) => res.render('location-report'));
 app.get('/supplier-report.html', (req, res) => res.render('supplier-report'));
+app.get('/invoice-report.html', (req, res) => res.render('invoice-report'));
 
 // Health check with database connectivity test
 app.get('/health', async (req, res) => {

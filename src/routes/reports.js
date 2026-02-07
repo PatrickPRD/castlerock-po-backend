@@ -731,4 +731,76 @@ router.get(
   }
 );
 
+/* ======================================================
+   INVOICE REPORT (SUPER ADMIN ONLY)
+   ====================================================== */
+router.get(
+  '/invoices',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      const { siteId } = req.query;
+      const params = [];
+      let siteFilter = '';
+
+      if (siteId) {
+        siteFilter = 'AND po.site_id = ?';
+        params.push(siteId);
+      }
+
+      const [rows] = await db.query(
+        `
+        SELECT
+          i.id,
+          i.invoice_number,
+          DATE_FORMAT(i.invoice_date, '%Y-%m-%d') AS invoice_date,
+          EXTRACT(MONTH FROM i.invoice_date) AS month_num,
+          MONTHNAME(i.invoice_date) AS month_name,
+          YEAR(i.invoice_date) AS year_num,
+          i.net_amount,
+          i.vat_rate,
+          i.vat_amount,
+          i.total_amount,
+          
+          po.id AS po_id,
+          po.po_number,
+          po.net_amount AS po_net_amount,
+          po.total_amount AS po_total_amount,
+          
+          s.id AS supplier_id,
+          s.name AS supplier,
+          
+          si.id AS site_id,
+          si.name AS site,
+          
+          l.id AS location_id,
+          l.name AS location,
+          
+          ps.id AS stage_id,
+          ps.name AS stage
+
+        FROM invoices i
+        JOIN purchase_orders po ON i.purchase_order_id = po.id
+        JOIN suppliers s ON po.supplier_id = s.id
+        JOIN sites si ON po.site_id = si.id
+        JOIN locations l ON po.location_id = l.id
+        JOIN po_stages ps ON po.stage_id = ps.id
+
+        WHERE po.status NOT IN ('cancelled', 'draft')
+          ${siteFilter}
+
+        ORDER BY i.invoice_date DESC, i.invoice_number DESC
+        `,
+        params
+      );
+
+      res.json(rows);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to load invoice report' });
+    }
+  }
+);
+
 module.exports = router;

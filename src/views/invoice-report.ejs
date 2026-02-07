@@ -1,0 +1,83 @@
+<%- include('partials/head', { title: 'Invoice Report | Castlerock Homes', styles: ['admin.css', 'invoice-report.css'] }) %>
+<%- include('partials/header', { pageTitle: 'Invoice Report' }) %>
+
+<main class="container">
+  <!-- Filter Section -->
+  <div id="filterPanel" class="card dashboard-filters">
+    <div class="filter-row">
+      <label>Site</label>
+      <select id="siteFilter">
+        <option value="">All Sites</option>
+      </select>
+    </div>
+
+    <div class="filter-row">
+      <label>Date From</label>
+      <input type="date" id="dateFrom">
+    </div>
+
+    <div class="filter-row">
+      <label>Date To</label>
+      <input type="date" id="dateTo">
+    </div>
+
+    <div class="filter-row">
+      <label>Supplier</label>
+      <input type="text" id="supplierFilter" placeholder="Search supplier...">
+    </div>
+
+    <div class="filter-actions">
+      <button class="btn btn-outline-secondary" onclick="toggleFilters()">Close</button>
+      <button class="btn btn-outline-secondary" onclick="clearFilters()">Clear Filters</button>
+    </div>
+  </div>
+
+  <!-- Main Card -->
+  <div class="card">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-3 p-3 pt-3">
+      <h3 class="mb-0">Invoices</h3>
+      <div class="d-flex flex-column flex-md-row gap-2 w-100 w-md-auto">
+        <input type="text" id="searchInput" placeholder="Search invoices..." class="form-control">
+        <button class="btn btn-outline-secondary" onclick="toggleFilters()">
+          <i class="bi bi-funnel me-1"></i>Filters
+        </button>
+        <button class="btn btn-outline-primary" onclick="exportExcel()">
+          <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
+        </button>
+      </div>
+    </div>
+
+    <table class="po-table">
+      <thead>
+        <tr>
+          <th onclick="sortTable('id')" class="sortable">ID <span class="sort-indicator"></span></th>
+          <th onclick="sortTable('invoice_date')" class="sortable">Date <span class="sort-indicator"></span></th>
+          <th onclick="sortTable('invoice_number')" class="sortable">Supplier Ref <span class="sort-indicator"></span></th>
+          <th onclick="sortTable('po_number')" class="sortable">PO # <span class="sort-indicator"></span></th>
+          <th onclick="sortTable('supplier')" class="sortable">Supplier <span class="sort-indicator"></span></th>
+          <th onclick="sortTable('net_amount')" class="sortable">Net (€) <span class="sort-indicator"></span></th>
+          <th onclick="sortTable('total_amount')" class="sortable">Total (€) <span class="sort-indicator"></span></th>
+        </tr>
+      </thead>
+      <tbody id="invoiceTable"></tbody>
+    </table>
+  </div>
+
+  <!-- Totals Bar -->
+  <div id="totalsBar" class="totals-bar">
+    <div>
+      <strong>Count:</strong>
+      <span id="invoiceCount">0</span>
+    </div>
+    <div>
+      <strong>Total Net (ex VAT):</strong>
+      <span id="totalNet">€0.00</span>
+    </div>
+    <div>
+      <strong>Total Gross (inc VAT):</strong>
+      <span id="totalGross">€0.00</span>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/footer', { scripts: ['/ui.js', 'invoice-report.js'], includeNavScript: true }) %>

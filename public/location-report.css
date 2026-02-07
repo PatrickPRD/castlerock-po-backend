@@ -23,7 +23,7 @@
 /* Details row */
 .details-row td {
   padding: 8px 12px;
-  background: #fafafa;
+  background: #fafafac0;
 }
 
 /* Inner table should not affect layout */

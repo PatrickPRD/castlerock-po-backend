@@ -1,0 +1,154 @@
+/* =====================================================
+   INVOICE REPORT STYLES
+   ===================================================== */
+
+/* Filter Panel */
+#filterPanel {
+  display: none;
+}
+
+/* Sort functionality - Desktop only */
+@media (min-width: 769px) {
+  .sortable {
+    cursor: pointer;
+    user-select: none;
+  }
+  
+  .sortable:hover {
+    background-color: #f3f4f6;
+  }
+}
+
+@media (max-width: 768px) {
+  .sortable {
+    pointer-events: none;
+  }
+  
+  .sort-indicator {
+    display: none;
+  }
+}
+
+/* Main Row Styling */
+.po-row {
+  background-color: #e5e7eb;
+}
+
+/* Details Wrapper */
+.details-wrapper {
+  padding: 1.5rem;
+  background: #f9fafb;
+}
+
+/* Hierarchical Details Layout */
+.po-details-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.details-group {
+  background-color: #ffffff;
+  border-left: 4px solid #2563eb;
+  padding: 1rem;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.details-group h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #2563eb;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.details-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.details-grid div {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.95rem;
+  color: #374151;
+}
+
+.details-grid strong {
+  font-weight: 600;
+  color: #111827;
+  margin-right: 1rem;
+}
+
+.details-grid .total-amount {
+  font-weight: 700;
+  color: #059669;
+  font-size: 1rem;
+}
+
+.details-grid .vat-rate {
+  font-weight: 600;
+  color: #d97706;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  /* Override admin.css table styles for details row */
+  .po-table .details-row {
+    display: block !important;
+    width: 100% !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  
+  .po-table .details-row td {
+    display: block !important;
+    width: 100% !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+  
+  .details-wrapper {
+    background: #d1d5db !important;
+    padding: 1rem !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    display: block !important;
+  }
+  
+  .po-details-section {
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+    gap: 1rem;
+  }
+  
+  .details-group {
+    border-left: none;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+  }
+  
+  .details-grid div {
+    flex-direction: column;
+  }
+  
+  .details-grid strong {
+    margin-bottom: 0.25rem;
+    margin-right: 0;
+  }
+}
+
+/* Desktop Search Input Width */
+@media (min-width: 769px) {
+  #searchInput {
+    min-width: 250px;
+  }
+}
