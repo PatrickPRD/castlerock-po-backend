@@ -8,6 +8,7 @@ if (!token || role !== 'super_admin') {
 
 const table = document.getElementById('invoiceTable');
 const siteFilter = document.getElementById('siteFilter');
+const locationFilter = document.getElementById('locationFilter');
 const searchInput = document.getElementById('searchInput');
 const supplierFilter = document.getElementById('supplierFilter');
 const dateFrom = document.getElementById('dateFrom');
@@ -65,6 +66,39 @@ async function loadSites() {
 }
 
 /* =========================
+   Load Locations
+   ========================= */
+async function loadLocations(siteId) {
+  if (!siteId) {
+    locationFilter.innerHTML = `<option value="">All Locations</option>`;
+    locationFilter.disabled = true;
+    return;
+  }
+
+  try {
+    const res = await fetch(`/locations?siteId=${siteId}`, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+
+    const locations = await res.json();
+    locationFilter.innerHTML = `<option value="">All Locations</option>`;
+
+    locations.forEach(l => {
+      const opt = document.createElement('option');
+      opt.value = l.id;
+      opt.textContent = l.name;
+      locationFilter.appendChild(opt);
+    });
+
+    locationFilter.disabled = false;
+  } catch (err) {
+    console.error('Failed to load locations:', err);
+    locationFilter.innerHTML = `<option value="">All Locations</option>`;
+    locationFilter.disabled = true;
+  }
+}
+
+/* =========================
    Load Invoices
    ========================= */
 async function loadInvoices() {
@@ -80,6 +114,10 @@ async function loadInvoices() {
   });
 
   allData = await res.json();
+  
+  // Load locations for selected site
+  await loadLocations(siteId);
+  
   applyFilters();
 }
 
@@ -145,6 +183,7 @@ function applyFilters() {
   
   const searchTerm = searchInput.value.toLowerCase();
   const supplierTerm = supplierFilter.value.toLowerCase();
+  const locationId = locationFilter.value;
   const fromDate = dateFrom.value;
   const toDate = dateTo.value;
 
@@ -165,6 +204,11 @@ function applyFilters() {
 
     // Supplier filter
     if (supplierTerm && !inv.supplier.toLowerCase().includes(supplierTerm)) {
+      return false;
+    }
+
+    // Location filter
+    if (locationId && String(inv.location_id) !== locationId) {
       return false;
     }
 
@@ -305,11 +349,13 @@ function toggleFilters() {
    ========================= */
 function clearFilters() {
   siteFilter.value = '';
+  locationFilter.value = '';
+  locationFilter.disabled = true;
   searchInput.value = '';
   supplierFilter.value = '';
   dateFrom.value = '';
   dateTo.value = '';
-  applyFilters();
+  loadInvoices();
 }
 
 /* =========================
@@ -319,6 +365,7 @@ async function exportExcel() {
   // Get filtered data
   const searchTerm = searchInput.value.toLowerCase();
   const supplierTerm = supplierFilter.value.toLowerCase();
+  const locationId = locationFilter.value;
   const fromDate = dateFrom.value;
   const toDate = dateTo.value;
 
@@ -333,6 +380,10 @@ async function exportExcel() {
     }
 
     if (supplierTerm && !inv.supplier.toLowerCase().includes(supplierTerm)) {
+      return false;
+    }
+
+    if (locationId && String(inv.location_id) !== locationId) {
       return false;
     }
 
@@ -614,6 +665,7 @@ async function exportExcel() {
    Event Listeners
    ========================= */
 siteFilter.addEventListener('change', loadInvoices);
+locationFilter.addEventListener('change', applyFilters);
 searchInput.addEventListener('input', applyFilters);
 supplierFilter.addEventListener('input', applyFilters);
 dateFrom.addEventListener('change', applyFilters);

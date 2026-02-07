@@ -7,6 +7,13 @@
   display: none;
 }
 
+/* Disabled location filter */
+#locationFilter:disabled {
+  background-color: #e5e7eb;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 /* Sort functionality - Desktop only */
 @media (min-width: 769px) {
   .sortable {

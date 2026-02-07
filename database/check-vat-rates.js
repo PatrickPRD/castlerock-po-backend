@@ -28,7 +28,7 @@ const config = {
     const [invs] = await conn.query(`
       SELECT id, invoice_number, vat_rate 
       FROM invoices 
-      WHERE vat_rate NOT IN (0, 13.5, 23) 
+      WHERE vat_rate NOT IN (0, 0.135, 0.23) 
       LIMIT 20
     `);
     console.log('\n=== Invoices with invalid VAT rates ===');
