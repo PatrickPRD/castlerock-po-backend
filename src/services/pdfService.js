@@ -97,6 +97,8 @@ class PDFService {
       stage
     } = poData;
 
+    const lineItems = Array.isArray(poData.line_items) ? poData.line_items : [];
+
     // Use website theme colors - header uses dark navbar background from Bootstrap
     const headerColor = '#212529'; // Bootstrap bg-dark color to match website navbar
     const accentColor = settings.accent_color || '#c62828'; // Primary red for accents
@@ -140,6 +142,45 @@ class PDFService {
       month: 'long',
       day: 'numeric'
     });
+
+    // Build line items table HTML
+    let lineItemsHtml = '';
+    if (lineItems.length > 0) {
+      lineItemsHtml = `
+        <div class="section">
+          <div class="section-title">Line Items</div>
+          <table class="line-items-table">
+            <thead>
+              <tr style="background-color: #f5f6f8;">
+                <th style="padding: 6px; text-align: left; font-weight: 600; font-size: 11px;">Description</th>
+                <th style="padding: 6px; text-align: right; font-weight: 600; font-size: 11px;">Qty</th>
+                <th style="padding: 6px; text-align: left; font-weight: 600; font-size: 11px;">Unit</th>
+                <th style="padding: 6px; text-align: right; font-weight: 600; font-size: 11px;">Unit Cost</th>
+                <th style="padding: 6px; text-align: right; font-weight: 600; font-size: 11px;">Line Total</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      lineItems.forEach((item, index) => {
+        const rowBg = index % 2 === 0 ? '#ffffff' : '#f9f9f9';
+        lineItemsHtml += `
+              <tr style="background-color: ${rowBg}; border-bottom: 1px solid #eee;">
+                <td style="padding: 6px; font-size: 11px;">${this.escapeHtml(item.description || '')}</td>
+                <td style="padding: 6px; text-align: right; font-size: 11px;">${Number(item.quantity || 0).toFixed(2)}</td>
+                <td style="padding: 6px; font-size: 11px;">${this.escapeHtml(item.unit || '')}</td>
+                <td style="padding: 6px; text-align: right; font-size: 11px;">€${Number(item.unit_price || 0).toFixed(2)}</td>
+                <td style="padding: 6px; text-align: right; font-size: 11px; font-weight: 500;">€${Number(item.line_total || 0).toFixed(2)}</td>
+              </tr>
+        `;
+      });
+
+      lineItemsHtml += `
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
 
     // Build invoices table HTML
     let invoicesHtml = '';
@@ -357,9 +398,18 @@ class PDFService {
             margin-bottom: 8px;
             font-size: 12px;
           }
+
+          .line-items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 8px;
+            font-size: 12px;
+          }
           
           .invoices-table th,
-          .invoices-table td {
+          .invoices-table td,
+          .line-items-table th,
+          .line-items-table td {
             border: 1px solid #e0e0e0;
           }
           
@@ -447,6 +497,8 @@ class PDFService {
               </div>
             </div>
             ` : ''}
+
+            ${lineItemsHtml}
 
             <!-- Invoices Section -->
             ${invoicesHtml}

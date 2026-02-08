@@ -7,6 +7,34 @@ const db = require('../db');
 const { generatePONumber } = require('../services/poService');
 const logAudit = require('../services/auditService');
 
+function normalizeLineItems(lineItems) {
+  if (!Array.isArray(lineItems)) return [];
+
+  return lineItems
+    .map((item, index) => {
+      const description = String(item.description || '').trim();
+      const quantity = Number(item.quantity) || 0;
+      const unit = item.unit ? String(item.unit).trim() : null;
+      const unitPrice = Number(item.unitPrice ?? item.unit_price) || 0;
+
+      return {
+        line_number: index + 1,
+        description,
+        quantity,
+        unit,
+        unit_price: unitPrice
+      };
+    })
+    .filter(item => item.description && item.quantity > 0 && item.unit_price >= 0);
+}
+
+function calculateLineItemsNet(lineItems) {
+  return lineItems.reduce(
+    (sum, item) => sum + item.quantity * item.unit_price,
+    0
+  );
+}
+
 /* ======================================================
    GET ALL PURCHASE ORDERS (Dashboard)
    ====================================================== */
@@ -52,6 +80,38 @@ router.get(
   }
 );
 
+
+/* ======================================================
+  LINE ITEM SEARCH (SUGGESTIONS)
+  ====================================================== */
+router.get(
+  '/line-items/search',
+  authenticate,
+  authorizeRoles('super_admin', 'admin', 'staff'),
+  async (req, res) => {
+    const q = String(req.query.q || '').trim();
+
+    if (!q) {
+      return res.json([]);
+    }
+
+    const [rows] = await db.query(
+      `
+      SELECT
+        description,
+        MAX(updated_at) AS last_used
+      FROM po_line_items
+      WHERE description LIKE ?
+      GROUP BY description
+      ORDER BY last_used DESC
+      LIMIT 10
+      `,
+      [`%${q}%`]
+    );
+
+    res.json(rows.map(row => row.description));
+  }
+);
 
 /* ======================================================
    GET SINGLE PURCHASE ORDER
@@ -121,11 +181,30 @@ router.get(
       [poId]
     );
 
+    /* ---------------- LINE ITEMS ---------------- */
+    const [lineItems] = await db.query(
+      `
+      SELECT
+        id,
+        line_number,
+        description,
+        quantity,
+        unit,
+        unit_price,
+        line_total
+      FROM po_line_items
+      WHERE po_id = ?
+      ORDER BY line_number ASC, id ASC
+      `,
+      [poId]
+    );
+
     /* ---------------- UNINVOICED (EX VAT) ---------------- */
     const invoicedNet = invoices.reduce((sum, i) => sum + Number(i.net_amount), 0);
     po.uninvoiced_net = +(po.net_amount - invoicedNet).toFixed(2);
 
     po.invoices = invoices;
+    po.line_items = lineItems;
 
     res.json(po);
   }
@@ -147,7 +226,8 @@ router.post(
       poDate,
       description,
       netAmount,
-      vatRate
+      vatRate,
+      lineItems
     } = req.body;
 
     if (!supplierId || !siteId || !locationId || !poDate) {
@@ -161,46 +241,80 @@ router.post(
       return res.status(400).json({ error: 'Stage is required' });
     }
     try {
-      const net = Number(netAmount) || 0;
+      const normalizedLineItems = normalizeLineItems(lineItems);
+      const net = normalizedLineItems.length
+        ? calculateLineItemsNet(normalizedLineItems)
+        : Number(netAmount) || 0;
       const vatPercent = Number(vatRate) || 0;
       const vatDecimal = vatPercent / 100; // Convert percentage to decimal (13.5 -> 0.135)
       const total = net + (net * vatPercent / 100);
 
-      const poNumber = await generatePONumber(db, siteId);
+      const conn = await db.getConnection();
+      try {
+        await conn.beginTransaction();
 
-      await db.query(`
-        INSERT INTO purchase_orders
-          (
-            po_number,
-            supplier_id,
-            site_id,
-            location_id,
-            po_date,
-            description,
-            net_amount,
-            vat_rate,
-            total_amount,
-            created_by,
-            status,
-            stage_id
-          )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        poNumber,
-        supplierId,
-        siteId,
-        locationId,
-        poDate,
-        description || '',
-        net,
-        vatDecimal,
-        total,
-        req.user.id,
-        'Issued',
-        stageId
-      ]);
+        const poNumber = await generatePONumber(conn, siteId);
 
-      res.json({ success: true, poNumber });
+        const [result] = await conn.query(`
+          INSERT INTO purchase_orders
+            (
+              po_number,
+              supplier_id,
+              site_id,
+              location_id,
+              po_date,
+              description,
+              net_amount,
+              vat_rate,
+              total_amount,
+              created_by,
+              status,
+              stage_id
+            )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+          poNumber,
+          supplierId,
+          siteId,
+          locationId,
+          poDate,
+          normalizedLineItems.length ? '' : (description || ''),
+          net,
+          vatDecimal,
+          total,
+          req.user.id,
+          'Issued',
+          stageId
+        ]);
+
+        if (normalizedLineItems.length) {
+          const values = normalizedLineItems.map((item, index) => [
+            result.insertId,
+            index + 1,
+            item.description,
+            item.quantity,
+            item.unit,
+            item.unit_price
+          ]);
+
+          await conn.query(
+            `
+            INSERT INTO po_line_items
+              (po_id, line_number, description, quantity, unit, unit_price)
+            VALUES ?
+            `,
+            [values]
+          );
+        }
+
+        await conn.commit();
+        res.json({ success: true, poNumber });
+      } catch (error) {
+        await conn.rollback();
+        throw error;
+      } finally {
+        conn.release();
+      }
 
     } catch (err) {
       console.error('CREATE PO ERROR:', err);
@@ -226,41 +340,82 @@ router.put(
       description,
       netAmount,
       vatRate,
-      stageId
+      stageId,
+      lineItems
     } = req.body;
 
-    const net = Number(netAmount) || 0;
+    const normalizedLineItems = normalizeLineItems(lineItems);
+    const net = normalizedLineItems.length
+      ? calculateLineItemsNet(normalizedLineItems)
+      : Number(netAmount) || 0;
     const vatPercent = Number(vatRate) || 0;
     const vatDecimal = vatPercent / 100; // Convert percentage to decimal (13.5 -> 0.135)
     const total = net + (net * vatPercent / 100);
 
-    await db.query(`
-      UPDATE purchase_orders
-      SET
-        supplier_id = ?,
-        site_id = ?,
-        location_id = ?,
-        po_date = ?,
-        description = ?,
-        net_amount = ?,
-        vat_rate = ?,
-        total_amount = ?,
-        stage_id = ?
-      WHERE id = ?
-    `, [
-      supplierId,
-      siteId,
-      locationId,
-      poDate,
-      description || '',
-      net,
-      vatDecimal,
-      total,
-      stageId,
-      id
-    ]);
+    const conn = await db.getConnection();
+    try {
+      await conn.beginTransaction();
 
-    res.json({ success: true });
+      await conn.query(`
+        UPDATE purchase_orders
+        SET
+          supplier_id = ?,
+          site_id = ?,
+          location_id = ?,
+          po_date = ?,
+          description = ?,
+          net_amount = ?,
+          vat_rate = ?,
+          total_amount = ?,
+          stage_id = ?
+        WHERE id = ?
+      `, [
+        supplierId,
+        siteId,
+        locationId,
+        poDate,
+        normalizedLineItems.length ? '' : (description || ''),
+        net,
+        vatDecimal,
+        total,
+        stageId,
+        id
+      ]);
+
+      await conn.query(
+        'DELETE FROM po_line_items WHERE po_id = ?',
+        [id]
+      );
+
+      if (normalizedLineItems.length) {
+        const values = normalizedLineItems.map((item, index) => [
+          id,
+          index + 1,
+          item.description,
+          item.quantity,
+          item.unit,
+          item.unit_price
+        ]);
+
+        await conn.query(
+          `
+          INSERT INTO po_line_items
+            (po_id, line_number, description, quantity, unit, unit_price)
+          VALUES ?
+          `,
+          [values]
+        );
+      }
+
+      await conn.commit();
+      res.json({ success: true });
+    } catch (error) {
+      await conn.rollback();
+      console.error('UPDATE PO ERROR:', error);
+      res.status(500).json({ error: 'Failed to save changes' });
+    } finally {
+      conn.release();
+    }
   }
 );
 

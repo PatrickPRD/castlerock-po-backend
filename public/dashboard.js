@@ -24,6 +24,251 @@ let openDetailsRow = null;
 
 let allPOs = [];
 
+let createLineItems = null;
+let editLineItems = null;
+
+function initLineItemsManager({
+  toggleBtn,
+  section,
+  body,
+  addBtn,
+  suggestions,
+  descriptionInput,
+  netAmountInput,
+  onTotalsChange,
+  readOnly = false
+}) {
+  if (!toggleBtn || !section || !body || !addBtn || !descriptionInput || !netAmountInput) {
+    return null;
+  }
+
+  let lineItemsMode = false;
+  let searchTimeout = null;
+
+  function setLineItemsMode(enabled) {
+    lineItemsMode = enabled;
+    section.style.display = enabled ? 'block' : 'none';
+    descriptionInput.style.display = enabled ? 'none' : 'block';
+    toggleBtn.textContent = enabled ? 'Use Description' : 'Add Line Items';
+    netAmountInput.disabled = enabled;
+
+    // Only run description-to-line-items logic if there are no existing line items and not loading from .loadItems
+    if (enabled && body.children.length === 0 && !initLineItemsManager._loadingFromLoadItems) {
+      if (descriptionInput && descriptionInput.id === 'editPODescription' && netAmountInput && netAmountInput.id === 'editPONetAmount') {
+        const net = Number(netAmountInput.value) || 0;
+        const descriptionItems = descriptionInput.value
+          .split(',')
+          .map(item => item.trim())
+          .filter(Boolean);
+        if (descriptionItems.length) {
+          descriptionItems.forEach((item, idx) => {
+            if (idx === 0) {
+              addLineItemRow({ description: item, quantity: 1, unitPrice: net });
+            } else {
+              addLineItemRow({ description: item });
+            }
+          });
+        } else {
+          addLineItemRow({ quantity: 1, unitPrice: net });
+        }
+      } else {
+        const descriptionItems = descriptionInput.value
+          .split(',')
+          .map(item => item.trim())
+          .filter(Boolean);
+        if (descriptionItems.length) {
+          descriptionItems.forEach(item => addLineItemRow({ description: item }));
+        } else {
+          addLineItemRow();
+        }
+      }
+    }
+
+    if (!enabled) {
+      // When switching back, set description to comma-separated line item descriptions and net amount to total
+      const descriptions = Array.from(body.querySelectorAll('[data-field="description"]'))
+        .map(input => input.value.trim())
+        .filter(Boolean);
+      if (descriptions.length) {
+        descriptionInput.value = descriptions.join(', ');
+      }
+      // Set net amount to total of line items
+      const rows = Array.from(body.querySelectorAll('tr'));
+      const total = rows.reduce((sum, row) => {
+        const qty = Number(row.querySelector('[data-field="quantity"]').value) || 0;
+        const unitPrice = Number(row.querySelector('[data-field="unitPrice"]').value) || 0;
+        return sum + qty * unitPrice;
+      }, 0);
+      netAmountInput.value = total.toFixed(2);
+    }
+
+    if (enabled) {
+      updateLineItemsNet();
+    }
+
+    onTotalsChange();
+  }
+
+  function updateLineItemsNet() {
+    const rows = Array.from(body.querySelectorAll('tr'));
+    const total = rows.reduce((sum, row) => {
+      const qty = Number(row.querySelector('[data-field="quantity"]').value) || 0;
+      const unitPrice = Number(row.querySelector('[data-field="unitPrice"]').value) || 0;
+      return sum + qty * unitPrice;
+    }, 0);
+
+    netAmountInput.value = total.toFixed(2);
+    onTotalsChange();
+  }
+
+  function handleLineItemInput(row) {
+    const qty = Number(row.querySelector('[data-field="quantity"]').value) || 0;
+    const unitPrice = Number(row.querySelector('[data-field="unitPrice"]').value) || 0;
+    row.querySelector('[data-field="lineTotal"]').textContent = (qty * unitPrice).toFixed(2);
+    updateLineItemsNet();
+  }
+
+  function fetchLineItemSuggestions(query) {
+    if (!suggestions) return;
+    if (!query) {
+      suggestions.innerHTML = '';
+      return;
+    }
+
+    fetch(`/purchase-orders/line-items/search?q=${encodeURIComponent(query)}`, {
+      headers: { Authorization: 'Bearer ' + token }
+    })
+      .then(res => res.json())
+      .then(items => {
+        suggestions.innerHTML = '';
+        items.forEach(item => {
+          const opt = document.createElement('option');
+          opt.value = item;
+          suggestions.appendChild(opt);
+        });
+      })
+      .catch(() => {
+        suggestions.innerHTML = '';
+      });
+  }
+
+  function addLineItemRow(item = {}) {
+    const row = document.createElement('tr');
+
+    row.innerHTML = `
+      <td><input class="line-item-input line-item-desc" data-field="description" type="text" list="${suggestions ? suggestions.id : ''}" value="${item.description || ''}" placeholder="Description"></td>
+      <td><input class="line-item-input line-item-qty" data-field="quantity" type="number" step="0.01" min="0" value="${item.quantity || ''}" placeholder="0"></td>
+      <td><input class="line-item-input line-item-unit" data-field="unit" type="text" value="${item.unit || ''}" placeholder="Unit"></td>
+      <td><input class="line-item-input line-item-cost" data-field="unitPrice" type="number" step="0.01" min="0" value="${item.unit_price || item.unitPrice || ''}" placeholder="0.00"></td>
+      <td class="line-items-total" data-field="lineTotal">0.00</td>
+      <td style="width:1%;white-space:nowrap;text-align:center;"><button type="button" class="btn btn-outline-danger btn-sm line-items-remove" aria-label="Remove line item" title="Remove" data-field="remove" style="z-index:2;position:relative;">&times;</button></td>
+    `;
+
+    const descriptionField = row.querySelector('[data-field="description"]');
+    const qtyField = row.querySelector('[data-field="quantity"]');
+    const unitPriceField = row.querySelector('[data-field="unitPrice"]');
+    const removeBtn = row.querySelector('[data-field="remove"]');
+
+    descriptionField.addEventListener('input', () => {
+      clearTimeout(searchTimeout);
+      const query = descriptionField.value.trim();
+      searchTimeout = setTimeout(() => {
+        if (query.length >= 2) {
+          fetchLineItemSuggestions(query);
+        } else if (suggestions) {
+          suggestions.innerHTML = '';
+        }
+      }, 200);
+    });
+
+    qtyField.addEventListener('input', () => handleLineItemInput(row));
+    unitPriceField.addEventListener('input', () => handleLineItemInput(row));
+
+    removeBtn.addEventListener('click', () => {
+      row.remove();
+      updateLineItemsNet();
+    });
+
+    if (readOnly) {
+      row.querySelectorAll('input').forEach(input => input.disabled = true);
+      removeBtn.disabled = true;
+    }
+
+    body.appendChild(row);
+    handleLineItemInput(row);
+  }
+
+  function collectLineItems() {
+    const rows = Array.from(body.querySelectorAll('tr'));
+    const items = [];
+    let hasIncomplete = false;
+
+    rows.forEach(row => {
+      const descriptionValue = row.querySelector('[data-field="description"]').value.trim();
+      const quantityValue = row.querySelector('[data-field="quantity"]').value;
+      const unitValue = row.querySelector('[data-field="unit"]').value.trim();
+      const unitPriceValue = row.querySelector('[data-field="unitPrice"]').value;
+      const hasAny = descriptionValue || quantityValue || unitValue || unitPriceValue;
+
+      if (!hasAny) {
+        return;
+      }
+
+      const quantity = Number(quantityValue);
+      const unitPrice = Number(unitPriceValue);
+
+      if (!descriptionValue || !quantity || !unitPrice) {
+        hasIncomplete = true;
+        return;
+      }
+
+      items.push({
+        description: descriptionValue,
+        quantity,
+        unit: unitValue || null,
+        unitPrice
+      });
+    });
+
+    return { items, hasIncomplete };
+  }
+
+  function reset() {
+    body.innerHTML = '';
+    setLineItemsMode(false);
+  }
+
+  toggleBtn.addEventListener('click', () => setLineItemsMode(!lineItemsMode));
+  addBtn.addEventListener('click', () => addLineItemRow());
+
+  if (readOnly) {
+    toggleBtn.style.display = 'none';
+    addBtn.style.display = 'none';
+  }
+
+  return {
+    setMode: setLineItemsMode,
+    loadItems(items = []) {
+      body.innerHTML = '';
+      // Prevent description-to-line-items logic from running during .loadItems
+      initLineItemsManager._loadingFromLoadItems = true;
+      if (items.length > 0) {
+        setLineItemsMode(true);
+        items.forEach(item => addLineItemRow(item));
+        updateLineItemsNet();
+      } else {
+        setLineItemsMode(false);
+      }
+      initLineItemsManager._loadingFromLoadItems = false;
+    },
+    collectItems: collectLineItems,
+    isEnabled() {
+      return lineItemsMode;
+    },
+    reset
+  };
+}
+
 /* ============================
    Filter Panel Toggle
    ============================ */
@@ -236,10 +481,7 @@ function renderPO(po) {
           <div><strong>Site:</strong> ${po.site}</div>
           ${po.site_address ? `<div><strong>Site Address:</strong> ${po.site_address}</div>` : ''}
           <div><strong>VAT Rate:</strong> ${formatVat(po.vat_rate)}</div>
-          <div><strong>Total (inc VAT):</strong> €${Number(po.total_amount).toFixed(
-            2
-          )}</div>
-
+          <div><strong>Total (inc VAT):</strong> €${Number(po.total_amount).toFixed(2)}</div>
           <div>
             <strong>Uninvoiced (inc VAT):</strong>
             <span class="${
@@ -253,20 +495,18 @@ function renderPO(po) {
             </span>
           </div>
         </div>
-        
         <div style="flex: 1; min-width: 0;">
-          <div><strong>Description:</strong></div>
-          <div style="padding: 0.75rem; background: #f9f9f9; border-radius: 4px; border-left: 3px solid #007bff; word-wrap: break-word;">
-            ${po.description || '<span style="color: #999;">No description</span>'}
+          <div id="po-desc-wrapper-${po.id}">
+            <div><strong>Description:</strong></div>
+            <div id="po-desc-${po.id}" style="padding: 0.75rem; background: #f9f9f9; border-radius: 4px; border-left: 3px solid #007bff; word-wrap: break-word;">
+              <span style="color: #999;">Loading…</span>
+            </div>
           </div>
         </div>
       </div>
-
-
       <div class="invoice-container" id="inv-${po.id}">
         <p class="muted">Loading invoices…</p>
       </div>
-
       <div class="details-actions">
         <button class="btn btn-outline-primary" onclick="editPO(${po.id})">Edit PO</button>
         <button class="btn btn-outline-secondary" onclick="event.stopPropagation(); downloadPOPDF(${po.id}, this)">
@@ -283,43 +523,63 @@ function renderPO(po) {
             : ""
         }
       </div>
-          </div> 
+    </div> 
     </td>
   `;
 
-  let loaded = false;
 
-  mainRow.onclick = () => {
+  let loaded = false;
+  let lineItemsLoaded = false;
+
+  mainRow.onclick = async () => {
     const isOpen = detailsRow.classList.contains("open");
 
     // Close previously open PO
     if (openDetailsRow && openDetailsRow !== detailsRow) {
       openDetailsRow.classList.remove("open");
       openDetailsRow.style.display = "none";
-
-      // remove highlight from previous main row
       openDetailsRow.previousSibling?.classList.remove("open", "active");
     }
 
     if (isOpen) {
-      // Close current
       detailsRow.classList.remove("open");
       detailsRow.style.display = "none";
       mainRow.classList.remove("open", "active");
       openDetailsRow = null;
     } else {
-      // Open current
       detailsRow.style.display = "table-row";
       detailsRow.classList.add("open");
       mainRow.classList.add("open", "active");
       openDetailsRow = detailsRow;
+
+      // Lazy load line items for this PO
+      if (!lineItemsLoaded) {
+        try {
+          const res = await fetch(`/purchase-orders/${po.id}`, { headers: { Authorization: "Bearer " + token } });
+          if (res.ok) {
+            const data = await res.json();
+            const descDiv = document.getElementById(`po-desc-${po.id}`);
+            if (Array.isArray(data.line_items) && data.line_items.length > 0) {
+              // Show line items as comma-separated values in the description wrapper
+              const lineItemsText = data.line_items.map(item => item.description).filter(Boolean).join(', ');
+              descDiv.innerHTML = lineItemsText || '<span style="color: #999;">No line items</span>';
+            } else {
+              descDiv.innerHTML = data.description || '<span style="color: #999;">No description</span>';
+            }
+          }
+        } catch (e) {
+          // fallback
+          const descDiv = document.getElementById(`po-desc-${po.id}`);
+          if (descDiv) descDiv.innerHTML = '<span style="color: #999;">Failed to load details</span>';
+        }
+        lineItemsLoaded = true;
+      }
 
       if (!loaded) {
         loadInvoices(po.id, document.getElementById(`inv-${po.id}`));
         loaded = true;
       }
 
-      // 🔽 Ensure expanded PO is not hidden behind sticky bar
       requestAnimationFrame(() => {
         scrollExpandedRowIntoView(detailsRow);
       });
@@ -409,6 +669,7 @@ async function editPO(id) {
     document.getElementById("editPODate").value = po.po_date.split('T')[0];
     document.getElementById("editPODescription").value = po.description || "";
     document.getElementById("editPONetAmount").value = po.net_amount;
+    let originalNetAmount = po.net_amount;
     
     // Convert decimal VAT rate to percentage for dropdown (0.135 -> 13.5)
     const vatRatePercent = po.vat_rate < 1 ? po.vat_rate * 100 : po.vat_rate;
@@ -427,6 +688,15 @@ async function editPO(id) {
       await loadEditPOLocations(po.site_id, po.location_id);
     }
     
+
+    if (editLineItems) {
+      editLineItems.loadItems(po.line_items || []);
+      // If not in line items mode, restore the original net amount
+      if (!editLineItems.isEnabled()) {
+        document.getElementById("editPONetAmount").value = originalNetAmount;
+      }
+    }
+
     // Recalculate totals
     recalcEditPO();
     
@@ -441,6 +711,9 @@ function closeEditPOModal() {
   const modal = document.getElementById("editPOModal");
   modal.style.display = "none";
   document.getElementById("editPOForm").reset();
+  if (editLineItems) {
+    editLineItems.reset();
+  }
 }
 
 function addInvoice(id) {
@@ -789,12 +1062,20 @@ function openCreatePOModal() {
   document.getElementById("poTotalAmount").textContent = "0.00";
   document.getElementById("poSupplierSearch").value = "";
   document.getElementById("poSupplier").value = "";
+
+  if (createLineItems) {
+    createLineItems.reset();
+  }
 }
 
 function closeCreatePOModal() {
   const modal = document.getElementById("createPOModal");
   modal.style.display = "none";
   document.getElementById("poForm").reset();
+
+  if (createLineItems) {
+    createLineItems.reset();
+  }
 }
 
 async function loadPOSuppliers() {
@@ -949,6 +1230,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const vatRate = document.getElementById("poVatRate");
   const vatAmount = document.getElementById("poVatAmount");
   const totalAmount = document.getElementById("poTotalAmount");
+  const poDescription = document.getElementById("poDescription");
+  const poToggleLineItems = document.getElementById("poToggleLineItems");
+  const poLineItemsSection = document.getElementById("poLineItemsSection");
+  const poLineItemsBody = document.getElementById("poLineItemsBody");
+  const poAddLineItem = document.getElementById("poAddLineItem");
+  const poLineItemSuggestions = document.getElementById("poLineItemSuggestions");
   
   function recalcPO() {
     const net = Number(netAmount.value) || 0;
@@ -962,6 +1249,18 @@ document.addEventListener("DOMContentLoaded", () => {
   
   if (netAmount) netAmount.addEventListener("input", recalcPO);
   if (vatRate) vatRate.addEventListener("change", recalcPO);
+
+  createLineItems = initLineItemsManager({
+    toggleBtn: poToggleLineItems,
+    section: poLineItemsSection,
+    body: poLineItemsBody,
+    addBtn: poAddLineItem,
+    suggestions: poLineItemSuggestions,
+    descriptionInput: poDescription,
+    netAmountInput: netAmount,
+    onTotalsChange: recalcPO,
+    readOnly: role === 'viewer'
+  });
   
   // Form submission
   const poForm = document.getElementById("poForm");
@@ -979,6 +1278,20 @@ document.addEventListener("DOMContentLoaded", () => {
         netAmount: Number(document.getElementById("poNetAmount").value) || 0,
         vatRate: Number(document.getElementById("poVatRate").value) || 0
       };
+
+      if (createLineItems && createLineItems.isEnabled()) {
+        const { items, hasIncomplete } = createLineItems.collectItems();
+        if (hasIncomplete) {
+          showToast("Please complete all line item fields", "error");
+          return;
+        }
+        if (items.length === 0) {
+          showToast("Add at least one line item", "error");
+          return;
+        }
+        payload.lineItems = items;
+        payload.description = '';
+      }
       
       if (!payload.supplierId || !payload.siteId || !payload.locationId || !payload.poDate || !payload.stageId) {
         showToast("Supplier, site, location, stage and date are required", "error");
@@ -1118,9 +1431,27 @@ document.addEventListener("DOMContentLoaded", () => {
   // VAT calculation for edit modal
   const editNetAmount = document.getElementById("editPONetAmount");
   const editVatRate = document.getElementById("editPOVatRate");
+  const editDescription = document.getElementById("editPODescription");
+  const editToggleLineItems = document.getElementById("editPOToggleLineItems");
+  const editLineItemsSection = document.getElementById("editPOLineItemsSection");
+  const editLineItemsBody = document.getElementById("editPOLineItemsBody");
+  const editAddLineItem = document.getElementById("editPOAddLineItem");
+  const editLineItemSuggestions = document.getElementById("editPOLineItemSuggestions");
   
   if (editNetAmount) editNetAmount.addEventListener("input", recalcEditPO);
   if (editVatRate) editVatRate.addEventListener("change", recalcEditPO);
+
+  editLineItems = initLineItemsManager({
+    toggleBtn: editToggleLineItems,
+    section: editLineItemsSection,
+    body: editLineItemsBody,
+    addBtn: editAddLineItem,
+    suggestions: editLineItemSuggestions,
+    descriptionInput: editDescription,
+    netAmountInput: editNetAmount,
+    onTotalsChange: recalcEditPO,
+    readOnly: role === 'viewer'
+  });
   
   // Edit form submission
   const editPOForm = document.getElementById("editPOForm");
@@ -1141,6 +1472,20 @@ document.addEventListener("DOMContentLoaded", () => {
         netAmount: Number(document.getElementById("editPONetAmount").value) || 0,
         vatRate: Number(document.getElementById("editPOVatRate").value) || 0
       };
+
+      if (editLineItems && editLineItems.isEnabled()) {
+        const { items, hasIncomplete } = editLineItems.collectItems();
+        if (hasIncomplete) {
+          showToast("Please complete all line item fields", "error");
+          return;
+        }
+        if (items.length === 0) {
+          showToast("Add at least one line item", "error");
+          return;
+        }
+        payload.lineItems = items;
+        payload.description = '';
+      }
       
       if (!payload.supplierId || !payload.siteId || !payload.locationId || !payload.poDate || !payload.stageId) {
         showToast("Supplier, site, location, stage and date are required", "error");

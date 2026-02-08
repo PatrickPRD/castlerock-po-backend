@@ -1,0 +1,145 @@
+.field-with-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.line-items-section {
+  margin-top: 10px;
+}
+
+/* Ensure modal scrolls, not background page */
+.line-items-section .table-responsive {
+  max-height: 350px;
+  overflow-y: auto;
+}
+
+.line-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: fixed;
+}
+
+/* Adjust column widths: unit cost is 2/3 its previous size, qty is 50% larger */
+.line-items-table th:nth-child(1),
+.line-items-table td:nth-child(1) {
+  width: 44% !important;
+}
+
+.line-items-table th:nth-child(2),
+.line-items-table td:nth-child(2) {
+  width: 12% !important; /* qty: 8% * 1.5 = 12% */
+}
+
+.line-items-table th:nth-child(3),
+.line-items-table td:nth-child(3) {
+  width: 16% !important;
+}
+
+.line-items-th:nth-child(4),
+.line-items-table td:nth-child(4) {
+  width: 10.7% !important; /* unit cost: 16% * 2/3 = 10.7% */
+}
+
+.line-items-table th:nth-child(5),
+.line-items-table td:nth-child(5) {
+  width: 8% !important;
+}
+
+.line-items-table th:nth-child(6),
+.line-items-table td:nth-child(6) {
+  width: 8% !important;
+}
+
+.line-items-table {
+  table-layout: fixed !important;
+}
+
+.line-items-table th,
+.line-table td {
+  border: 1px solid #e0e0e0;
+  padding: 6px;
+  overflow: hidden;
+}
+
+.line-items-table th {
+  background: #f5f6f8;
+  font-weight: 600;
+}
+
+.line-items-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.line-items-total {
+  text-align: right;
+  font-weight: 600;
+}
+
+.line-item-input {
+  width: 100%;
+  min-width: 50px;
+  box-sizing: border-box;
+  height: 28px;
+  padding: 2px 4px;
+  overflow: hidden;
+}
+
+.line-item-desc {
+  min-width: 0;
+}
+
+.line-item-qty {
+  min-width: 0;
+}
+
+.line-item-unit {
+  min-width: 0;
+}
+
+.line-item-cost {
+  min-width: 0;
+}
+
+.line-items-table td {
+  vertical-align: middle;
+}
+
+.line-items-remove {
+  color: #c62828;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 4px;
+}
+.line-item-input[type="number"] {
+  text-align: right;
+}
+
+/* Remove up/down arrows from number inputs for qty and unit cost */
+.line-item-qty::-webkit-outer-spin-button,
+.line-item-qty::-webkit-inner-spin-button,
+.line-item-cost::-webkit-outer-spin-button,
+.line-item-cost::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.line-item-qty[type="number"],
+.line-item-cost[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Ensure modal scrolls, not background page */
+.modal-dialog-scrollable .modal-content {
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+body.modal-open {
+  overflow: hidden !important;
+}

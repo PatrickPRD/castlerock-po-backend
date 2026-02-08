@@ -278,6 +278,7 @@ async function setupDatabase() {
         line_number INT NOT NULL,
         description TEXT NOT NULL,
         quantity DECIMAL(10, 2) NOT NULL,
+        unit VARCHAR(50),
         unit_price DECIMAL(15, 2) NOT NULL,
         line_total DECIMAL(15, 2) GENERATED ALWAYS AS (quantity * unit_price) STORED,
         received_quantity DECIMAL(10, 2) DEFAULT 0.00,

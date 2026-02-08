@@ -1,3 +1,128 @@
+/* Line Items Table - Desktop */
+
+/* Line Items Table - Clean Modern Look */
+.line-items-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 6px;
+  background: none;
+  margin-bottom: 1rem;
+}
+.line-items-table th {
+  background: none;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 6px 4px 6px 0;
+  border: none;
+  color: #333;
+}
+.line-items-table td {
+  background: #f8fafc;
+  border: none;
+  font-size: 15px;
+  padding: 10px 6px 10px 0;
+  vertical-align: middle;
+}
+.line-items-table tr {
+  border-radius: 8px;
+  box-shadow: none;
+}
+.line-items-table td:last-child,
+.line-items-table th:last-child {
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  text-align: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+.line-items-remove {
+  z-index: 2;
+  position: relative;
+  min-width: 32px;
+  width: 32px;
+  text-align: center;
+  display: inline-block;
+}
+
+/* Responsive: Card style for line items on mobile */
+
+@media (max-width: 600px) {
+  .line-items-table {
+    border-spacing: 0;
+    width: 100%;
+  }
+  .line-items-table thead {
+    display: none;
+  }
+  .line-items-table tr {
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    margin-bottom: 14px;
+    border: 1px solid #e0e0e0;
+    padding: 0;
+    width: 100%;
+  }
+  .line-items-table td {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    border: none;
+    font-size: 15px;
+    padding: 8px 12px 2px 12px;
+    width: 100%;
+    background: none;
+    box-sizing: border-box;
+  }
+  .line-items-table td label {
+    font-size: 13px;
+    color: #666;
+    font-weight: 600;
+    margin-bottom: 2px;
+    display: block;
+  }
+  .line-items-table input {
+    width: 100%;
+    font-size: 15px;
+    padding: 7px 8px;
+    border-radius: 6px;
+    border: 1px solid #d1d5db;
+    margin-bottom: 2px;
+    background: #f8fafc;
+    box-sizing: border-box;
+  }
+  .line-items-table td:last-child {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 8px 12px 8px 12px;
+  }
+  .line-items-remove {
+    margin-left: 8px;
+  }
+}
+.line-items-remove {
+  z-index: 2;
+  position: relative;
+}
+@media (max-width: 768px) {
+  .details-wrapper > div {
+    flex-direction: column !important;
+    display: flex !important;
+    width: 100% !important;
+    gap: 0 !important;
+  }
+  .details-grid {
+    margin-bottom: 1rem;
+  }
+  .po-line-items-table {
+    margin-top: 0.5rem;
+  }
+}
 /* =====================================================
    ADMIN – BASE
    ===================================================== */

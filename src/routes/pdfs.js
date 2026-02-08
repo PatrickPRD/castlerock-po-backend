@@ -78,6 +78,21 @@ router.get(
         ORDER BY i.invoice_date DESC
       `, [poId]);
 
+      const [lineItems] = await db.query(`
+        SELECT
+          line_number,
+          description,
+          quantity,
+          unit,
+          unit_price,
+          line_total
+        FROM po_line_items
+        WHERE po_id = ?
+        ORDER BY line_number ASC, id ASC
+      `, [poId]);
+
+      poData.line_items = lineItems;
+
       // Fetch settings
       const settings = await SettingsService.getSettings();
 
@@ -162,6 +177,21 @@ router.get(
         WHERE i.purchase_order_id = ?
         ORDER BY i.invoice_date DESC
       `, [poId]);
+
+      const [lineItems] = await db.query(`
+        SELECT
+          line_number,
+          description,
+          quantity,
+          unit,
+          unit_price,
+          line_total
+        FROM po_line_items
+        WHERE po_id = ?
+        ORDER BY line_number ASC, id ASC
+      `, [poId]);
+
+      poData.line_items = lineItems;
 
       // Fetch settings
       const settings = await SettingsService.getSettings();

@@ -1,15 +1,15 @@
--- Add address column to suppliers table if missing (idempotent for older MySQL)
+-- Add unit column to PO line items (idempotent for older MySQL)
 SET @col_exists = (
   SELECT COUNT(*)
   FROM INFORMATION_SCHEMA.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE()
-    AND TABLE_NAME = 'suppliers'
-    AND COLUMN_NAME = 'address'
+    AND TABLE_NAME = 'po_line_items'
+    AND COLUMN_NAME = 'unit'
 );
 
 SET @sql_add_col = IF(
   @col_exists = 0,
-  'ALTER TABLE suppliers ADD COLUMN address TEXT AFTER phone',
+  'ALTER TABLE po_line_items ADD COLUMN unit VARCHAR(50) AFTER quantity',
   'SELECT 1'
 );
 
