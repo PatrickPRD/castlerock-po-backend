@@ -330,7 +330,7 @@ router.post(
   authenticate,
   authorizeRoles('super_admin'),
   async (req, res) => {
-    const { name, site_code } = req.body;
+    const { name, site_code, address } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Site name is required' });
@@ -344,9 +344,9 @@ router.post(
 
     try {
       await db.query(
-        `INSERT INTO sites (name, site_letter)
-         VALUES (?, ?)`,
-        [name.trim(), site_code.toUpperCase()]
+        `INSERT INTO sites (name, site_letter, address)
+         VALUES (?, ?, ?)`,
+        [name.trim(), site_code.toUpperCase(), address || null]
       );
 
       res.json({ success: true });
@@ -374,7 +374,7 @@ router.put(
   authorizeRoles('super_admin'),
   async (req, res) => {
     const siteId = req.params.id;
-    const { name } = req.body;
+    const { name, address } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Site name is required' });
@@ -382,9 +382,9 @@ router.put(
 
     await db.query(
       `UPDATE sites
-       SET name = ?
+       SET name = ?, address = ?
        WHERE id = ?`,
-      [name.trim(), siteId]
+      [name.trim(), address || null, siteId]
     );
 
     res.json({ success: true });

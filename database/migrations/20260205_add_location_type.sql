@@ -2,8 +2,6 @@
 -- Date: 2026-02-05
 -- Description: Adds the type field to the locations table for categorizing locations
 
-USE castlerock_po_dev;
-
 -- Add type column to locations table
 ALTER TABLE locations 
 ADD COLUMN type VARCHAR(100) DEFAULT NULL AFTER name;

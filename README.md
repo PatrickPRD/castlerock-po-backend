@@ -123,6 +123,46 @@ pm2 save
 npm start
 ```
 
+### 3a. EC2 (Amazon Linux 2023) - Puppeteer Dependencies
+If you plan to use PDF generation on EC2 with Puppeteer, install the required
+Chromium dependencies on the server:
+```bash
+sudo dnf update -y
+sudo dnf install -y \
+  atk \
+  cairo \
+  cups-libs \
+  dbus-glib \
+  expat \
+  fontconfig \
+  freetype \
+  glib2 \
+  gtk3 \
+  libX11 \
+  libXcomposite \
+  libXcursor \
+  libXdamage \
+  libXext \
+  libXfixes \
+  libXi \
+  libXrandr \
+  libXrender \
+  libXScrnSaver \
+  libXtst \
+  nss \
+  pango \
+  alsa-lib \
+  xorg-x11-fonts-Type1 \
+  xorg-x11-fonts-misc \
+  xorg-x11-utils
+
+# Optional: add more fonts
+sudo dnf install -y google-noto-sans-fonts
+
+# If running as non-root, ensure Puppeteer cache is writable
+export PUPPETEER_CACHE_DIR=/home/ec2-user/.cache/puppeteer
+```
+
 ### 4. Security Group Configuration
 Allow inbound traffic on port 3000 (or your chosen port) in EC2 Security Group.
 

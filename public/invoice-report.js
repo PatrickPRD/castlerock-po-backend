@@ -11,6 +11,7 @@ const siteFilter = document.getElementById('siteFilter');
 const locationFilter = document.getElementById('locationFilter');
 const searchInput = document.getElementById('searchInput');
 const supplierFilter = document.getElementById('supplierFilter');
+const supplierFilterWrapper = document.getElementById('supplierFilterWrapper');
 const dateFrom = document.getElementById('dateFrom');
 const dateTo = document.getElementById('dateTo');
 const invoiceCountEl = document.getElementById('invoiceCount');
@@ -99,6 +100,29 @@ async function loadLocations(siteId) {
 }
 
 /* =========================
+   Load Suppliers
+   ========================= */
+async function loadSuppliers() {
+  try {
+    const res = await fetch('/suppliers', {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+
+    const suppliers = await res.json();
+    supplierFilter.innerHTML = `<option value="">All Suppliers</option>`;
+
+    suppliers.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = s.name;
+      supplierFilter.appendChild(opt);
+    });
+  } catch (err) {
+    console.error('Failed to load suppliers:', err);
+  }
+}
+
+/* =========================
    Load Invoices
    ========================= */
 async function loadInvoices() {
@@ -182,7 +206,7 @@ function applyFilters() {
   table.innerHTML = '';
   
   const searchTerm = searchInput.value.toLowerCase();
-  const supplierTerm = supplierFilter.value.toLowerCase();
+  const supplierId = supplierFilter.value;
   const locationId = locationFilter.value;
   const fromDate = dateFrom.value;
   const toDate = dateTo.value;
@@ -203,7 +227,7 @@ function applyFilters() {
     }
 
     // Supplier filter
-    if (supplierTerm && !inv.supplier.toLowerCase().includes(supplierTerm)) {
+    if (supplierId && String(inv.supplier_id) !== supplierId) {
       return false;
     }
 
@@ -263,6 +287,7 @@ function renderInvoice(inv) {
             <div class="details-grid">
               <div><strong>Supplier:</strong> ${inv.supplier}</div>
               <div><strong>Site:</strong> ${inv.site}</div>
+              ${inv.site_address ? `<div><strong>Site Address:</strong> ${inv.site_address}</div>` : ''}
               <div><strong>Location:</strong> ${inv.location}</div>
               <div><strong>Stage:</strong> ${inv.stage}</div>
             </div>
@@ -275,6 +300,15 @@ function renderInvoice(inv) {
               <div><strong>VAT Rate:</strong> <span class="vat-rate">${formatVat(inv.vat_rate)}</span></div>
               <div><strong>VAT Amount:</strong> ${euro(inv.vat_amount)}</div>
               <div><strong>Total Amount (inc VAT):</strong> <span class="total-amount">${euro(inv.total_amount)}</span></div>
+            </div>
+          </div>
+          
+          <div class="details-group">
+            <h3>Actions</h3>
+            <div style="display: flex; gap: 10px;">
+              <button class="btn btn-outline-secondary btn-sm" onclick="event.stopPropagation(); downloadPOPDF(${inv.po_id}, this)">
+                <i class="bi bi-download me-1"></i>Download PO PDF
+              </button>
             </div>
           </div>
         </div>
@@ -364,7 +398,7 @@ function clearFilters() {
 async function exportExcel() {
   // Get filtered data
   const searchTerm = searchInput.value.toLowerCase();
-  const supplierTerm = supplierFilter.value.toLowerCase();
+  const supplierId = supplierFilter.value;
   const locationId = locationFilter.value;
   const fromDate = dateFrom.value;
   const toDate = dateTo.value;
@@ -379,7 +413,7 @@ async function exportExcel() {
       if (!searchMatch) return false;
     }
 
-    if (supplierTerm && !inv.supplier.toLowerCase().includes(supplierTerm)) {
+    if (supplierId && String(inv.supplier_id) !== supplierId) {
       return false;
     }
 
@@ -662,12 +696,150 @@ async function exportExcel() {
 }
 
 /* =========================
+   Setup Searchable Supplier Filter
+   ========================= */
+function setupSearchableSupplierFilter() {
+  const wrapper = supplierFilterWrapper;
+  
+  // Create search input inline
+  const searchInputField = document.createElement('input');
+  searchInputField.type = 'text';
+  searchInputField.placeholder = 'Type to filter...';
+  searchInputField.style.cssText = `
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+  `;
+  
+  // Create dropdown menu for options
+  const dropdown = document.createElement('div');
+  dropdown.className = 'searchable-select-dropdown';
+  dropdown.style.cssText = `
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  `;
+  
+  // Create options container
+  const optionsContainer = document.createElement('div');
+  optionsContainer.className = 'searchable-select-options';
+  optionsContainer.style.cssText = `
+    max-height: 200px;
+    overflow-y: auto;
+  `;
+  
+  dropdown.appendChild(optionsContainer);
+  
+  // Hide the original select
+  supplierFilter.style.display = 'none';
+  
+  wrapper.appendChild(searchInputField);
+  wrapper.appendChild(dropdown);
+  
+  // Get all suppliers from original select options
+  function getSuppliers() {
+    const options = [...supplierFilter.options];
+    return options
+      .filter(opt => opt.value !== '')
+      .map(opt => ({ value: opt.value, text: opt.textContent }))
+      .sort((a, b) => a.text.localeCompare(b.text));
+  }
+  
+  // Render options
+  function renderOptions(filter = '') {
+    optionsContainer.innerHTML = '';
+    const suppliers = getSuppliers();
+    const filtered = suppliers.filter(s => 
+      s.text.toLowerCase().includes(filter.toLowerCase())
+    );
+    
+    // Show dropdown if there's a filter term or if focused
+    if (filter.trim() !== '' || searchInputField === document.activeElement) {
+      dropdown.style.display = 'block';
+    }
+    
+    // "All" option
+    const allDiv = document.createElement('div');
+    allDiv.style.cssText = `
+      padding: 0.5rem;
+      cursor: pointer;
+      border-bottom: 1px solid #f0f0f0;
+      transition: background 0.2s;
+    `;
+    allDiv.textContent = 'All Suppliers';
+    allDiv.onmouseenter = () => allDiv.style.background = '#f5f5f5';
+    allDiv.onmouseleave = () => allDiv.style.background = '';
+    allDiv.onclick = () => {
+      supplierFilter.value = '';
+      searchInputField.value = '';
+      dropdown.style.display = 'none';
+      applyFilters();
+    };
+    optionsContainer.appendChild(allDiv);
+    
+    if (filtered.length === 0) {
+      const noResults = document.createElement('div');
+      noResults.style.cssText = 'padding: 0.5rem; color: #999; text-align: center;';
+      noResults.textContent = 'No suppliers found';
+      optionsContainer.appendChild(noResults);
+      return;
+    }
+    
+    filtered.forEach(supplier => {
+      const div = document.createElement('div');
+      div.style.cssText = `
+        padding: 0.5rem;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+        transition: background 0.2s;
+      `;
+      
+      div.textContent = supplier.text;
+      
+      div.onmouseenter = () => div.style.background = '#f5f5f5';
+      div.onmouseleave = () => div.style.background = '';
+      div.onclick = () => {
+        supplierFilter.value = supplier.value;
+        searchInputField.value = supplier.text;
+        dropdown.style.display = 'none';
+        applyFilters();
+      };
+      
+      optionsContainer.appendChild(div);
+    });
+  }
+  
+  // Focus on input shows dropdown
+  searchInputField.addEventListener('focus', () => {
+    renderOptions(searchInputField.value);
+  });
+  
+  // Filter on input
+  searchInputField.addEventListener('input', (e) => {
+    renderOptions(e.target.value);
+  });
+  
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!wrapper.contains(e.target)) {
+      dropdown.style.display = 'none';
+    }
+  });
+}
+
+/* =========================
    Event Listeners
    ========================= */
 siteFilter.addEventListener('change', loadInvoices);
 locationFilter.addEventListener('change', applyFilters);
 searchInput.addEventListener('input', applyFilters);
-supplierFilter.addEventListener('input', applyFilters);
 dateFrom.addEventListener('change', applyFilters);
 dateTo.addEventListener('change', applyFilters);
 
@@ -683,5 +855,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   dateFrom.value = lastMonth.toISOString().slice(0, 10);
 
   await loadSites();
+  await loadSuppliers();
   await loadInvoices();
+  setupSearchableSupplierFilter();
 });

@@ -100,6 +100,14 @@ app.use('/invoices', invoiceRoutes);
 const reportRoutes = require('./routes/reports');
 app.use('/reports', reportRoutes);
 
+// PDFs
+const pdfRoutes = require('./routes/pdfs');
+app.use('/pdfs', pdfRoutes);
+
+// Settings
+const settingsRoutes = require('./routes/settings');
+app.use('/settings', settingsRoutes);
+
 // ✅ EXPORTS — THIS IS THE CRITICAL PART
 const exportRoutes = require('./routes/exports');
 app.use('/exports', exportRoutes);

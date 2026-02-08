@@ -773,6 +773,7 @@ router.get(
           
           si.id AS site_id,
           si.name AS site,
+          si.address AS site_address,
           
           l.id AS location_id,
           l.name AS location,

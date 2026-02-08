@@ -30,7 +30,10 @@
 
     <div class="filter-row">
       <label>Supplier</label>
-      <input type="text" id="supplierFilter" placeholder="Search supplier...">
+      <select id="supplierFilter">
+        <option value="">All Suppliers</option>
+      </select>
+      <div id="supplierFilterWrapper" style="position: relative; margin-top: 0.5rem;"></div>
     </div>
 
     <div class="filter-actions">
@@ -87,4 +90,4 @@
   </div>
 </main>
 
-<%- include('partials/footer', { scripts: ['/ui.js', 'invoice-report.js'], includeNavScript: true }) %>
+<%- include('partials/footer', { scripts: ['/ui.js', '/pdf-utils.js', 'invoice-report.js'], includeNavScript: true }) %>

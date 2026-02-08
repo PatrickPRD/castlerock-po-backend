@@ -71,17 +71,17 @@
   </div>
 
   <div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 1rem 1rem 0 1rem;">
+    <div class="dashboard-header">
       <h3 style="margin: 0;">Purchase Orders</h3>
-      <div style="display: flex; gap: 0.5rem;">
+      <div class="dashboard-actions">
         <button class="btn btn-primary" onclick="openCreatePOModal()">
-          <i class="bi bi-plus-circle me-1"></i>Create Purchase Order
+          <i class="bi bi-plus-circle me-1"></i><span class="btn-text">Add PO</span>
         </button>
         <button class="btn btn-outline-secondary" onclick="window.location.href='suppliers.html'">
-          <i class="bi bi-building me-1"></i>Suppliers
+          <i class="bi bi-building me-1"></i><span class="btn-text">Suppliers</span>
         </button>
         <button class="btn btn-outline-secondary" onclick="toggleFilters()">
-          <i class="bi bi-funnel me-1"></i>Filters
+          <i class="bi bi-funnel me-1"></i><span class="btn-text">Filters</span>
         </button>
       </div>
     </div>
@@ -276,4 +276,4 @@
 
 </main>
 
-<%- include('partials/footer', { scripts: ['/ui.js', 'dashboard.js'], includeNavScript: true }) %>
+<%- include('partials/footer', { scripts: ['/ui.js', '/pdf-utils.js', 'dashboard.js'], includeNavScript: true }) %>

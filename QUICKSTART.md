@@ -37,6 +37,47 @@ Open http://localhost:3000 and login with the admin credentials above.
 
 ---
 
+## EC2 (Amazon Linux 2023) - Puppeteer Dependencies
+If you will run PDF generation on EC2, install the Chromium dependencies:
+```bash
+sudo dnf update -y
+sudo dnf install -y \
+   atk \
+   cairo \
+   cups-libs \
+   dbus-glib \
+   expat \
+   fontconfig \
+   freetype \
+   glib2 \
+   gtk3 \
+   libX11 \
+   libXcomposite \
+   libXcursor \
+   libXdamage \
+   libXext \
+   libXfixes \
+   libXi \
+   libXrandr \
+   libXrender \
+   libXScrnSaver \
+   libXtst \
+   nss \
+   pango \
+   alsa-lib \
+   xorg-x11-fonts-Type1 \
+   xorg-x11-fonts-misc \
+   xorg-x11-utils
+
+# Optional: add more fonts
+sudo dnf install -y google-noto-sans-fonts
+
+# If running as non-root, ensure Puppeteer cache is writable
+export PUPPETEER_CACHE_DIR=/home/ec2-user/.cache/puppeteer
+```
+
+---
+
 ## Alternative: Manual Database Setup
 
 If you prefer to run SQL manually, execute these files in order:

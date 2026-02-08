@@ -1,12 +1,34 @@
 require('dotenv').config();
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
+const fs = require('fs');
+
+function runDependencyPreflight() {
+  try {
+    require('bcrypt');
+  } catch (error) {
+    console.warn('⚠️  bcrypt native module not available:', error.message);
+    console.warn('   You can switch to bcryptjs or install build tools for your OS.');
+  }
+
+  try {
+    const puppeteer = require('puppeteer');
+    const chromePath = puppeteer.executablePath();
+    if (!chromePath || !fs.existsSync(chromePath)) {
+      console.warn('⚠️  Puppeteer Chromium not found. PDF generation will fail.');
+      console.warn('   Run: npx puppeteer browsers install chrome');
+    }
+  } catch (error) {
+    console.warn('⚠️  Puppeteer not available:', error.message);
+  }
+}
 
 async function setupDatabase() {
   let pool;
   let adminConn;
 
   try {
+    runDependencyPreflight();
     console.log('🔧 Setting up database...\n');
 
     const dbName = process.env.DB_NAME;
@@ -48,14 +70,16 @@ async function setupDatabase() {
         password_hash VARCHAR(255) DEFAULT NULL,
         first_name VARCHAR(100) NOT NULL,
         last_name VARCHAR(100) NOT NULL,
-        role ENUM('super_admin', 'admin', 'user', 'viewer') NOT NULL DEFAULT 'user',
+        role ENUM('super_admin', 'admin', 'staff', 'user', 'viewer') NOT NULL DEFAULT 'user',
         active TINYINT(1) NOT NULL DEFAULT 1,
         reset_token VARCHAR(255) DEFAULT NULL,
         reset_token_expires DATETIME DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_email (email),
-        INDEX idx_role (role)
+        INDEX idx_role (role),
+        INDEX idx_active (active),
+        INDEX idx_reset_token (reset_token)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log('✅ Users table created');
@@ -75,6 +99,21 @@ async function setupDatabase() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log('✅ Sites table created');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS site_letters (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        site_id INT NOT NULL,
+        letter VARCHAR(1) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_letter (letter),
+        FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
+        INDEX idx_site_id (site_id),
+        INDEX idx_letter (letter)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ Site letters table created');
 
     // Check if super admin exists
     const [[existingAdmin]] = await pool.query(
@@ -110,7 +149,8 @@ async function setupDatabase() {
         active TINYINT(1) NOT NULL DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_name (name)
+        INDEX idx_name (name),
+        INDEX idx_active (active)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log('✅ Suppliers table created');
@@ -138,6 +178,7 @@ async function setupDatabase() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE RESTRICT,
         INDEX idx_name (name),
+        INDEX idx_type (type),
         INDEX idx_site_id (site_id),
         INDEX idx_active (active)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -214,6 +255,7 @@ async function setupDatabase() {
         FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT,
         FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE RESTRICT,
         FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE SET NULL,
+        FOREIGN KEY (stage_id) REFERENCES po_stages(id) ON DELETE SET NULL,
         FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
         FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL,
         FOREIGN KEY (cancelled_by) REFERENCES users(id) ON DELETE SET NULL,
@@ -222,6 +264,7 @@ async function setupDatabase() {
         INDEX idx_supplier_id (supplier_id),
         INDEX idx_site_id (site_id),
         INDEX idx_location_id (location_id),
+        INDEX idx_stage_id (stage_id),
         INDEX idx_status (status),
         INDEX idx_created_by (created_by)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -286,10 +329,47 @@ async function setupDatabase() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
         INDEX idx_user_id (user_id),
+        INDEX idx_action (action),
+        INDEX idx_table_name (table_name),
         INDEX idx_created_at (created_at)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log('✅ Audit log table created');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        filename VARCHAR(255) NOT NULL UNIQUE,
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ Schema migrations table created');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS site_settings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        ` + "`key`" + ` VARCHAR(255) NOT NULL UNIQUE,
+        value LONGTEXT,
+        description VARCHAR(500),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_key (` + "`key`" + `)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ Site settings table created');
+
+    await pool.query(`
+      INSERT INTO site_settings (` + "`key`" + `, value, description) VALUES
+      ('logo_path', 'assets/Logo.png', 'Path to company logo file - relative to public folder (matches website header)'),
+      ('header_color', '#212529', 'Header background color (dark navbar from Bootstrap)'),
+      ('accent_color', '#c62828', 'Accent color for highlights (primary red)'),
+      ('company_name', 'Castlerock Homes', 'Company name for branding'),
+      ('company_address', '', 'Company address for PO footer'),
+      ('company_phone', '', 'Company phone number'),
+      ('company_email', '', 'Company email address')
+      ON DUPLICATE KEY UPDATE value = VALUES(value)
+    `);
+    console.log('✅ Site settings defaults added');
 
     // PO sequences table for tracking PO number generation
     await pool.query(`

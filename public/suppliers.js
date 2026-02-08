@@ -52,7 +52,7 @@ function render() {
     main.className = "main-row";
     main.innerHTML = `
       <td>${s.name}</td>
-      <td>${s.main_contact || ""}</td>
+      <td>${s.contact_person || ""}</td>
     `;
 
     const details = document.createElement("tr");
@@ -64,8 +64,8 @@ function render() {
           <div><strong>Email:</strong> ${s.email || "—"}</div>
           <div><strong>Phone:</strong> ${s.phone || "—"}</div>
           <div class="full-width">
-            <strong>Notes:</strong><br>
-            ${s.notes || "—"}
+            <strong>Address:</strong><br>
+            ${s.address ? s.address.replace(/\n/g, '<br>') : "—"}
           </div>
         </div>
 

@@ -14,16 +14,16 @@ async function logAudit({
   await pool.query(
     `
     INSERT INTO audit_log
-      (table_name, record_id, action, old_data, new_data, changed_by)
+      (user_id, action, table_name, record_id, old_values, new_values)
     VALUES (?, ?, ?, ?, ?, ?)
     `,
     [
+      changed_by,
+      action,
       table_name,
       record_id,
-      action,
       old_data ? JSON.stringify(old_data) : null,
-      new_data ? JSON.stringify(new_data) : null,
-      changed_by
+      new_data ? JSON.stringify(new_data) : null
     ]
   );
 }

@@ -21,8 +21,10 @@ router.get(
     po.id,
     po.po_number,
     DATE_FORMAT(po.po_date, '%Y-%m-%d') AS po_date,
+    po.description,
     s.name AS supplier,
     si.name AS site,
+    si.address AS site_address,
     l.name AS location,
 
     po.net_amount,
@@ -80,6 +82,7 @@ router.get(
 
         po.site_id,
         si.name AS site,
+        si.address AS site_address,
 
         po.location_id,
         l.name AS location,

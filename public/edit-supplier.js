@@ -15,7 +15,7 @@ const nameEl    = document.getElementById('name');
 const contactEl = document.getElementById('contact');
 const emailEl   = document.getElementById('email');
 const phoneEl   = document.getElementById('phone');
-const notesEl   = document.getElementById('notes');
+const addressEl = document.getElementById('address');
 
 /* =========================
    Load supplier (edit)
@@ -32,10 +32,10 @@ async function loadSupplier() {
   const s = await res.json();
 
   nameEl.value    = s.name;
-  contactEl.value = s.main_contact || '';
+  contactEl.value = s.contact_person || '';
   emailEl.value   = s.email || '';
   phoneEl.value   = s.phone || '';
-  notesEl.value   = s.notes || '';
+  addressEl.value = s.address || '';
 }
 
 /* =========================
@@ -46,10 +46,10 @@ form.onsubmit = async e => {
 
   const payload = {
     name: nameEl.value.trim(),
-    main_contact: contactEl.value.trim(),
+    contact_person: contactEl.value.trim(),
     email: emailEl.value.trim(),
     phone: phoneEl.value.trim(),
-    notes: notesEl.value.trim()
+    address: addressEl.value.trim()
   };
 
   if (!payload.name) {

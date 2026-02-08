@@ -234,6 +234,7 @@ function renderPO(po) {
       <div style="display: flex; gap: 2rem;">
         <div class="details-grid" style="flex: 0 0 auto;">
           <div><strong>Site:</strong> ${po.site}</div>
+          ${po.site_address ? `<div><strong>Site Address:</strong> ${po.site_address}</div>` : ''}
           <div><strong>VAT Rate:</strong> ${formatVat(po.vat_rate)}</div>
           <div><strong>Total (inc VAT):</strong> €${Number(po.total_amount).toFixed(
             2
@@ -268,6 +269,9 @@ function renderPO(po) {
 
       <div class="details-actions">
         <button class="btn btn-outline-primary" onclick="editPO(${po.id})">Edit PO</button>
+        <button class="btn btn-outline-secondary" onclick="event.stopPropagation(); downloadPOPDF(${po.id}, this)">
+          <i class="bi bi-download me-1"></i>Download PDF
+        </button>
         ${
           role !== "viewer"
             ? `<button class="btn btn-primary" onclick="addInvoice(${po.id})">Invoices</button>`

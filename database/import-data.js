@@ -29,30 +29,41 @@ async function importData() {
     let sql = fs.readFileSync(dataFile, 'utf8');
     
     // Convert VAT rates from decimals (0.135, 0.23) to percentages (13.5, 23)
-    // Match invoice INSERT statements and multiply vat_rate values by 100
+    // For invoices: match description/net_amount pattern then convert the following vat_rate
     sql = sql.replace(
-      /(INSERT INTO `invoices`[\s\S]*?VALUES[\s\S]*?)(\d+\.\d{4})/g,
-      (match, before, vatRate) => {
-        // Only convert if it looks like a decimal vat_rate (0.xxxx format)
-        const rate = parseFloat(vatRate);
-        if (rate > 0 && rate < 1) {
-          const percentRate = (rate * 100).toFixed(2);
-          return before + percentRate;
-        }
-        return match;
+      /INSERT INTO `invoices`[\s\S]*?VALUES\s([\s\S]*?);/,
+      function(match) {
+        // Process each row: find rows with VAT rates in decimal format
+        return match.replace(
+          /('[^']*',\s*'[\d.]+',\s*)'(\d+\.\d{4})'/g,
+          function(rowMatch, beforeVat, vatRate) {
+            const rate = parseFloat(vatRate);
+            if (rate > 0 && rate < 1) {
+              const percentRate = (rate * 100).toFixed(2);
+              return beforeVat + `'${percentRate}'`;
+            }
+            return rowMatch;
+          }
+        );
       }
     );
     
-    // Convert VAT rates in purchase_orders if they're in decimal format
+    // For purchase_orders: match description/net_amount then convert the following vat_rate
     sql = sql.replace(
-      /(INSERT INTO `purchase_orders`[\s\S]*?VALUES[\s\S]*?)(\d+\.\d{4})/g,
-      (match, before, vatRate) => {
-        const rate = parseFloat(vatRate);
-        if (rate > 0 && rate < 1) {
-          const percentRate = (rate * 100).toFixed(2);
-          return before + percentRate;
-        }
-        return match;
+      /INSERT INTO `purchase_orders`[\s\S]*?VALUES\s([\s\S]*?);/,
+      function(match) {
+        // Process each row: description is always before net_amount, vat_rate comes after net_amount
+        return match.replace(
+          /('[^']*',\s*'[\d.]+',\s*)'(\d+\.\d{4})'/g,
+          function(rowMatch, beforeVat, vatRate) {
+            const rate = parseFloat(vatRate);
+            if (rate > 0 && rate < 1) {
+              const percentRate = (rate * 100).toFixed(2);
+              return beforeVat + `'${percentRate}'`;
+            }
+            return rowMatch;
+          }
+        );
       }
     );
     

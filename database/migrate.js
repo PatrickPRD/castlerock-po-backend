@@ -1,4 +1,6 @@
 require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
 const pool = require('../src/db');
 
 async function migrateDatabase() {
@@ -66,6 +68,52 @@ async function migrateDatabase() {
       }
       
       console.log('\n🎉 All migrations completed successfully!\n');
+    }
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        filename VARCHAR(255) NOT NULL UNIQUE,
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    const [appliedRows] = await pool.query(
+      'SELECT filename FROM schema_migrations'
+    );
+    const applied = new Set(appliedRows.map(row => row.filename));
+
+    const migrationsDir = path.join(__dirname, 'migrations');
+    const files = fs
+      .readdirSync(migrationsDir)
+      .filter(file => file.endsWith('.sql'))
+      .sort();
+
+    if (files.length === 0) {
+      console.log('ℹ️  No SQL migrations found.');
+      return;
+    }
+
+    for (const file of files) {
+      if (applied.has(file)) {
+        continue;
+      }
+
+      const filePath = path.join(migrationsDir, file);
+      const sql = fs.readFileSync(filePath, 'utf8').trim();
+
+      if (!sql) {
+        console.log(`⚠️  Skipping empty migration: ${file}`);
+        continue;
+      }
+
+      console.log(`  ⏳ Applying ${file}...`);
+      await pool.query(sql);
+      await pool.query(
+        'INSERT INTO schema_migrations (filename) VALUES (?)',
+        [file]
+      );
+      console.log(`  ✅ Applied ${file}`);
     }
 
     // Show updated structure
