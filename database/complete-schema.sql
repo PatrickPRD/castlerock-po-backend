@@ -228,6 +228,43 @@ CREATE TABLE `audit_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ========================================
+-- SCHEMA MIGRATIONS TABLE
+-- ========================================
+CREATE TABLE `schema_migrations` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `filename` VARCHAR(255) NOT NULL UNIQUE,
+  `applied_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ========================================
+-- SITE SETTINGS TABLE
+-- ========================================
+CREATE TABLE `site_settings` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `key` VARCHAR(255) NOT NULL UNIQUE,
+  `value` LONGTEXT,
+  `description` VARCHAR(500),
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_key` (`key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ========================================
+-- PO SEQUENCES TABLE
+-- ========================================
+CREATE TABLE `po_sequences` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `site_id` INT NOT NULL,
+  `year` INT NOT NULL,
+  `month` INT NOT NULL,
+  `last_number` INT NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `unique_sequence` (`site_id`, `year`, `month`),
+  FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ========================================
 -- DEFAULT DATA
 -- ========================================
 
@@ -259,6 +296,19 @@ INSERT INTO `po_stages` (`id`, `name`) VALUES
 -- Insert system user for data imports
 INSERT INTO `users` (`id`, `email`, `password_hash`, `first_name`, `last_name`, `role`, `active`) VALUES
 (99, 'system@upload.local', '__SYSTEM__', 'System', 'Upload', 'admin', 1);
+
+-- Insert default site settings
+INSERT INTO `site_settings` (`key`, `value`, `description`) VALUES
+('logo_path', '/assets/Logo.png', 'Path to company logo file - relative to public folder (matches website header)'),
+('header_color', '#212529', 'Header background color (dark navbar from Bootstrap)'),
+('header_logo_mode', 'image', 'Header brand display mode: image or text'),
+('header_logo_text', 'Castlerock Homes', 'Header text shown when header_logo_mode is text'),
+('accent_color', '#c62828', 'Accent color for highlights (primary red)'),
+('company_name', 'Castlerock Homes', 'Company name for branding'),
+('company_address', '', 'Company address for PO footer'),
+('company_phone', '', 'Company phone number'),
+('company_email', '', 'Company email address')
+ON DUPLICATE KEY UPDATE `value` = VALUES(`value`);
 
 SELECT '✅ Database schema created successfully!' AS message;
 SELECT 'Run the seed data file to import existing data' AS next_step;

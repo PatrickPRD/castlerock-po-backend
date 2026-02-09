@@ -11,8 +11,10 @@ CREATE TABLE IF NOT EXISTS `site_settings` (
 
 -- Insert default settings
 INSERT INTO `site_settings` (`key`, `value`, `description`) VALUES
-('logo_path', 'assets/Logo.png', 'Path to company logo file - relative to public folder (matches website header)'),
+('logo_path', '/assets/Logo.png', 'Path to company logo file - relative to public folder (matches website header)'),
 ('header_color', '#212529', 'Header background color (dark navbar from Bootstrap)'),
+('header_logo_mode', 'image', 'Header brand display mode: image or text'),
+('header_logo_text', 'Castlerock Homes', 'Header text shown when header_logo_mode is text'),
 ('accent_color', '#c62828', 'Accent color for highlights (primary red)'),
 ('company_name', 'Castlerock Homes', 'Company name for branding'),
 ('company_address', '', 'Company address for PO footer'),
