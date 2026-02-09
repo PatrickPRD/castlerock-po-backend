@@ -227,7 +227,7 @@ function sortTable(column) {
 
 function updateSortIndicators() {
   const headers = document.querySelectorAll('th.sortable');
-  const columnMap = ['id', 'invoice_date', 'invoice_number', 'po_number', 'supplier', 'net_amount', 'total_amount'];
+  const columnMap = ['id', 'invoice_date', 'invoice_number', 'po_number', 'supplier', 'vat_rate', 'net_amount', 'total_amount'];
 
   headers.forEach((header, index) => {
     const indicator = header.querySelector('.sort-indicator');
@@ -318,6 +318,7 @@ function renderInvoice(inv) {
     <td data-label="Supplier Ref">${inv.invoice_number}</td>
     <td data-label="PO #">${inv.po_number}</td>
     <td data-label="Supplier">${inv.supplier}</td>
+    <td data-label="VAT Rate">${formatVat(inv.vat_rate)}</td>
     <td data-label="Net (€)">${euro(inv.net_amount)}</td>
     <td data-label="Total (€)">${euro(inv.total_amount)}</td>
   `;

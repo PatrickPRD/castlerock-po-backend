@@ -81,7 +81,7 @@ class PDFService {
    * @param {Object} settings - Site settings
    * @returns {string} HTML content
    */
-  static generatePOHTML(poData, invoices = [], settings) {
+  static generatePOHTML(poData, invoices = [], settings = {}) {
     const {
       id,
       po_number,
@@ -99,12 +99,17 @@ class PDFService {
 
     const lineItems = Array.isArray(poData.line_items) ? poData.line_items : [];
 
-    // Use website theme colors - header uses dark navbar background from Bootstrap
-    const headerColor = '#212529'; // Bootstrap bg-dark color to match website navbar
-    const accentColor = settings.accent_color || '#c62828'; // Primary red for accents
-    
-    // Load logo from website header - matches src from header.ejs navbar
-    const logoPath = settings.logo_path || 'assets/Logo.png';
+    // Match live header branding settings used by the website navbar.
+    const headerColor = /^#[0-9a-fA-F]{6}$/.test(settings?.header_color || '')
+      ? settings.header_color
+      : '#212529';
+    const logoMode = settings?.header_logo_mode === 'text' ? 'text' : 'image';
+    const logoText = String(
+      settings?.header_logo_text || settings?.company_name || 'Castlerock Homes'
+    ).trim();
+
+    // Load logo from stored branding path (defaults to original logo asset).
+    const logoPath = settings.logo_path || '/assets/Logo.png';
     
     // Convert relative path to absolute file path for reading the file
     let absoluteLogoPath = logoPath;
@@ -124,7 +129,14 @@ class PDFService {
         const logoBase64 = logoBuffer.toString('base64');
         // Determine mime type based on file extension
         const ext = path.extname(absoluteLogoPath).toLowerCase();
-        const mimeType = ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'image/png';
+        const mimeByExt = {
+          '.png': 'image/png',
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.webp': 'image/webp',
+          '.svg': 'image/svg+xml'
+        };
+        const mimeType = mimeByExt[ext] || 'image/png';
         logoDataUrl = `data:${mimeType};base64,${logoBase64}`;
       }
     } catch (error) {
@@ -262,7 +274,7 @@ class PDFService {
           .header {
             background-color: ${headerColor};
             color: white;
-            padding: 18px 15px;
+            padding: 9px 15px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -275,8 +287,15 @@ class PDFService {
           
           .logo-section img {
             width: 100%;
-            max-width: 300px;
+            max-width: 225px;
             height: auto;
+          }
+
+          .logo-text {
+            font-size: 18px;
+            font-weight: 700;
+            color: #ffffff;
+            letter-spacing: 0.3px;
           }
           
           .po-meta {
@@ -289,17 +308,18 @@ class PDFService {
           }
           
           .po-label {
-            padding: 6px 10px;
+            padding: 4px 8px;
             border-radius: 3px;
             font-weight: bold;
             font-size: 12px;
             text-align: right;
+            white-space: nowrap;
           }
-          
-          .po-number {
-            font-size: 16px;
-            font-weight: bold;
-            margin-top: 3px;
+
+          .po-number-inline {
+            font-size: 15px;
+            font-weight: 700;
+            margin-left: 6px;
           }
           
           .content {
@@ -437,12 +457,15 @@ class PDFService {
           <!-- Header -->
           <div class="header">
             <div class="logo-section">
-              ${logoDataUrl ? `<img src="${logoDataUrl}" alt="Logo">` : ''}
-              <div class="company-title">${companyName}</div>
+              ${logoMode === 'text'
+                ? `<div class="logo-text">${this.escapeHtml(logoText || companyName)}</div>`
+                : (logoDataUrl
+                  ? `<img src="${logoDataUrl}" alt="Logo">`
+                  : `<div class="logo-text">${this.escapeHtml(companyName)}</div>`)}
+              <div class="company-title">${this.escapeHtml(companyName)}</div>
             </div>
             <div class="po-meta">
-              <div class="po-label">PURCHASE ORDER</div>
-              <div class="po-number">#${po_number}</div>
+              <div class="po-label">PURCHASE ORDER <span class="po-number-inline">#${po_number}</span></div>
             </div>
           </div>
 

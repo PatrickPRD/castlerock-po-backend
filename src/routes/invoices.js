@@ -23,6 +23,7 @@ router.get(
         DATE_FORMAT(invoice_date, '%Y-%m-%d') AS invoice_date,
         net_amount,
         vat_rate,
+        vat_amount,
         total_amount
       FROM invoices
       WHERE purchase_order_id = ?

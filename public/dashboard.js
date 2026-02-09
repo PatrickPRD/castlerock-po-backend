@@ -642,6 +642,7 @@ async function loadInvoices(poId, container) {
           <th>Date</th>
           <th>Net (ex VAT)</th>
           <th>VAT %</th>
+          <th>VAT</th>
           <th>Total (inc VAT)</th>
         </tr>
       </thead>
@@ -649,6 +650,7 @@ async function loadInvoices(poId, container) {
 `;
 
   invoices.forEach((i) => {
+    const vatAmount = Number(i.vat_amount ?? (Number(i.net_amount) * Number(i.vat_rate)));
     html += `
     <tr>
       <td>${i.id}</td>
@@ -656,6 +658,7 @@ async function loadInvoices(poId, container) {
       <td>${i.invoice_date}</td>
       <td>€${Number(i.net_amount).toFixed(2)}</td>
       <td>${formatVat(i.vat_rate)}</td>
+      <td>${euro(vatAmount)}</td>
       <td>€${Number(i.total_amount).toFixed(2)}</td>
     </tr>
   `;
