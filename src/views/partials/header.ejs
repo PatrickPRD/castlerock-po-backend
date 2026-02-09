@@ -1,8 +1,9 @@
 <body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+<nav id="mainHeaderNav" class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
   <div class="container-fluid px-4">
     <a class="navbar-brand d-flex align-items-center" href="dashboard.html">
-      <img src="assets/Logo.png" alt="Castlerock Homes" height="40" class="me-3">
+      <img id="headerBrandImage" src="/assets/Logo.png" alt="Castlerock Homes" height="40" class="me-3">
+      <span id="headerBrandText" class="fw-semibold text-white" style="display:none;"></span>
     </a>
 
     <% if (typeof showNav === 'undefined' || showNav !== false) { %>
@@ -41,6 +42,9 @@
               </a></li>
               <li><a class="dropdown-item" href="backup-management.html">
                 <i class="bi bi-database me-2"></i>Backup Management
+              </a></li>
+              <li><a class="dropdown-item" href="header-branding.html">
+                <i class="bi bi-palette me-2"></i>Header Branding
               </a></li>
             </ul>
           </li>
@@ -91,6 +95,38 @@
     } else if (currentPage === 'suppliers.html') {
       // Change text on suppliers page
       if (navText) navText.textContent = 'Back to Purchase Orders';
+    }
+  })();
+
+  // Apply global header branding settings
+  (async function() {
+    try {
+      const res = await fetch('/settings/public');
+      if (!res.ok) return;
+      const settings = await res.json();
+
+      const nav = document.getElementById('mainHeaderNav');
+      const logoImage = document.getElementById('headerBrandImage');
+      const logoText = document.getElementById('headerBrandText');
+
+      if (nav && settings.header_color) {
+        nav.classList.remove('bg-dark');
+        nav.style.backgroundColor = settings.header_color;
+      }
+
+      if (!logoImage || !logoText) return;
+
+      if (settings.header_logo_mode === 'text') {
+        logoImage.style.display = 'none';
+        logoText.style.display = 'inline';
+        logoText.textContent = settings.header_logo_text || 'Castlerock Homes';
+      } else {
+        logoText.style.display = 'none';
+        logoImage.style.display = 'inline-block';
+        logoImage.src = settings.logo_path || '/assets/Logo.png';
+      }
+    } catch (_) {
+      // Keep defaults if branding settings cannot be loaded
     }
   })();
 </script>

@@ -87,8 +87,10 @@ class SettingsService {
    */
   static getDefaultSettings() {
     return {
-      logo_path: '/assets/logo.png',
-      header_color: '#2563eb',
+      logo_path: '/assets/Logo.png',
+      header_color: '#212529',
+      header_logo_mode: 'image',
+      header_logo_text: 'Castlerock Homes',
       accent_color: '#1e40af',
       company_name: 'Castlerock Homes',
       company_address: '',

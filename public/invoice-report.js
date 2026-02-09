@@ -12,6 +12,7 @@ const locationFilter = document.getElementById('locationFilter');
 const searchInput = document.getElementById('searchInput');
 const supplierFilter = document.getElementById('supplierFilter');
 const supplierFilterWrapper = document.getElementById('supplierFilterWrapper');
+const vatRateFilter = document.getElementById('vatRateFilter');
 const dateFrom = document.getElementById('dateFrom');
 const dateTo = document.getElementById('dateTo');
 const invoiceCountEl = document.getElementById('invoiceCount');
@@ -39,6 +40,18 @@ function formatVat(rate) {
     return `${percentage}%`;
   }
   return `${n}%`;
+}
+
+function normalizeVatRate(rate) {
+  const n = Number(rate);
+  if (!Number.isFinite(n)) return null;
+  return n < 1 ? n * 100 : n;
+}
+
+function vatRateOptionValue(rate) {
+  const normalized = normalizeVatRate(rate);
+  if (normalized === null) return '';
+  return (Math.round(normalized * 1000) / 1000).toString();
 }
 
 function formatDate(dateStr) {
@@ -138,11 +151,40 @@ async function loadInvoices() {
   });
 
   allData = await res.json();
+  populateVatRateFilter();
   
   // Load locations for selected site
   await loadLocations(siteId);
   
   applyFilters();
+}
+
+function populateVatRateFilter() {
+  if (!vatRateFilter) return;
+
+  const previousValue = vatRateFilter.value;
+  const uniqueRates = Array.from(
+    new Set(
+      allData
+        .map(inv => vatRateOptionValue(inv.vat_rate))
+        .filter(v => v !== '')
+    )
+  ).sort((a, b) => Number(a) - Number(b));
+
+  vatRateFilter.innerHTML = `<option value="">All VAT Rates</option>`;
+
+  uniqueRates.forEach(rate => {
+    const opt = document.createElement('option');
+    opt.value = rate;
+    opt.textContent = `${rate}%`;
+    vatRateFilter.appendChild(opt);
+  });
+
+  if (previousValue && uniqueRates.includes(previousValue)) {
+    vatRateFilter.value = previousValue;
+  } else {
+    vatRateFilter.value = '';
+  }
 }
 
 /* =========================
@@ -208,6 +250,7 @@ function applyFilters() {
   const searchTerm = searchInput.value.toLowerCase();
   const supplierId = supplierFilter.value;
   const locationId = locationFilter.value;
+  const vatRate = vatRateFilter.value;
   const fromDate = dateFrom.value;
   const toDate = dateTo.value;
 
@@ -239,6 +282,12 @@ function applyFilters() {
     // Date filters
     if (fromDate && inv.invoice_date < fromDate) return false;
     if (toDate && inv.invoice_date > toDate) return false;
+
+    // VAT rate filter
+    if (vatRate) {
+      const invoiceVatRate = vatRateOptionValue(inv.vat_rate);
+      if (invoiceVatRate !== vatRate) return false;
+    }
 
     return true;
   });
@@ -387,6 +436,7 @@ function clearFilters() {
   locationFilter.disabled = true;
   searchInput.value = '';
   supplierFilter.value = '';
+  vatRateFilter.value = '';
   dateFrom.value = '';
   dateTo.value = '';
   loadInvoices();
@@ -400,6 +450,7 @@ async function exportExcel() {
   const searchTerm = searchInput.value.toLowerCase();
   const supplierId = supplierFilter.value;
   const locationId = locationFilter.value;
+  const vatRate = vatRateFilter.value;
   const fromDate = dateFrom.value;
   const toDate = dateTo.value;
 
@@ -423,6 +474,11 @@ async function exportExcel() {
 
     if (fromDate && inv.invoice_date < fromDate) return false;
     if (toDate && inv.invoice_date > toDate) return false;
+
+    if (vatRate) {
+      const invoiceVatRate = vatRateOptionValue(inv.vat_rate);
+      if (invoiceVatRate !== vatRate) return false;
+    }
 
     return true;
   });
@@ -840,6 +896,7 @@ function setupSearchableSupplierFilter() {
 siteFilter.addEventListener('change', loadInvoices);
 locationFilter.addEventListener('change', applyFilters);
 searchInput.addEventListener('input', applyFilters);
+vatRateFilter.addEventListener('change', applyFilters);
 dateFrom.addEventListener('change', applyFilters);
 dateTo.addEventListener('change', applyFilters);
 

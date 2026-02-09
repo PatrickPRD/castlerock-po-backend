@@ -1,0 +1,27 @@
+.preview-box {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f9fafb;
+}
+
+.preview-bar {
+  min-height: 56px;
+  border-radius: 6px;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  background: #212529;
+}
+
+#brandPreviewImage {
+  height: 34px;
+  width: auto;
+  object-fit: contain;
+}
+
+#brandPreviewText {
+  color: #fff;
+  font-weight: 600;
+  font-size: 1rem;
+}

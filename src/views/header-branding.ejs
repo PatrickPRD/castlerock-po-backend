@@ -1,0 +1,52 @@
+<%- include('partials/head', { title: 'Header Branding | Castlerock Homes', styles: ['admin.css', 'header-branding.css'] }) %>
+<%- include('partials/header', { pageTitle: 'Header Branding' }) %>
+
+<main class="container py-4">
+  <div class="card p-4">
+    <h3 class="mb-3">Header Branding</h3>
+    <p class="text-muted mb-4">Set the site-wide header background color and brand display for the top navbar.</p>
+
+    <form id="brandingForm" class="d-grid gap-3">
+      <div>
+        <label for="headerColor" class="form-label">Header Background Color</label>
+        <div class="d-flex align-items-center gap-3">
+          <input id="headerColor" type="color" class="form-control form-control-color" value="#212529" />
+          <input id="headerColorHex" type="text" class="form-control" value="#212529" maxlength="7" />
+        </div>
+      </div>
+
+      <div>
+        <label for="logoMode" class="form-label">Header Brand Type</label>
+        <select id="logoMode" class="form-select">
+          <option value="image">Logo Image</option>
+          <option value="text">Simple Text</option>
+        </select>
+      </div>
+
+      <div id="logoImageSection">
+        <label for="logoFile" class="form-label">Upload New Logo</label>
+        <input id="logoFile" type="file" class="form-control" accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml" />
+        <small class="text-muted">Accepted formats: PNG, JPG, WEBP, SVG. Max size 2 MB.</small>
+      </div>
+
+      <div id="logoTextSection" style="display: none;">
+        <label for="logoText" class="form-label">Header Text</label>
+        <input id="logoText" type="text" class="form-control" maxlength="80" placeholder="Castlerock Homes" />
+      </div>
+
+      <div class="preview-box">
+        <div id="brandPreviewBar" class="preview-bar">
+          <img id="brandPreviewImage" src="/assets/Logo.png" alt="Logo preview" />
+          <span id="brandPreviewText" style="display: none;">Castlerock Homes</span>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mt-2">
+        <button type="submit" class="btn btn-primary">Save Branding</button>
+        <button type="button" class="btn btn-outline-secondary" id="resetBtn">Reset</button>
+      </div>
+    </form>
+  </div>
+</main>
+
+<%- include('partials/footer', { scripts: ['/ui.js', 'header-branding.js'], includeNavScript: true }) %>

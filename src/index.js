@@ -36,6 +36,7 @@ app.get('/sites.html', (req, res) => res.render('sites'));
 app.get('/stages.html', (req, res) => res.render('stages'));
 app.get('/location-spread.html', (req, res) => res.render('location-spread'));
 app.get('/backup-management.html', (req, res) => res.render('backup-management'));
+app.get('/header-branding.html', (req, res) => res.render('header-branding'));
 app.get('/location-report.html', (req, res) => res.render('location-report'));
 app.get('/supplier-report.html', (req, res) => res.render('supplier-report'));
 app.get('/invoice-report.html', (req, res) => res.render('invoice-report'));
