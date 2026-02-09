@@ -19,6 +19,12 @@
             </a>
           </li>
 
+          <li class="nav-item" data-roles="super_admin,admin" id="timesheetsNavItem">
+            <a class="nav-link px-3" href="timesheets.html">
+              <i class="bi bi-calendar2-week me-1"></i>Timesheets
+            </a>
+          </li>
+
           <li class="nav-item dropdown" data-roles="super_admin">
             <a class="nav-link dropdown-toggle px-3" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
               <i class="bi bi-gear-fill me-1"></i>Admin
@@ -66,6 +72,9 @@
               <li><a class="dropdown-item" href="invoice-report.html">
                 <i class="bi bi-receipt-cutoff me-2"></i>Invoices
               </a></li>
+              <li><a class="dropdown-item" href="labour-costs.html">
+                <i class="bi bi-people me-2"></i>Labour Costs
+              </a></li>
             </ul>
           </li>
 
@@ -94,6 +103,7 @@
     const currentPage = window.location.pathname.split('/').pop();
     const navItem = document.getElementById('purchaseOrdersNavItem');
     const navText = document.getElementById('purchaseOrdersText');
+    const timesheetsNavItem = document.getElementById('timesheetsNavItem');
     
     if (currentPage === 'dashboard.html' || currentPage === '') {
       // Hide on dashboard
@@ -101,6 +111,9 @@
     } else if (currentPage === 'suppliers.html') {
       // Change text on suppliers page
       if (navText) navText.textContent = 'Back to Purchase Orders';
+    } else if (currentPage === 'timesheets.html') {
+      // Hide on timesheets page
+      if (timesheetsNavItem) timesheetsNavItem.style.display = 'none';
     }
   })();
 

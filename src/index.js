@@ -32,6 +32,7 @@ app.get('/edit-supplier.html', (req, res) => res.render('edit-supplier'));
 app.get('/edit-user.html', (req, res) => res.render('edit-user'));
 app.get('/users.html', (req, res) => res.render('users'));
 app.get('/workers.html', (req, res) => res.render('workers'));
+app.get('/timesheets.html', (req, res) => res.render('timesheets'));
 app.get('/locations.html', (req, res) => res.render('locations'));
 app.get('/sites.html', (req, res) => res.render('sites'));
 app.get('/stages.html', (req, res) => res.render('stages'));
@@ -42,6 +43,7 @@ app.get('/header-branding.html', (req, res) => res.redirect('/application-settin
 app.get('/location-report.html', (req, res) => res.render('location-report'));
 app.get('/supplier-report.html', (req, res) => res.render('supplier-report'));
 app.get('/invoice-report.html', (req, res) => res.render('invoice-report'));
+app.get('/labour-costs.html', (req, res) => res.render('labour-costs'));
 
 // Health check with database connectivity test
 app.get('/health', async (req, res) => {
@@ -110,6 +112,10 @@ app.use('/pdfs', pdfRoutes);
 // Settings
 const settingsRoutes = require('./routes/settings');
 app.use('/settings', settingsRoutes);
+
+// Timesheets
+const timesheetRoutes = require('./routes/timesheets');
+app.use('/timesheets', timesheetRoutes);
 
 // ✅ EXPORTS — THIS IS THE CRITICAL PART
 const exportRoutes = require('./routes/exports');

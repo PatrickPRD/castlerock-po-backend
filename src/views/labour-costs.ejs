@@ -1,0 +1,29 @@
+<%- include('partials/head', { title: 'Labour Costs | Castlerock Homes', styles: ['labour-costs.css'] }) %>
+<%- include('partials/header', { pageTitle: 'Labour Costs' }) %>
+
+<main class="container">
+  <div class="card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="form-row" style="margin-bottom:0;">
+        <select id="siteFilter">
+          <option value="">All Sites</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <table class="po-table">
+      <thead>
+        <tr>
+          <th>Site</th>
+          <th>Location</th>
+          <th>Labour Spend (<span data-currency-symbol>€</span>)</th>
+        </tr>
+      </thead>
+      <tbody id="labourTable"></tbody>
+    </table>
+  </div>
+</main>
+
+<%- include('partials/footer', { scripts: ['/ui.js', 'labour-costs.js'], includeNavScript: true }) %>

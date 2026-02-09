@@ -1,0 +1,39 @@
+<%- include('partials/head', { title: 'Timesheets | Castlerock Homes', styles: ['admin.css', 'timesheets.css'] }) %>
+<%- include('partials/header', { pageTitle: 'Timesheets' }) %>
+
+<main class="container">
+  <div class="card">
+    <div class="timesheets-header">
+      <div>
+        <h3 style="margin: 0;">Timesheet - Week <span id="weekNumberLabel">-</span></h3>
+        <div class="week-range">
+          Week of <span id="weekStartLabel">-</span> to <span id="weekEndLabel">-</span>
+        </div>
+      </div>
+      <div class="timesheets-actions">
+        <button class="btn btn-outline-secondary" id="prevWeekBtn">Previous Week</button>
+        <button class="btn btn-outline-secondary" id="nextWeekBtn">Next Week</button>
+        <button class="btn btn-outline-secondary" id="currentWeekBtn">Current Week</button>
+        <button class="btn btn-primary" id="saveWeekBtn">Save Week</button>
+      </div>
+    </div>
+
+    <table class="po-table timesheets-table">
+      <thead>
+        <tr>
+          <th>Worker</th>
+          <th>Mon</th>
+          <th>Tue</th>
+          <th>Wed</th>
+          <th>Thu</th>
+          <th>Fri</th>
+          <th>Sat</th>
+          <th>Sun</th>
+        </tr>
+      </thead>
+      <tbody id="timesheetTable"></tbody>
+    </table>
+  </div>
+</main>
+
+<%- include('partials/footer', { scripts: ['/ui.js', 'timesheets.js'], includeNavScript: true }) %>

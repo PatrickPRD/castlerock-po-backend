@@ -446,6 +446,60 @@ res.send(Buffer.from(buffer));
   }
 );
 
+/* ======================================================
+   LABOUR COSTS REPORT
+   ====================================================== */
+router.get(
+  '/labour-costs',
+  authenticate,
+  authorizeRoles('super_admin', 'admin'),
+  async (req, res) => {
+    const siteId = String(req.query.siteId || '').trim();
+    const params = [];
+    const filters = [];
+
+    if (siteId) {
+      filters.push('s.id = ?');
+      params.push(siteId);
+    }
+
+    const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+
+    try {
+      const [rows] = await db.query(
+        `
+        SELECT
+          s.id AS site_id,
+          s.name AS site,
+          l.id AS location_id,
+          l.name AS location,
+          SUM(COALESCE(w.weekly_take_home, 0) / 5) AS labour_cost
+        FROM timesheet_entries te
+        JOIN workers w ON w.id = te.worker_id
+        JOIN sites s ON s.id = te.site_id
+        JOIN locations l ON l.id = te.location_id
+        ${whereClause}
+        GROUP BY s.id, s.name, l.id, l.name
+        HAVING labour_cost > 0
+        ORDER BY s.name, l.name
+        `,
+        params
+      );
+
+      res.json(rows.map(row => ({
+        site_id: row.site_id,
+        site: row.site,
+        location_id: row.location_id,
+        location: row.location,
+        labour_cost: Number(row.labour_cost || 0)
+      })));
+    } catch (err) {
+      console.error('LABOUR COSTS REPORT ERROR:', err);
+      res.status(500).json({ error: 'Failed to load labour costs report' });
+    }
+  }
+);
+
 
 
 

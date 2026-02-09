@@ -1,0 +1,34 @@
+/* Table layout */
+.po-table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.po-table th:nth-child(2),
+.po-table td:nth-child(2) { width: 45%; }
+
+.po-table th:nth-child(3),
+.po-table td:nth-child(3) {
+  width: 20%;
+  text-align: right;
+}
+
+@media (max-width: 768px) {
+  .po-table thead {
+    display: none;
+  }
+
+  .po-table tr {
+    display: block;
+    padding: 12px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    background: #fff;
+  }
+
+  .po-table td {
+    display: block;
+    width: 100%;
+    text-align: left;
+  }
+}

@@ -1,0 +1,132 @@
+.timesheets-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.week-range {
+  margin-top: 0.25rem;
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+.timesheets-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.timesheets-table th {
+  display: table-cell;
+  white-space: nowrap;
+}
+
+.timesheets-table td {
+  vertical-align: top;
+}
+
+.timesheets-table .main-row {
+  cursor: pointer;
+}
+
+.timesheets-table .main-row:hover {
+  background-color: #f9fafb;
+}
+
+.timesheets-table .main-row.open {
+  background-color: #eef2ff;
+  box-shadow: inset 4px 0 0 #4f46e5;
+}
+
+.timesheets-table .details-row {
+  display: none;
+}
+
+.timesheets-table .details-row.open {
+  display: table-row;
+}
+
+.timesheets-table .details-row td {
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.worker-name {
+  font-weight: 600;
+}
+
+.worker-status {
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+.day-summary {
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.timesheet-day-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.timesheet-day-row {
+  display: grid;
+  grid-template-columns: 160px 1fr 1fr;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.timesheet-day-row label {
+  font-weight: 600;
+  color: #374151;
+}
+
+.timesheet-day-row select {
+  width: 100%;
+}
+
+@media (max-width: 1024px) {
+  .timesheets-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .timesheets-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 900px) {
+  .timesheets-table thead {
+    display: none;
+  }
+
+  .timesheets-table .main-row {
+    display: block;
+    padding: 12px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    background: #fff;
+  }
+
+  .timesheets-table td {
+    display: block;
+    width: 100%;
+    text-align: left;
+  }
+
+  .timesheets-table .details-row td {
+    display: block;
+  }
+
+  .timesheet-day-row {
+    grid-template-columns: 1fr;
+  }
+}
