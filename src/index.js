@@ -31,6 +31,7 @@ app.get('/invoice-entry.html', (req, res) => res.render('invoice-entry'));
 app.get('/edit-supplier.html', (req, res) => res.render('edit-supplier'));
 app.get('/edit-user.html', (req, res) => res.render('edit-user'));
 app.get('/users.html', (req, res) => res.render('users'));
+app.get('/workers.html', (req, res) => res.render('workers'));
 app.get('/locations.html', (req, res) => res.render('locations'));
 app.get('/sites.html', (req, res) => res.render('sites'));
 app.get('/stages.html', (req, res) => res.render('stages'));

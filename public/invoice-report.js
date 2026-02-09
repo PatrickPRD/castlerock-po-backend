@@ -614,6 +614,7 @@ async function exportExcel() {
     grandTotalRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
 
     // Format currency columns
+    ['C', 'D', 'E'].forEach(col => {
       summarySheet.getColumn(col).numFmt = `${symbol}#,##0.00`;
     });
 

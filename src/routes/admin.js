@@ -525,6 +525,163 @@ router.delete(
 );
 
 /* ======================================================
+   WORKERS – SUPER ADMIN ONLY
+   ====================================================== */
+
+router.get(
+  '/workers',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const includeInactive = String(req.query.include_inactive) === '1';
+    const whereClause = includeInactive ? '' : 'WHERE active = 1';
+
+    try {
+      const [rows] = await db.query(
+        `SELECT
+           id,
+           first_name,
+           last_name,
+           pps_number,
+           weekly_take_home,
+           date_of_employment,
+           employee_id,
+           notes,
+           active,
+           left_at
+         FROM workers
+         ${whereClause}
+         ORDER BY last_name, first_name`
+      );
+
+      res.json(rows);
+    } catch (err) {
+      console.error('LOAD WORKERS ERROR:', err);
+      res.status(500).json({ error: 'Failed to load workers' });
+    }
+  }
+);
+
+router.post(
+  '/workers',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const {
+      first_name,
+      last_name,
+      pps_number,
+      weekly_take_home,
+      date_of_employment,
+      employee_id,
+      notes
+    } = req.body;
+
+    if (!first_name || !first_name.trim() || !last_name || !last_name.trim()) {
+      return res.status(400).json({ error: 'First and last name are required' });
+    }
+
+    try {
+      await db.query(
+        `INSERT INTO workers
+         (first_name, last_name, pps_number, weekly_take_home, date_of_employment, employee_id, notes, active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+        [
+          first_name.trim(),
+          last_name.trim(),
+          pps_number || null,
+          weekly_take_home ?? null,
+          date_of_employment || null,
+          employee_id || null,
+          notes || null
+        ]
+      );
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error('CREATE WORKER ERROR:', err);
+      res.status(500).json({ error: 'Failed to create worker' });
+    }
+  }
+);
+
+router.put(
+  '/workers/:id',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const workerId = Number(req.params.id);
+    const {
+      first_name,
+      last_name,
+      pps_number,
+      weekly_take_home,
+      date_of_employment,
+      employee_id,
+      notes
+    } = req.body;
+
+    if (!first_name || !first_name.trim() || !last_name || !last_name.trim()) {
+      return res.status(400).json({ error: 'First and last name are required' });
+    }
+
+    try {
+      await db.query(
+        `UPDATE workers
+         SET
+           first_name = ?,
+           last_name = ?,
+           pps_number = ?,
+           weekly_take_home = ?,
+           date_of_employment = ?,
+           employee_id = ?,
+           notes = ?
+         WHERE id = ?`,
+        [
+          first_name.trim(),
+          last_name.trim(),
+          pps_number || null,
+          weekly_take_home ?? null,
+          date_of_employment || null,
+          employee_id || null,
+          notes || null,
+          workerId
+        ]
+      );
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error('UPDATE WORKER ERROR:', err);
+      res.status(500).json({ error: 'Failed to update worker' });
+    }
+  }
+);
+
+router.put(
+  '/workers/:id/status',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const workerId = Number(req.params.id);
+    const active = Number(req.body.active) === 1 ? 1 : 0;
+
+    try {
+      await db.query(
+        `UPDATE workers
+         SET active = ?, left_at = ?
+         WHERE id = ?`,
+        [active, active ? null : new Date(), workerId]
+      );
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error('UPDATE WORKER STATUS ERROR:', err);
+      res.status(500).json({ error: 'Failed to update worker status' });
+    }
+  }
+);
+
+/* ======================================================
    MERGE STAGES – SUPER ADMIN ONLY
    ====================================================== */
 router.post(

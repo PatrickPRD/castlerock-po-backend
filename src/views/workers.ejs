@@ -1,0 +1,79 @@
+<%- include('partials/head', { title: 'Workers | Castlerock Homes', styles: ['admin.css', 'workers.css'] }) %>
+<%- include('partials/header', { pageTitle: 'Workers' }) %>
+
+<main class="container">
+  <div class="card">
+    <div class="workers-header">
+      <h3 style="margin: 0;">Workers</h3>
+      <div class="workers-actions">
+        <label class="checkbox-row" for="showInactiveWorkers">
+          <input type="checkbox" id="showInactiveWorkers">
+          Show inactive workers
+        </label>
+        <button class="btn btn-primary" onclick="openWorkerModal()">
+          + Add Worker
+        </button>
+      </div>
+    </div>
+
+    <table class="po-table workers-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Employee ID</th>
+          <th>PPS Number</th>
+          <th>Weekly Take Home (<span data-currency-symbol>EUR</span>)</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="workerTable"></tbody>
+    </table>
+  </div>
+
+  <div id="workerModal" class="modal" style="display:none;">
+    <div class="modal-content" style="width: 600px;">
+      <h2 id="workerModalTitle">Add Worker</h2>
+      <p id="workerEditNotice" class="edit-notice" style="display:none; color: #666; font-size: 0.9rem; margin-bottom: 1rem;">
+        Editing existing worker
+      </p>
+
+      <div class="form-row workers-form">
+        <div>
+          <label for="workerFirstName">First name *</label>
+          <input id="workerFirstName" placeholder="Enter first name" class="form-control">
+        </div>
+        <div>
+          <label for="workerLastName">Last name *</label>
+          <input id="workerLastName" placeholder="Enter last name" class="form-control">
+        </div>
+        <div>
+          <label for="workerEmployeeId">Employee ID</label>
+          <input id="workerEmployeeId" placeholder="Employee ID" class="form-control">
+        </div>
+        <div>
+          <label for="workerPpsNumber">PPS Number</label>
+          <input id="workerPpsNumber" placeholder="PPS Number" class="form-control">
+        </div>
+        <div>
+          <label for="workerWeeklyPay">Weekly take home (<span data-currency-symbol>EUR</span>)</label>
+          <input id="workerWeeklyPay" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0.00" class="form-control">
+        </div>
+        <div>
+          <label for="workerEmploymentDate">Date of employment</label>
+          <input id="workerEmploymentDate" type="date" class="form-control">
+        </div>
+        <div class="full-width">
+          <label for="workerNotes">Notes</label>
+          <textarea id="workerNotes" rows="3" class="form-control" placeholder="Notes"></textarea>
+        </div>
+      </div>
+
+      <div class="form-row" style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1.5rem;">
+        <button class="btn btn-secondary" onclick="closeWorkerModal()">Cancel</button>
+        <button class="btn btn-primary" id="saveWorkerBtn" onclick="saveWorker()">Add Worker</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/footer', { scripts: ['/ui.js', 'workers.js'], includeNavScript: true }) %>

@@ -133,6 +133,28 @@ CREATE TABLE `suppliers` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ========================================
+-- WORKERS TABLE
+-- ========================================
+CREATE TABLE `workers` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `first_name` VARCHAR(100) NOT NULL,
+  `last_name` VARCHAR(100) NOT NULL,
+  `pps_number` VARCHAR(50),
+  `weekly_take_home` DECIMAL(12, 2) DEFAULT NULL,
+  `date_of_employment` DATE DEFAULT NULL,
+  `employee_id` VARCHAR(100),
+  `notes` TEXT,
+  `active` TINYINT(1) NOT NULL DEFAULT 1,
+  `left_at` DATE DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_last_name` (`last_name`),
+  INDEX `idx_employee_id` (`employee_id`),
+  INDEX `idx_pps_number` (`pps_number`),
+  INDEX `idx_active` (`active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ========================================
 -- PO STAGES TABLE (lookup table)
 -- ========================================
 CREATE TABLE `po_stages` (
@@ -327,10 +349,14 @@ INSERT INTO `site_settings` (`key`, `value`, `description`) VALUES
 ('header_color', '#212529', 'Header background color (dark navbar from Bootstrap)'),
 ('header_logo_mode', 'image', 'Header brand display mode: image or text'),
 ('header_logo_text', 'Castlerock Homes', 'Header text shown when header_logo_mode is text'),
-('accent_color', '#c62828', 'Accent color for highlights (primary red)'),
+('accent_color', '#1e40af', 'Accent color for highlights'),
+('currency_code', 'EUR', 'Default currency code'),
+('vat_rates', '[0,13.5,23]', 'Default VAT rates (percent)'),
 ('company_name', 'Castlerock Homes', 'Company name for branding'),
 ('company_trading_name', '', 'Trading as name for branding'),
 ('company_address', '', 'Company address for PO footer'),
+('company_vat_number', '', 'Company VAT number'),
+('company_cro_number', '', 'Company CRO number'),
 ('company_phone', '', 'Company phone number'),
 ('company_email', '', 'Company email address')
 ON DUPLICATE KEY UPDATE `value` = VALUES(`value`);
