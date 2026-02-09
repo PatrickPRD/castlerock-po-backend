@@ -28,7 +28,8 @@ let sortAscending = false; // Most recent first by default
    Helpers
    ========================= */
 const num = v => isNaN(Number(v)) ? 0 : Number(v);
-const euro = v => `€${num(v).toFixed(2)}`;
+const euro = v => (window.formatMoney ? window.formatMoney(v) : `€${num(v).toFixed(2)}`);
+const getCurrencySymbol = () => (window.getCurrencySymbol ? window.getCurrencySymbol() : '€');
 
 function formatVat(rate) {
   const n = Number(rate);
@@ -319,8 +320,8 @@ function renderInvoice(inv) {
     <td data-label="PO #">${inv.po_number}</td>
     <td data-label="Supplier">${inv.supplier}</td>
     <td data-label="VAT Rate">${formatVat(inv.vat_rate)}</td>
-    <td data-label="Net (€)">${euro(inv.net_amount)}</td>
-    <td data-label="Total (€)">${euro(inv.total_amount)}</td>
+    <td data-label="Net (${getCurrencySymbol()})">${euro(inv.net_amount)}</td>
+    <td data-label="Total (${getCurrencySymbol()})">${euro(inv.total_amount)}</td>
   `;
 
   // Details row
@@ -500,6 +501,7 @@ async function exportExcel() {
 
   // Load ExcelJS library
   const script = document.createElement('script');
+    const symbol = getCurrencySymbol();
   script.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js';
   script.onload = () => {
     const ExcelJS = window.ExcelJS;
@@ -577,9 +579,9 @@ async function exportExcel() {
     summarySheet.columns = [
       { header: 'Month', key: 'month', width: 15 },
       { header: 'Invoices', key: 'count', width: 12 },
-      { header: 'Net (€)', key: 'net', width: 15 },
-      { header: 'VAT (€)', key: 'vat', width: 15 },
-      { header: 'Total (€)', key: 'total', width: 15 }
+      { header: `Net (${symbol})`, key: 'net', width: 15 },
+      { header: `VAT (${symbol})`, key: 'vat', width: 15 },
+      { header: `Total (${symbol})`, key: 'total', width: 15 }
     ];
 
     summarySheet.getRow(5).font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -612,8 +614,7 @@ async function exportExcel() {
     grandTotalRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
 
     // Format currency columns
-    ['C', 'D', 'E'].forEach(col => {
-      summarySheet.getColumn(col).numFmt = '€#,##0.00';
+      summarySheet.getColumn(col).numFmt = `${symbol}#,##0.00`;
     });
 
     summarySheet.addRow([]);
@@ -625,9 +626,9 @@ async function exportExcel() {
 
     summarySheet.getCell(`A${suppRowStart + 1}`).value = 'Supplier';
     summarySheet.getCell(`B${suppRowStart + 1}`).value = 'Invoices';
-    summarySheet.getCell(`C${suppRowStart + 1}`).value = 'Net (€)';
-    summarySheet.getCell(`D${suppRowStart + 1}`).value = 'VAT (€)';
-    summarySheet.getCell(`E${suppRowStart + 1}`).value = 'Total (€)';
+    summarySheet.getCell(`C${suppRowStart + 1}`).value = `Net (${symbol})`;
+    summarySheet.getCell(`D${suppRowStart + 1}`).value = `VAT (${symbol})`;
+    summarySheet.getCell(`E${suppRowStart + 1}`).value = `Total (${symbol})`;
 
     for (let i = 1; i <= 5; i++) {
       summarySheet.getCell(`${String.fromCharCode(64 + i)}${suppRowStart + 1}`).font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -682,10 +683,10 @@ async function exportExcel() {
             { name: 'Site' },
             { name: 'Location' },
             { name: 'Stage' },
-            { name: 'Net (€)' },
+            { name: `Net (${symbol})` },
             { name: 'VAT %' },
-            { name: 'VAT (€)' },
-            { name: 'Total (€)' }
+            { name: `VAT (${symbol})` },
+            { name: `Total (${symbol})` }
           ],
           rows: data.invoices.map(inv => [
             inv.id,
@@ -731,8 +732,9 @@ async function exportExcel() {
         sheet.getCell(`L${totalRowNum}`).font = { bold: true };
 
         // Format currency columns
+        const symbol = window.getCurrencySymbol ? window.getCurrencySymbol() : '€';
         ['I', 'K', 'L'].forEach(col => {
-          sheet.getColumn(col).numFmt = '€#,##0.00';
+          sheet.getColumn(col).numFmt = `${symbol}#,##0.00`;
         });
 
         sheet.views = [{ state: 'frozen', ySplit: 1 }];
@@ -905,6 +907,11 @@ dateTo.addEventListener('change', applyFilters);
    Initialize
    ========================= */
 document.addEventListener('DOMContentLoaded', async () => {
+  if (window.loadCurrencySettings) {
+    try {
+      await window.loadCurrencySettings();
+    } catch (_) {}
+  }
   // Set default date filter to last month
   const today = new Date();
   const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);

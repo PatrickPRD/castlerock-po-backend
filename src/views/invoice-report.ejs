@@ -73,8 +73,8 @@
           <th onclick="sortTable('po_number')" class="sortable">PO # <span class="sort-indicator"></span></th>
           <th onclick="sortTable('supplier')" class="sortable">Supplier <span class="sort-indicator"></span></th>
           <th onclick="sortTable('vat_rate')" class="sortable">VAT Rate <span class="sort-indicator"></span></th>
-          <th onclick="sortTable('net_amount')" class="sortable">Net (€) <span class="sort-indicator"></span></th>
-          <th onclick="sortTable('total_amount')" class="sortable">Total (€) <span class="sort-indicator"></span></th>
+          <th onclick="sortTable('net_amount')" class="sortable">Net (<span data-currency-symbol>€</span>) <span class="sort-indicator"></span></th>
+          <th onclick="sortTable('total_amount')" class="sortable">Total (<span data-currency-symbol>€</span>) <span class="sort-indicator"></span></th>
         </tr>
       </thead>
       <tbody id="invoiceTable"></tbody>
@@ -89,11 +89,11 @@
     </div>
     <div>
       <strong>Total Net (ex VAT):</strong>
-      <span id="totalNet">€0.00</span>
+      <span id="totalNet"><span data-currency-symbol>€</span>0.00</span>
     </div>
     <div>
       <strong>Total Gross (inc VAT):</strong>
-      <span id="totalGross">€0.00</span>
+      <span id="totalGross"><span data-currency-symbol>€</span>0.00</span>
     </div>
   </div>
 </main>

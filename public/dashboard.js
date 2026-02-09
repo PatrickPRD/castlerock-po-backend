@@ -26,6 +26,48 @@ let allPOs = [];
 
 let createLineItems = null;
 let editLineItems = null;
+let vatRatesCache = null;
+
+async function ensureVatRates() {
+  if (vatRatesCache) return vatRatesCache;
+  try {
+    const res = await fetch('/settings/financial', {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    const data = await res.json();
+    vatRatesCache = Array.isArray(data.vat_rates) ? data.vat_rates.map(Number) : [];
+  } catch (_) {
+    vatRatesCache = [];
+  }
+  return vatRatesCache;
+}
+
+function fillVatSelect(select, rates) {
+  if (!select) return;
+  const current = select.value;
+  select.innerHTML = '';
+  if (!rates || rates.length === 0) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'No VAT rates configured';
+    opt.disabled = true;
+    opt.selected = true;
+    select.appendChild(opt);
+    select.disabled = true;
+    return;
+  }
+  select.disabled = false;
+  rates.sort((a, b) => a - b).forEach(rate => {
+    const opt = document.createElement('option');
+    opt.value = rate;
+    opt.textContent = `${rate}%`;
+    select.appendChild(opt);
+  });
+  if (current) {
+    const has = rates.some(r => String(r) === current);
+    select.value = has ? current : String(rates[0] || 0);
+  }
+}
 
 function initLineItemsManager({
   toggleBtn,
@@ -316,6 +358,7 @@ function num(v) {
   return isNaN(n) ? 0 : n;
 }
 function euro(v) {
+  if (window.formatMoney) return window.formatMoney(v);
   return `€${num(v).toFixed(2)}`;
 }
 
@@ -509,7 +552,7 @@ function renderPO(po) {
           <div><strong>Site:</strong> ${po.site}</div>
           ${po.site_address ? `<div><strong>Site Address:</strong> ${po.site_address}</div>` : ''}
           <div><strong>VAT Rate:</strong> ${formatVat(po.vat_rate)}</div>
-          <div><strong>Total (inc VAT):</strong> €${Number(po.total_amount).toFixed(2)}</div>
+          <div><strong>Total (inc VAT):</strong> ${euro(Number(po.total_amount))}</div>
           <div>
             <strong>Uninvoiced (inc VAT):</strong>
             <span class="${
@@ -519,7 +562,7 @@ function renderPO(po) {
                 ? "ok"
                 : "warn"
             }">
-              €${Number(po.uninvoiced_total).toFixed(2)}
+              ${euro(Number(po.uninvoiced_total))}
             </span>
           </div>
         </div>
@@ -656,10 +699,10 @@ async function loadInvoices(poId, container) {
       <td>${i.id}</td>
       <td>${i.invoice_number}</td>
       <td>${i.invoice_date}</td>
-      <td>€${Number(i.net_amount).toFixed(2)}</td>
+      <td>${euro(Number(i.net_amount))}</td>
       <td>${formatVat(i.vat_rate)}</td>
       <td>${euro(vatAmount)}</td>
-      <td>€${Number(i.total_amount).toFixed(2)}</td>
+      <td>${euro(Number(i.total_amount))}</td>
     </tr>
   `;
   });
@@ -702,9 +745,24 @@ async function editPO(id) {
     document.getElementById("editPONetAmount").value = po.net_amount;
     let originalNetAmount = po.net_amount;
     
+    const editVatSelect = document.getElementById("editPOVatRate");
+    if (editVatSelect) {
+      const rates = await ensureVatRates();
+      fillVatSelect(editVatSelect, rates);
+    }
+
     // Convert decimal VAT rate to percentage for dropdown (0.135 -> 13.5)
     const vatRatePercent = po.vat_rate < 1 ? po.vat_rate * 100 : po.vat_rate;
-    document.getElementById("editPOVatRate").value = vatRatePercent;
+    if (editVatSelect) {
+      const hasRate = Array.from(editVatSelect.options).some(opt => Number(opt.value) === Number(vatRatePercent));
+      if (!hasRate) {
+        const opt = document.createElement('option');
+        opt.value = vatRatePercent;
+        opt.textContent = `${vatRatePercent}%`;
+        editVatSelect.appendChild(opt);
+      }
+      editVatSelect.value = String(vatRatePercent);
+    }
     
     // Store the PO ID and site ID for submission
     document.getElementById("editPOForm").dataset.poId = id;
@@ -1085,6 +1143,11 @@ function openCreatePOModal() {
   loadPOSuppliers();
   loadPOSites();
   loadPOStages();
+  ensureVatRates().then(rates => {
+    fillVatSelect(document.getElementById("poVatRate"), rates);
+    const vatField = document.getElementById("poVatRate");
+    if (vatField) vatField.dispatchEvent(new Event('change'));
+  });
   
   // Reset form
   document.getElementById("poForm").reset();
@@ -1554,6 +1617,11 @@ document.addEventListener("DOMContentLoaded", () => {
    Init
    ============================ */
 (async () => {
+  if (window.loadCurrencySettings) {
+    try {
+      await window.loadCurrencySettings();
+    } catch (_) {}
+  }
   setDefaultDateFilter();
   await loadPOs();
   setupSearchableSupplierFilter();

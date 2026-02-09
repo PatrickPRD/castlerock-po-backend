@@ -10,6 +10,7 @@ const path = require('path');
 const SettingsService = require('../services/settingsService');
 const { authenticate } = require('../middleware/auth');
 const authorizeRoles = require('../middleware/authorizeRoles');
+const db = require('../db');
 
 /**
  * GET /settings/public
@@ -95,6 +96,125 @@ router.put(
     } catch (error) {
       console.error('Error updating branding settings:', error);
       res.status(500).json({ error: 'Failed to update branding settings' });
+    }
+  }
+);
+
+/**
+ * GET /settings/financial
+ * Returns currency + VAT rate options with usage counts
+ */
+router.get(
+  '/financial',
+  authenticate,
+  authorizeRoles('super_admin', 'admin', 'staff', 'viewer'),
+  async (req, res) => {
+    try {
+      const settings = await SettingsService.getSettings();
+      const currency_code = settings.currency_code || 'EUR';
+      const vatRates = settings.vat_rates
+        ? JSON.parse(settings.vat_rates)
+        : [0, 13.5, 23];
+
+      // Aggregate usage from both POs and invoices
+      const [poRates] = await db.query(
+        'SELECT vat_rate, COUNT(*) AS count FROM purchase_orders GROUP BY vat_rate'
+      );
+      const [invRates] = await db.query(
+        'SELECT vat_rate, COUNT(*) AS count FROM invoices GROUP BY vat_rate'
+      );
+
+      const usageMap = new Map();
+      function addUsage(rows) {
+        rows.forEach(r => {
+          const percent = Number(r.vat_rate) < 1 ? Number(r.vat_rate) * 100 : Number(r.vat_rate);
+          const key = Number(percent.toFixed(3));
+          usageMap.set(key, (usageMap.get(key) || 0) + Number(r.count || 0));
+        });
+      }
+      addUsage(poRates || []);
+      addUsage(invRates || []);
+
+      const usage = {};
+      usageMap.forEach((count, rate) => {
+        usage[String(rate)] = count;
+      });
+
+      res.json({
+        currency_code,
+        vat_rates: vatRates,
+        usage
+      });
+    } catch (error) {
+      console.error('Error fetching financial settings:', error);
+      res.status(500).json({ error: 'Failed to fetch financial settings' });
+    }
+  }
+);
+
+/**
+ * PUT /settings/financial
+ * Update currency + VAT list; block removal of in-use VAT rates
+ */
+router.put(
+  '/financial',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      const { currencyCode, vatRates } = req.body || {};
+
+      const currency = String(currencyCode || 'EUR').toUpperCase();
+      if (!/^[A-Z]{3}$/.test(currency)) {
+        return res.status(400).json({ error: 'currencyCode must be a 3-letter ISO code' });
+      }
+
+      if (!Array.isArray(vatRates) || vatRates.length === 0) {
+        return res.status(400).json({ error: 'vatRates must be a non-empty array' });
+      }
+
+      const normalizedRates = vatRates.map(r => Number(r)).filter(r => Number.isFinite(r));
+      if (normalizedRates.length !== vatRates.length) {
+        return res.status(400).json({ error: 'vatRates must contain numbers only' });
+      }
+      if (normalizedRates.some(r => r < 0 || r > 100)) {
+        return res.status(400).json({ error: 'vatRates must be between 0 and 100' });
+      }
+
+      // Current usage
+      const [poRates] = await db.query(
+        'SELECT vat_rate, COUNT(*) AS count FROM purchase_orders GROUP BY vat_rate'
+      );
+      const [invRates] = await db.query(
+        'SELECT vat_rate, COUNT(*) AS count FROM invoices GROUP BY vat_rate'
+      );
+
+      const usageSet = new Set();
+      function addUsage(rows) {
+        rows.forEach(r => {
+          const percent = Number(r.vat_rate) < 1 ? Number(r.vat_rate) * 100 : Number(r.vat_rate);
+          usageSet.add(Number(percent.toFixed(3)));
+        });
+      }
+      addUsage(poRates || []);
+      addUsage(invRates || []);
+
+      const newSet = new Set(normalizedRates.map(r => Number(r.toFixed(3))));
+      const blocked = [...usageSet].filter(r => !newSet.has(r));
+      if (blocked.length > 0) {
+        return res.status(400).json({
+          error: 'Cannot remove VAT rates that are in use',
+          blockedRates: blocked
+        });
+      }
+
+      await SettingsService.updateSetting('currency_code', currency);
+      await SettingsService.updateSetting('vat_rates', JSON.stringify(normalizedRates));
+
+      res.json({ success: true, currency_code: currency, vat_rates: normalizedRates });
+    } catch (error) {
+      console.error('Error updating financial settings:', error);
+      res.status(500).json({ error: 'Failed to update financial settings' });
     }
   }
 );

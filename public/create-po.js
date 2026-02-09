@@ -37,6 +37,7 @@ const lineItemSuggestions = document.getElementById('lineItemSuggestions');
 
 let lineItemsMode = false;
 let lineItemSearchTimeout = null;
+let availableVatRates = [];
 
 
 /* =========================
@@ -85,6 +86,7 @@ function loadOptions(url, selectEl) {
 loadOptions('/suppliers', supplierSelect);
 loadOptions('/sites', siteSelect);
 loadOptions('/stages', stageSelect);
+loadVatRates();
 
 /* =========================
    Site → Location cascade
@@ -110,6 +112,45 @@ function recalc() {
 
   vatAmount.textContent   = vat.toFixed(2);
   totalAmount.textContent = total.toFixed(2);
+}
+
+async function loadVatRates() {
+  try {
+    const res = await fetch('/settings/financial', {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    const data = await res.json();
+    availableVatRates = Array.isArray(data.vat_rates) ? data.vat_rates.map(Number) : [];
+  } catch (_) {
+    availableVatRates = [];
+  }
+
+  vatRate.innerHTML = '';
+  if (!availableVatRates.length) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'No VAT rates configured';
+    opt.disabled = true;
+    opt.selected = true;
+    vatRate.appendChild(opt);
+    vatRate.disabled = true;
+    recalc();
+    return;
+  }
+  vatRate.disabled = false;
+  availableVatRates
+    .sort((a, b) => a - b)
+    .forEach(rate => {
+      const opt = document.createElement('option');
+      opt.value = rate;
+      opt.textContent = `${rate}%`;
+      vatRate.appendChild(opt);
+    });
+  // keep existing selection if possible
+  if (!vatRate.value) {
+    vatRate.value = String(availableVatRates[0]);
+  }
+  recalc();
 }
 
 function setLineItemsMode(enabled) {

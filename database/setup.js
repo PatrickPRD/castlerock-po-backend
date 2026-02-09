@@ -367,6 +367,7 @@ async function setupDatabase() {
       ('header_logo_text', 'Castlerock Homes', 'Header text shown when header_logo_mode is text'),
       ('accent_color', '#c62828', 'Accent color for highlights (primary red)'),
       ('company_name', 'Castlerock Homes', 'Company name for branding'),
+      ('company_trading_name', '', 'Trading as name for branding'),
       ('company_address', '', 'Company address for PO footer'),
       ('company_phone', '', 'Company phone number'),
       ('company_email', '', 'Company email address')

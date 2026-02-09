@@ -17,7 +17,7 @@ let sortAscending = true;
    Helpers
    ========================= */
 const num = v => isNaN(Number(v)) ? 0 : Number(v);
-const euro = v => `€${num(v).toFixed(2)}`;
+const euro = v => (window.formatMoney ? window.formatMoney(v) : `€${num(v).toFixed(2)}`);
 
 /* =========================
    Load Sites into Dropdown
@@ -215,4 +215,12 @@ function back() {
 /* =========================
    Init
    ========================= */
-loadSites().then(loadReport);
+(async () => {
+  if (window.loadCurrencySettings) {
+    try {
+      await window.loadCurrencySettings();
+    } catch (_) {}
+  }
+  await loadSites();
+  await loadReport();
+})();

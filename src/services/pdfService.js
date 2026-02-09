@@ -147,6 +147,13 @@ class PDFService {
     const companyAddress = settings.company_address || '';
     const companyPhone = settings.company_phone || '';
     const companyEmail = settings.company_email || '';
+    const currencyCode = String(settings.currency_code || 'EUR').toUpperCase();
+    const currencySymbol = {
+      EUR: '€',
+      GBP: '£',
+      USD: '$'
+    }[currencyCode] || currencyCode;
+    const formatMoney = value => `${currencySymbol}${Number(value || 0).toFixed(2)}`;
 
     const vatAmount = (po_net_amount * (po_vat_rate / 100)).toFixed(2);
     const poDate = new Date(po_date).toLocaleDateString('en-IE', {
@@ -181,8 +188,8 @@ class PDFService {
                 <td style="padding: 6px; font-size: 11px;">${this.escapeHtml(item.description || '')}</td>
                 <td style="padding: 6px; text-align: right; font-size: 11px;">${Number(item.quantity || 0).toFixed(2)}</td>
                 <td style="padding: 6px; font-size: 11px;">${this.escapeHtml(item.unit || '')}</td>
-                <td style="padding: 6px; text-align: right; font-size: 11px;">€${Number(item.unit_price || 0).toFixed(2)}</td>
-                <td style="padding: 6px; text-align: right; font-size: 11px; font-weight: 500;">€${Number(item.line_total || 0).toFixed(2)}</td>
+                <td style="padding: 6px; text-align: right; font-size: 11px;">${formatMoney(item.unit_price)}</td>
+                <td style="padding: 6px; text-align: right; font-size: 11px; font-weight: 500;">${formatMoney(item.line_total)}</td>
               </tr>
         `;
       });
@@ -206,10 +213,10 @@ class PDFService {
               <tr style="background-color: #f5f6f8;">
                 <th style="padding: 6px; text-align: left; font-weight: 600; font-size: 11px;">Invoice #</th>
                 <th style="padding: 6px; text-align: left; font-weight: 600; font-size: 11px;">Date</th>
-                <th style="padding: 6px; text-align: right; font-weight: 600; font-size: 11px;">Net (€)</th>
+                <th style="padding: 6px; text-align: right; font-weight: 600; font-size: 11px;">Net (${currencySymbol})</th>
                 <th style="padding: 6px; text-align: right; font-weight: 600; font-size: 11px;">VAT %</th>
-                <th style="padding: 6px; text-align: right; font-weight: 600; font-size: 11px;">VAT (€)</th>
-                <th style="padding: 6px; text-align: right; font-weight: 600; font-size: 11px;">Total (€)</th>
+                <th style="padding: 6px; text-align: right; font-weight: 600; font-size: 11px;">VAT (${currencySymbol})</th>
+                <th style="padding: 6px; text-align: right; font-weight: 600; font-size: 11px;">Total (${currencySymbol})</th>
               </tr>
             </thead>
             <tbody>
@@ -222,10 +229,10 @@ class PDFService {
               <tr style="background-color: ${rowBg}; border-bottom: 1px solid #eee;">
                 <td style="padding: 6px; font-size: 11px;">${this.escapeHtml(inv.invoice_number)}</td>
                 <td style="padding: 6px; font-size: 11px;">${inv.invoice_date}</td>
-                <td style="padding: 6px; text-align: right; font-size: 11px;">€${parseFloat(inv.net_amount || 0).toFixed(2)}</td>
+                <td style="padding: 6px; text-align: right; font-size: 11px;">${formatMoney(inv.net_amount)}</td>
                 <td style="padding: 6px; text-align: right; font-size: 11px;">${parseFloat(inv.vat_rate || 0)}%</td>
-                <td style="padding: 6px; text-align: right; font-size: 11px;">€${parseFloat(inv.vat_amount || 0).toFixed(2)}</td>
-                <td style="padding: 6px; text-align: right; font-size: 11px; font-weight: 500;">€${parseFloat(inv.total_amount || 0).toFixed(2)}</td>
+                <td style="padding: 6px; text-align: right; font-size: 11px;">${formatMoney(inv.vat_amount)}</td>
+                <td style="padding: 6px; text-align: right; font-size: 11px; font-weight: 500;">${formatMoney(inv.total_amount)}</td>
               </tr>
         `;
       });
@@ -237,11 +244,11 @@ class PDFService {
           <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;">
             <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 15px; margin-bottom: 6px; font-size: 12px;">
               <div style="text-align: right; font-weight: 500;">Total Invoiced:</div>
-              <div style="text-align: right;">€${totalInvoiced.toFixed(2)}</div>
+              <div style="text-align: right;">${formatMoney(totalInvoiced)}</div>
             </div>
             <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 15px; font-size: 12px;">
               <div style="text-align: right; font-weight: 500;">Uninvoiced Amount:</div>
-              <div style="text-align: right; font-weight: 600; color: ${uninvoiced < 0 ? '#d32f2f' : '#2e7d32'};">€${uninvoiced}</div>
+              <div style="text-align: right; font-weight: 600; color: ${uninvoiced < 0 ? '#d32f2f' : '#2e7d32'};">${formatMoney(uninvoiced)}</div>
             </div>
           </div>
         </div>
@@ -532,15 +539,15 @@ class PDFService {
               <div class="totals-section">
                 <div class="totals-row">
                   <div class="totals-label">Subtotal (ex VAT):</div>
-                  <div class="totals-value">€${parseFloat(po_net_amount || 0).toFixed(2)}</div>
+                  <div class="totals-value">${formatMoney(po_net_amount)}</div>
                 </div>
                 <div class="totals-row">
                   <div class="totals-label">VAT (${po_vat_rate || 0}%):</div>
-                  <div class="totals-value">€${parseFloat(vatAmount).toFixed(2)}</div>
+                  <div class="totals-value">${formatMoney(vatAmount)}</div>
                 </div>
                 <div class="totals-row">
                   <div class="totals-label total-amount">Total Amount (inc VAT):</div>
-                  <div class="totals-value total-amount">€${parseFloat(po_total_amount || 0).toFixed(2)}</div>
+                  <div class="totals-value total-amount">${formatMoney(po_total_amount)}</div>
                 </div>
               </div>
             </div>

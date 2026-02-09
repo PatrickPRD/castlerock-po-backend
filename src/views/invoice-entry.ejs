@@ -59,9 +59,7 @@
           <div class="form-group">
             <label for="vatRate">VAT Rate</label>
             <select id="vatRate">
-              <option value="0">0%</option>
-              <option value="13.5">13.5%</option>
-              <option value="23">23%</option>
+              <option value="" disabled selected>Loading VAT rates...</option>
             </select>
           </div>
         </div>
@@ -69,11 +67,11 @@
         <div class="details-grid">
           <div>
             <strong>VAT Amount:</strong>
-            <span id="vatAmount">€0.00</span>
+            <span id="vatAmount"><span data-currency-symbol>€</span>0.00</span>
           </div>
           <div>
             <strong>Total (inc VAT):</strong>
-            <span id="totalAmount">€0.00</span>
+            <span id="totalAmount"><span data-currency-symbol>€</span>0.00</span>
           </div>
         </div>
 

@@ -22,6 +22,7 @@ const vatAmountSpan   = el('vatAmount');
 const totalAmountSpan = el('totalAmount');
 
 let po = null;
+let vatRates = [];
 
 /* ================= Modal Functions ================= */
 function openAddInvoiceModal() {
@@ -60,7 +61,7 @@ invoiceModal.addEventListener('click', e => {
 
 /* ================= Utilities ================= */
 const num  = v => isNaN(Number(v)) ? 0 : Number(v);
-const euro = v => `€${num(v).toFixed(2)}`;
+const euro = v => (window.formatMoney ? window.formatMoney(v) : `€${num(v).toFixed(2)}`);
 
 function formatVat(rate) {
   const n = Number(rate);
@@ -77,6 +78,39 @@ function formatVat(rate) {
 
   // fallback
   return `${n}%`;
+}
+
+async function loadVatRates() {
+  try {
+    const res = await fetch('/settings/financial', {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    const data = await res.json();
+    vatRates = Array.isArray(data.vat_rates) ? data.vat_rates.map(Number) : [];
+  } catch (_) {
+    vatRates = [];
+  }
+
+  vatRateSelect.innerHTML = '';
+  if (!vatRates.length) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'No VAT rates configured';
+    opt.disabled = true;
+    opt.selected = true;
+    vatRateSelect.appendChild(opt);
+    vatRateSelect.disabled = true;
+    return;
+  }
+  vatRateSelect.disabled = false;
+  vatRates
+    .sort((a, b) => a - b)
+    .forEach(rate => {
+      const opt = document.createElement('option');
+      opt.value = rate;
+      opt.textContent = `${rate}%`;
+      vatRateSelect.appendChild(opt);
+    });
 }
 
 
@@ -255,4 +289,11 @@ if (purchaseOrdersTextEl) {
   purchaseOrdersTextEl.textContent = 'Back to Purchase Orders';
 }
 
-loadPO();
+(async () => {
+  if (window.loadCurrencySettings) {
+    try {
+      await window.loadCurrencySettings();
+    } catch (_) {}
+  }
+  await loadPO();
+})();

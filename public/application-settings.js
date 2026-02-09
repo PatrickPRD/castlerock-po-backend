@@ -1,6 +1,6 @@
 (() => {
-if (window.__headerBrandingPageInitialized) return;
-window.__headerBrandingPageInitialized = true;
+if (window.__applicationSettingsPageInitialized) return;
+window.__applicationSettingsPageInitialized = true;
 
 const token = localStorage.getItem('token');
 const role = localStorage.getItem('role');
@@ -19,14 +19,35 @@ const logoImageSection = document.getElementById('logoImageSection');
 const logoTextSection = document.getElementById('logoTextSection');
 const resetBtn = document.getElementById('resetBtn');
 
+const companyDetailsForm = document.getElementById('companyDetailsForm');
+const companyNameInput = document.getElementById('companyName');
+const companyTradingNameInput = document.getElementById('companyTradingName');
+const companyAddressInput = document.getElementById('companyAddress');
+const companyVatNumberInput = document.getElementById('companyVatNumber');
+const companyCroNumberInput = document.getElementById('companyCroNumber');
+const currentCompanyName = document.getElementById('currentCompanyName');
+const currentCompanyTradingName = document.getElementById('currentCompanyTradingName');
+const currentCompanyAddress = document.getElementById('currentCompanyAddress');
+const currentCompanyVatNumber = document.getElementById('currentCompanyVatNumber');
+const currentCompanyCroNumber = document.getElementById('currentCompanyCroNumber');
+const companyResetBtn = document.getElementById('companyResetBtn');
+const financialForm = document.getElementById('financialForm');
+const currencyCodeSelect = document.getElementById('currencyCode');
+const vatInput = document.getElementById('vatInput');
+const vatAddBtn = document.getElementById('vatAddBtn');
+const vatList = document.getElementById('vatList');
+const financialResetBtn = document.getElementById('financialResetBtn');
+
 const brandPreviewBar = document.getElementById('brandPreviewBar');
 const brandPreviewImage = document.getElementById('brandPreviewImage');
 const brandPreviewText = document.getElementById('brandPreviewText');
 
 let currentLogoPath = '/assets/Logo.png';
 let selectedFileDataUrl = null;
+let financialVatRates = [];
+let vatUsage = {};
 const BRANDING_EVENT_KEY = 'headerBrandingVersion';
-const BRANDING_CHANNEL_NAME = 'header-branding-updates';
+const BRANDING_CHANNEL_NAME = 'application-settings-updates';
 
 function applyLiveHeaderBranding({ headerColor, logoMode, logoText, logoPath }) {
   const nav = document.getElementById('mainHeaderNav');
@@ -152,6 +173,106 @@ async function loadBrandingSettings() {
   });
 }
 
+async function loadCompanyDetails() {
+  const settings = await api('/settings');
+
+  if (companyNameInput) companyNameInput.value = settings.company_name || '';
+  if (companyTradingNameInput) companyTradingNameInput.value = settings.company_trading_name || '';
+  if (companyAddressInput) companyAddressInput.value = settings.company_address || '';
+  if (companyVatNumberInput) companyVatNumberInput.value = settings.company_vat_number || '';
+  if (companyCroNumberInput) companyCroNumberInput.value = settings.company_cro_number || '';
+
+  if (currentCompanyName) currentCompanyName.textContent = settings.company_name || '-';
+  if (currentCompanyTradingName) currentCompanyTradingName.textContent = settings.company_trading_name || '-';
+  if (currentCompanyAddress) currentCompanyAddress.textContent = settings.company_address || '-';
+  if (currentCompanyVatNumber) currentCompanyVatNumber.textContent = settings.company_vat_number || '-';
+  if (currentCompanyCroNumber) currentCompanyCroNumber.textContent = settings.company_cro_number || '-';
+}
+
+async function loadFinancialSettings() {
+  const settings = await api('/settings/financial');
+  financialVatRates = Array.isArray(settings.vat_rates) ? settings.vat_rates.map(Number) : [];
+  vatUsage = settings.usage || {};
+  if (currencyCodeSelect) {
+    currencyCodeSelect.value = (settings.currency_code || 'EUR').toUpperCase();
+  }
+  renderVatList();
+}
+
+function renderVatList() {
+  if (!vatList) return;
+  vatList.innerHTML = '';
+  const rates = [...financialVatRates].sort((a, b) => a - b);
+
+  rates.forEach(rate => {
+    const percent = Number(rate);
+    const usageCount = vatUsage && vatUsage[String(Number(percent.toFixed(3)))] || 0;
+    const disabled = usageCount > 0;
+
+    const row = document.createElement('div');
+    row.className = 'd-flex align-items-center justify-content-between border rounded px-3 py-2';
+    row.innerHTML = `
+      <div>
+        <strong>${percent}%</strong>
+        ${usageCount ? `<span class="badge bg-secondary ms-2">${usageCount} in use</span>` : ''}
+      </div>
+      <button type="button" class="btn btn-outline-danger btn-sm" ${disabled ? 'disabled' : ''} data-rate="${percent}">Delete</button>
+    `;
+
+    const btn = row.querySelector('button');
+    btn.addEventListener('click', () => handleDeleteVat(percent));
+
+    vatList.appendChild(row);
+  });
+}
+
+function handleAddVat() {
+  const value = Number(vatInput?.value);
+  if (!Number.isFinite(value) || value < 0 || value > 100) {
+    showToast('Enter a VAT rate between 0 and 100', 'warning');
+    return;
+  }
+  const rounded = Number(value.toFixed(3));
+  if (financialVatRates.some(r => Number(r.toFixed(3)) === rounded)) {
+    showToast('VAT rate already exists', 'info');
+    return;
+  }
+  financialVatRates.push(rounded);
+  vatInput.value = '';
+  renderVatList();
+}
+
+async function saveFinancialSettings() {
+  const payload = {
+    currencyCode: currencyCodeSelect?.value || 'EUR',
+    vatRates: financialVatRates
+  };
+  const res = await api('/settings/financial', 'PUT', payload);
+  financialVatRates = res.vat_rates || financialVatRates;
+  showToast('Financial settings updated', 'success');
+  await loadFinancialSettings();
+  if (window.clearCurrencyCache) {
+    window.clearCurrencyCache();
+  }
+  if (window.applyCurrencySymbols) {
+    await window.applyCurrencySymbols();
+  }
+}
+
+async function handleDeleteVat(rate) {
+  financialVatRates = financialVatRates.filter(r => Number(r.toFixed(3)) !== Number(rate.toFixed(3)));
+  try {
+    await saveFinancialSettings();
+  } catch (err) {
+    if (!financialVatRates.some(r => Number(r.toFixed(3)) === Number(rate.toFixed(3)))) {
+      financialVatRates.push(rate);
+      financialVatRates.sort((a, b) => a - b);
+    }
+    showToast(err.message || 'Cannot delete VAT rate in use', 'error');
+    await loadFinancialSettings();
+  }
+}
+
 brandingForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
@@ -197,6 +318,57 @@ brandingForm.addEventListener('submit', async (e) => {
     showToast(err.message || 'Failed to update branding', 'error');
   }
 });
+
+if (companyDetailsForm) {
+  companyDetailsForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    try {
+      await api('/settings/bulk', 'POST', {
+        company_name: (companyNameInput?.value || '').trim(),
+        company_trading_name: (companyTradingNameInput?.value || '').trim(),
+        company_address: (companyAddressInput?.value || '').trim(),
+        company_vat_number: (companyVatNumberInput?.value || '').trim(),
+        company_cro_number: (companyCroNumberInput?.value || '').trim()
+      });
+      await loadCompanyDetails();
+      showToast('Company details updated successfully', 'success');
+    } catch (err) {
+      showToast(err.message || 'Failed to update company details', 'error');
+    }
+  });
+}
+
+if (companyResetBtn) {
+  companyResetBtn.addEventListener('click', () => {
+    loadCompanyDetails().catch((err) => {
+      showToast(err.message || 'Failed to load company details', 'error');
+    });
+  });
+}
+
+if (vatAddBtn) {
+  vatAddBtn.addEventListener('click', handleAddVat);
+}
+
+if (financialForm) {
+  financialForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      await saveFinancialSettings();
+    } catch (err) {
+      showToast(err.message || 'Failed to update financial settings', 'error');
+    }
+  });
+}
+
+if (financialResetBtn) {
+  financialResetBtn.addEventListener('click', () => {
+    loadFinancialSettings().catch((err) => {
+      showToast(err.message || 'Failed to load financial settings', 'error');
+    });
+  });
+}
 
 logoModeSelect.addEventListener('change', () => {
   toggleLogoSections();
@@ -254,6 +426,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadBrandingSettings();
   } catch (err) {
     showToast(err.message || 'Failed to load branding settings', 'error');
+  }
+
+  try {
+    await loadCompanyDetails();
+  } catch (err) {
+    showToast(err.message || 'Failed to load company details', 'error');
+  }
+
+  try {
+    await loadFinancialSettings();
+  } catch (err) {
+    showToast(err.message || 'Failed to load financial settings', 'error');
   }
 });
 })();

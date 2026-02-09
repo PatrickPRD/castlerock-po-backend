@@ -92,8 +92,13 @@ class SettingsService {
       header_logo_mode: 'image',
       header_logo_text: 'Castlerock Homes',
       accent_color: '#1e40af',
+      currency_code: 'EUR',
+      vat_rates: JSON.stringify([0, 13.5, 23]),
       company_name: 'Castlerock Homes',
+      company_trading_name: '',
       company_address: '',
+      company_vat_number: '',
+      company_cro_number: '',
       company_phone: '',
       company_email: ''
     };
@@ -109,3 +114,4 @@ class SettingsService {
 }
 
 module.exports = SettingsService;
+

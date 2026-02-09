@@ -71,6 +71,7 @@ CREATE TABLE `locations` (
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON DELETE RESTRICT,
   INDEX `idx_name` (`name`),
+  INDEX `idx_type` (`type`),
   INDEX `idx_site_id` (`site_id`),
   INDEX `idx_active` (`active`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -163,6 +164,8 @@ CREATE TABLE `purchase_orders` (
   `created_by` INT NOT NULL,
   `approved_by` INT,
   `approved_at` DATETIME,
+  `cancelled_by` INT,
+  `cancelled_at` DATETIME,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (`supplier_id`) REFERENCES `suppliers`(`id`) ON DELETE RESTRICT,
@@ -171,13 +174,34 @@ CREATE TABLE `purchase_orders` (
   FOREIGN KEY (`stage_id`) REFERENCES `po_stages`(`id`) ON DELETE SET NULL,
   FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE RESTRICT,
   FOREIGN KEY (`approved_by`) REFERENCES `users`(`id`) ON DELETE SET NULL,
+  FOREIGN KEY (`cancelled_by`) REFERENCES `users`(`id`) ON DELETE SET NULL,
   INDEX `idx_po_number` (`po_number`),
   INDEX `idx_supplier_id` (`supplier_id`),
   INDEX `idx_site_id` (`site_id`),
   INDEX `idx_location_id` (`location_id`),
   INDEX `idx_stage_id` (`stage_id`),
   INDEX `idx_status` (`status`),
-  INDEX `idx_po_date` (`po_date`)
+  INDEX `idx_po_date` (`po_date`),
+  INDEX `idx_created_by` (`created_by`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ========================================
+-- PO LINE ITEMS TABLE
+-- ========================================
+CREATE TABLE `po_line_items` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `po_id` INT NOT NULL,
+  `line_number` INT NOT NULL,
+  `description` TEXT NOT NULL,
+  `quantity` DECIMAL(10, 2) NOT NULL,
+  `unit` VARCHAR(50),
+  `unit_price` DECIMAL(15, 2) NOT NULL,
+  `line_total` DECIMAL(15, 2) GENERATED ALWAYS AS (quantity * unit_price) STORED,
+  `received_quantity` DECIMAL(10, 2) DEFAULT 0.00,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`po_id`) REFERENCES `purchase_orders`(`id`) ON DELETE CASCADE,
+  INDEX `idx_po_id` (`po_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ========================================
@@ -186,7 +210,7 @@ CREATE TABLE `purchase_orders` (
 CREATE TABLE `invoices` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `purchase_order_id` INT NOT NULL,
-  `invoice_number` VARCHAR(100) NOT NULL,
+  `invoice_number` VARCHAR(100) NOT NULL UNIQUE,
   `invoice_date` DATE NOT NULL,
   `net_amount` DECIMAL(15, 2) NOT NULL,
   `vat_rate` DECIMAL(5, 4) NOT NULL DEFAULT 0.2300 COMMENT 'Valid rates: 0.0000, 0.1350, 0.2300',
@@ -305,6 +329,7 @@ INSERT INTO `site_settings` (`key`, `value`, `description`) VALUES
 ('header_logo_text', 'Castlerock Homes', 'Header text shown when header_logo_mode is text'),
 ('accent_color', '#c62828', 'Accent color for highlights (primary red)'),
 ('company_name', 'Castlerock Homes', 'Company name for branding'),
+('company_trading_name', '', 'Trading as name for branding'),
 ('company_address', '', 'Company address for PO footer'),
 ('company_phone', '', 'Company phone number'),
 ('company_email', '', 'Company email address')

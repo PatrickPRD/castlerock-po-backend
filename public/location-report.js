@@ -11,7 +11,8 @@ let allData = [];
    Helpers
    ========================= */
 const num = v => isNaN(Number(v)) ? 0 : Number(v);
-const euro = v => `€${num(v).toFixed(2)}`;
+const euro = v => (window.formatMoney ? window.formatMoney(v) : `€${num(v).toFixed(2)}`);
+const getCurrencySymbol = () => (window.getCurrencySymbol ? window.getCurrencySymbol() : '€');
 
 /* =========================
    Load Report
@@ -69,9 +70,9 @@ function renderReport() {
           <thead>
             <tr>
               <th>Stage</th>
-              <th>Net (€)</th>
-              <th>Gross (€)</th>
-              <th>Uninvoiced (€)</th>
+              <th>Net (${getCurrencySymbol()})</th>
+              <th>Gross (${getCurrencySymbol()})</th>
+              <th>Uninvoiced (${getCurrencySymbol()})</th>
             </tr>
           </thead>
           <tbody>
@@ -185,5 +186,12 @@ async function loadSites() {
   }
 }
 
-loadSites();
-loadReport();
+(async () => {
+  if (window.loadCurrencySettings) {
+    try {
+      await window.loadCurrencySettings();
+    } catch (_) {}
+  }
+  await loadSites();
+  await loadReport();
+})();

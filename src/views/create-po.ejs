@@ -44,12 +44,10 @@
       />
 
       <select id="vatRate">
-        <option value="0">0%</option>
-        <option value="13.5">13.5%</option>
-        <option value="23">23%</option>
+        <option value="" disabled selected>Loading VAT rates...</option>
       </select>
-      <p>VAT: <span id="vatAmount">0.00</span></p>
-      <p><b>Total: <span id="totalAmount">0.00</span></b></p>
+      <p>VAT: <span data-currency-symbol>€</span><span id="vatAmount">0.00</span></p>
+      <p><b>Total: <span data-currency-symbol>€</span><span id="totalAmount">0.00</span></b></p>
       <button class="btn btn-primary">Save PO</button>
     </form>
   </div>
