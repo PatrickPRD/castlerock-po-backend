@@ -1,3 +1,7 @@
+(() => {
+if (window.__headerBrandingPageInitialized) return;
+window.__headerBrandingPageInitialized = true;
+
 const token = localStorage.getItem('token');
 const role = localStorage.getItem('role');
 
@@ -21,6 +25,42 @@ const brandPreviewText = document.getElementById('brandPreviewText');
 
 let currentLogoPath = '/assets/Logo.png';
 let selectedFileDataUrl = null;
+const BRANDING_EVENT_KEY = 'headerBrandingVersion';
+const BRANDING_CHANNEL_NAME = 'header-branding-updates';
+
+function applyLiveHeaderBranding({ headerColor, logoMode, logoText, logoPath }) {
+  const nav = document.getElementById('mainHeaderNav');
+  const liveLogoImage = document.getElementById('headerBrandImage');
+  const liveLogoText = document.getElementById('headerBrandText');
+
+  if (nav && isHexColor(headerColor || '')) {
+    nav.classList.remove('bg-dark');
+    nav.style.backgroundColor = headerColor;
+  }
+
+  if (!liveLogoImage || !liveLogoText) return;
+
+  if (logoMode === 'text') {
+    liveLogoImage.style.display = 'none';
+    liveLogoText.style.display = 'inline';
+    liveLogoText.textContent = logoText || 'Castlerock Homes';
+  } else {
+    liveLogoText.style.display = 'none';
+    liveLogoImage.style.display = 'inline-block';
+    liveLogoImage.src = logoPath || '/assets/Logo.png';
+  }
+}
+
+function notifyBrandingUpdated() {
+  const payload = { ts: Date.now() };
+  localStorage.setItem(BRANDING_EVENT_KEY, String(payload.ts));
+
+  if ('BroadcastChannel' in window) {
+    const channel = new BroadcastChannel(BRANDING_CHANNEL_NAME);
+    channel.postMessage(payload);
+    channel.close();
+  }
+}
 
 async function api(url, method = 'GET', body) {
   const res = await fetch(url, {
@@ -104,6 +144,12 @@ async function loadBrandingSettings() {
 
   toggleLogoSections();
   applyPreview();
+  applyLiveHeaderBranding({
+    headerColor: settings.header_color || '#212529',
+    logoMode: settings.header_logo_mode || 'image',
+    logoText: settings.header_logo_text || 'Castlerock Homes',
+    logoPath: currentLogoPath
+  });
 }
 
 brandingForm.addEventListener('submit', async (e) => {
@@ -139,6 +185,13 @@ brandingForm.addEventListener('submit', async (e) => {
     }
 
     applyPreview();
+    applyLiveHeaderBranding({
+      headerColor,
+      logoMode,
+      logoText: logoText || 'Castlerock Homes',
+      logoPath: currentLogoPath
+    });
+    notifyBrandingUpdated();
     showToast('Header branding updated successfully', 'success');
   } catch (err) {
     showToast(err.message || 'Failed to update branding', 'error');
@@ -203,3 +256,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     showToast(err.message || 'Failed to load branding settings', 'error');
   }
 });
+})();

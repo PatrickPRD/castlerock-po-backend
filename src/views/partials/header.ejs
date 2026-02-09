@@ -83,6 +83,9 @@
 </nav>
 
 <script>
+  const BRANDING_EVENT_KEY = 'headerBrandingVersion';
+  const BRANDING_CHANNEL_NAME = 'header-branding-updates';
+
   // Handle Purchase Orders nav item visibility and text based on current page
   (function() {
     const currentPage = window.location.pathname.split('/').pop();
@@ -98,32 +101,52 @@
     }
   })();
 
+  function applyHeaderBrandingSettings(settings) {
+    const nav = document.getElementById('mainHeaderNav');
+    const logoImage = document.getElementById('headerBrandImage');
+    const logoText = document.getElementById('headerBrandText');
+
+    if (nav && settings.header_color) {
+      nav.classList.remove('bg-dark');
+      nav.style.backgroundColor = settings.header_color;
+    }
+
+    if (!logoImage || !logoText) return;
+
+    if (settings.header_logo_mode === 'text') {
+      logoImage.style.display = 'none';
+      logoText.style.display = 'inline';
+      logoText.textContent = settings.header_logo_text || 'Castlerock Homes';
+    } else {
+      logoText.style.display = 'none';
+      logoImage.style.display = 'inline-block';
+      logoImage.src = settings.logo_path || '/assets/Logo.png';
+    }
+  }
+
+  async function refreshHeaderBranding() {
+    const res = await fetch('/settings/public', { cache: 'no-store' });
+    if (!res.ok) return;
+    const settings = await res.json();
+    applyHeaderBrandingSettings(settings);
+  }
+
   // Apply global header branding settings
   (async function() {
     try {
-      const res = await fetch('/settings/public');
-      if (!res.ok) return;
-      const settings = await res.json();
+      await refreshHeaderBranding();
 
-      const nav = document.getElementById('mainHeaderNav');
-      const logoImage = document.getElementById('headerBrandImage');
-      const logoText = document.getElementById('headerBrandText');
+      window.addEventListener('storage', (event) => {
+        if (event.key === BRANDING_EVENT_KEY) {
+          refreshHeaderBranding().catch(() => {});
+        }
+      });
 
-      if (nav && settings.header_color) {
-        nav.classList.remove('bg-dark');
-        nav.style.backgroundColor = settings.header_color;
-      }
-
-      if (!logoImage || !logoText) return;
-
-      if (settings.header_logo_mode === 'text') {
-        logoImage.style.display = 'none';
-        logoText.style.display = 'inline';
-        logoText.textContent = settings.header_logo_text || 'Castlerock Homes';
-      } else {
-        logoText.style.display = 'none';
-        logoImage.style.display = 'inline-block';
-        logoImage.src = settings.logo_path || '/assets/Logo.png';
+      if ('BroadcastChannel' in window) {
+        const brandingChannel = new BroadcastChannel(BRANDING_CHANNEL_NAME);
+        brandingChannel.onmessage = () => {
+          refreshHeaderBranding().catch(() => {});
+        };
       }
     } catch (_) {
       // Keep defaults if branding settings cannot be loaded
