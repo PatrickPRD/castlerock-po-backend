@@ -455,12 +455,18 @@ router.get(
   authorizeRoles('super_admin', 'admin'),
   async (req, res) => {
     const siteId = String(req.query.siteId || '').trim();
+    const workerId = String(req.query.workerId || '').trim();
     const params = [];
     const filters = [];
 
     if (siteId) {
       filters.push('s.id = ?');
       params.push(siteId);
+    }
+
+    if (workerId) {
+      filters.push('te.worker_id = ?');
+      params.push(workerId);
     }
 
     const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
@@ -496,6 +502,32 @@ router.get(
     } catch (err) {
       console.error('LABOUR COSTS REPORT ERROR:', err);
       res.status(500).json({ error: 'Failed to load labour costs report' });
+    }
+  }
+);
+
+router.get(
+  '/labour-costs/workers',
+  authenticate,
+  authorizeRoles('super_admin', 'admin'),
+  async (req, res) => {
+    try {
+      const [rows] = await db.query(
+        `
+        SELECT id, first_name, last_name
+        FROM workers
+        WHERE active = 1
+        ORDER BY last_name, first_name
+        `
+      );
+
+      res.json(rows.map(row => ({
+        id: row.id,
+        name: `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Unnamed worker'
+      })));
+    } catch (err) {
+      console.error('LABOUR COSTS WORKERS ERROR:', err);
+      res.status(500).json({ error: 'Failed to load workers' });
     }
   }
 );

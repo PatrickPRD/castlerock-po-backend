@@ -2,13 +2,37 @@
 <%- include('partials/header', { pageTitle: 'Labour Costs' }) %>
 
 <main class="container">
+  <div id="filterPanel" class="card dashboard-filters" style="display:none;">
+    <div class="filter-row">
+      <label for="siteFilter">Site</label>
+      <select id="siteFilter">
+        <option value="">All Sites</option>
+      </select>
+    </div>
+    <div class="filter-row">
+      <label for="locationFilterInput">Location</label>
+      <select id="locationFilter" disabled>
+        <option value="">Select a site first</option>
+      </select>
+    </div>
+    <div class="filter-row">
+      <label for="workerFilter">Worker</label>
+      <select id="workerFilter">
+        <option value="">All Workers</option>
+      </select>
+    </div>
+    <div class="filter-actions">
+      <button class="btn btn-outline-secondary" onclick="toggleFilters()">Close</button>
+      <button class="btn btn-outline-secondary" onclick="clearFilters()">Clear Filters</button>
+    </div>
+  </div>
+
   <div class="card">
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <div class="form-row" style="margin-bottom:0;">
-        <select id="siteFilter">
-          <option value="">All Sites</option>
-        </select>
-      </div>
+      <h3 style="margin: 0;">Labour Costs</h3>
+      <button class="btn btn-outline-secondary" onclick="toggleFilters()">
+        <i class="bi bi-funnel me-1"></i>Filters
+      </button>
     </div>
   </div>
 
@@ -16,9 +40,9 @@
     <table class="po-table">
       <thead>
         <tr>
-          <th>Site</th>
-          <th>Location</th>
-          <th>Labour Spend (<span data-currency-symbol>€</span>)</th>
+          <th onclick="sortTable('site')" class="sortable">Site <span class="sort-indicator"></span></th>
+          <th onclick="sortTable('location')" class="sortable">Location <span class="sort-indicator"></span></th>
+          <th onclick="sortTable('labour_cost')" class="sortable">Labour Spend (<span data-currency-symbol>€</span>) <span class="sort-indicator"></span></th>
         </tr>
       </thead>
       <tbody id="labourTable"></tbody>

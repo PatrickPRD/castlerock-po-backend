@@ -13,6 +13,24 @@
   text-align: right;
 }
 
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+th.sortable:hover {
+  background-color: #f3f4f6;
+}
+
+.sort-indicator {
+  display: inline-block;
+  margin-left: 0.25rem;
+  font-size: 0.8rem;
+  color: #9ca3af;
+  font-weight: 700;
+}
+
 @media (max-width: 768px) {
   .po-table thead {
     display: none;
