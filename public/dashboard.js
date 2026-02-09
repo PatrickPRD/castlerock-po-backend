@@ -110,10 +110,13 @@ function initLineItemsManager({
   }
 
   function updateLineItemsNet() {
-    const rows = Array.from(body.querySelectorAll('tr'));
-    const total = rows.reduce((sum, row) => {
-      const qty = Number(row.querySelector('[data-field="quantity"]').value) || 0;
-      const unitPrice = Number(row.querySelector('[data-field="unitPrice"]').value) || 0;
+    // Find all .line-item-card in the body and sum their values
+    const cards = Array.from(body.querySelectorAll('.line-item-card'));
+    const total = cards.reduce((sum, card) => {
+      const qtyInput = card.querySelector('[data-field="quantity"]');
+      const unitPriceInput = card.querySelector('[data-field="unitPrice"]');
+      const qty = qtyInput ? Number(qtyInput.value) : 0;
+      const unitPrice = unitPriceInput ? Number(unitPriceInput.value) : 0;
       return sum + qty * unitPrice;
     }, 0);
 
@@ -122,9 +125,14 @@ function initLineItemsManager({
   }
 
   function handleLineItemInput(row) {
-    const qty = Number(row.querySelector('[data-field="quantity"]').value) || 0;
-    const unitPrice = Number(row.querySelector('[data-field="unitPrice"]').value) || 0;
-    row.querySelector('[data-field="lineTotal"]').textContent = (qty * unitPrice).toFixed(2);
+    const qtyInput = row.querySelector('[data-field="quantity"]');
+    const unitPriceInput = row.querySelector('[data-field="unitPrice"]');
+    const lineTotalCell = row.querySelector('[data-field="lineTotal"]');
+    const qty = qtyInput ? Number(qtyInput.value) : 0;
+    const unitPrice = unitPriceInput ? Number(unitPriceInput.value) : 0;
+    if (lineTotalCell) {
+      lineTotalCell.textContent = (qty * unitPrice).toFixed(2);
+    }
     updateLineItemsNet();
   }
 
@@ -153,21 +161,40 @@ function initLineItemsManager({
   }
 
   function addLineItemRow(item = {}) {
-    const row = document.createElement('tr');
-
-    row.innerHTML = `
-      <td><input class="line-item-input line-item-desc" data-field="description" type="text" list="${suggestions ? suggestions.id : ''}" value="${item.description || ''}" placeholder="Description"></td>
-      <td><input class="line-item-input line-item-qty" data-field="quantity" type="number" step="0.01" min="0" value="${item.quantity || ''}" placeholder="0"></td>
-      <td><input class="line-item-input line-item-unit" data-field="unit" type="text" value="${item.unit || ''}" placeholder="Unit"></td>
-      <td><input class="line-item-input line-item-cost" data-field="unitPrice" type="number" step="0.01" min="0" value="${item.unit_price || item.unitPrice || ''}" placeholder="0.00"></td>
-      <td class="line-items-total" data-field="lineTotal">0.00</td>
-      <td style="width:1%;white-space:nowrap;text-align:center;"><button type="button" class="btn btn-outline-danger btn-sm line-items-remove" aria-label="Remove line item" title="Remove" data-field="remove" style="z-index:2;position:relative;">&times;</button></td>
+    // Create a card-like row for each line item
+    const cardRow = document.createElement('tr');
+    cardRow.classList.add('line-item-card-row');
+    cardRow.innerHTML = `
+      <td colspan="6" style="padding:0; border:none; background:transparent;">
+        <div class="line-item-card">
+          <div class="line-item-card-desc">
+            <label class="line-item-label" style="font-size:11px; color:#888; margin-bottom:2px; display:block; text-align:left;">Description</label>
+            <input class="line-item-input line-item-desc" data-field="description" type="text" list="${suggestions ? suggestions.id : ''}" value="${item.description || ''}" placeholder="Description">
+          </div>
+          <div class="line-item-card-fields">
+            <div style="display:flex; flex-direction:column; align-items:flex-start; gap:2px;">
+              <input class="line-item-input line-item-qty" data-field="quantity" type="number" step="0.01" min="0" value="${item.quantity || ''}" placeholder="0">
+              <label class="line-item-label" style="font-size:10px; color:#888; margin-top:0; text-align:left;">Qty</label>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:flex-start; gap:2px;">
+              <input class="line-item-input line-item-unit" data-field="unit" type="text" value="${item.unit || ''}" placeholder="Unit">
+              <label class="line-item-label" style="font-size:10px; color:#888; margin-top:0; text-align:left;">Unit</label>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:flex-start; gap:2px;">
+              <input class="line-item-input line-item-cost" data-field="unitPrice" type="number" step="0.01" min="0" value="${item.unit_price || item.unitPrice || ''}" placeholder="0.00">
+              <label class="line-item-label" style="font-size:10px; color:#888; margin-top:0; text-align:left;">Unit Cost</label>
+            </div>
+            <span class="line-items-total" data-field="lineTotal" style="margin-left:8px;">0.00</span>
+            <button type="button" class="btn btn-outline-danger btn-sm line-items-remove" aria-label="Remove line item" title="Delete" data-field="remove" style="margin-left:8px;">Del</button>
+          </div>
+        </div>
+      </td>
     `;
 
-    const descriptionField = row.querySelector('[data-field="description"]');
-    const qtyField = row.querySelector('[data-field="quantity"]');
-    const unitPriceField = row.querySelector('[data-field="unitPrice"]');
-    const removeBtn = row.querySelector('[data-field="remove"]');
+    const descriptionField = cardRow.querySelector('[data-field="description"]');
+    const qtyField = cardRow.querySelector('[data-field="quantity"]');
+    const unitPriceField = cardRow.querySelector('[data-field="unitPrice"]');
+    const removeBtn = cardRow.querySelector('[data-field="remove"]');
 
     descriptionField.addEventListener('input', () => {
       clearTimeout(searchTimeout);
@@ -181,21 +208,22 @@ function initLineItemsManager({
       }, 200);
     });
 
-    qtyField.addEventListener('input', () => handleLineItemInput(row));
-    unitPriceField.addEventListener('input', () => handleLineItemInput(row));
+    qtyField.addEventListener('input', () => handleLineItemInput(cardRow, descriptionField));
+    unitPriceField.addEventListener('input', () => handleLineItemInput(cardRow, descriptionField));
 
     removeBtn.addEventListener('click', () => {
-      row.remove();
+      cardRow.remove();
       updateLineItemsNet();
     });
 
     if (readOnly) {
-      row.querySelectorAll('input').forEach(input => input.disabled = true);
+      cardRow.querySelectorAll('input').forEach(input => input.disabled = true);
+      descriptionField.disabled = true;
       removeBtn.disabled = true;
     }
 
-    body.appendChild(row);
-    handleLineItemInput(row);
+    body.appendChild(cardRow);
+    handleLineItemInput(cardRow, descriptionField);
   }
 
   function collectLineItems() {

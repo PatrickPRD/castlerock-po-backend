@@ -251,10 +251,11 @@ function fetchLineItemSuggestions(query) {
 }
 
 function addLineItemRow(item = {}) {
+  // Create two rows: one for numbers/buttons, one for description
   const row = document.createElement('tr');
-
+  row.classList.add('line-item-main-row');
   row.innerHTML = `
-    <td><input class="line-item-input line-item-desc" data-field="description" type="text" list="lineItemSuggestions" value="${item.description || ''}" placeholder="Description"></td>
+    <td colspan="1" class="line-item-desc-cell" style="padding-bottom:0;border-bottom:none;background:transparent;"></td>
     <td><input class="line-item-input line-item-qty" data-field="quantity" type="number" step="0.01" min="0" value="${typeof item.quantity !== 'undefined' ? item.quantity : ''}" placeholder="0"></td>
     <td><input class="line-item-input line-item-unit" data-field="unit" type="text" value="${item.unit || ''}" placeholder="Unit"></td>
     <td><input class="line-item-input line-item-cost" data-field="unitPrice" type="number" step="0.01" min="0" value="${typeof item.unitPrice !== 'undefined' ? item.unitPrice : (typeof item.unit_price !== 'undefined' ? item.unit_price : '')}" placeholder="0.00"></td>
@@ -262,7 +263,16 @@ function addLineItemRow(item = {}) {
     <td><button type="button" class="btn btn-outline-danger btn-sm line-items-remove" aria-label="Remove line item" title="Remove" data-field="remove">&times;</button></td>
   `;
 
-  const descriptionInput = row.querySelector('[data-field="description"]');
+  // Second row for description
+  const descRow = document.createElement('tr');
+  descRow.classList.add('line-item-desc-row');
+  descRow.innerHTML = `
+    <td colspan="6" style="padding-top:0;border-top:none;">
+      <input class="line-item-input line-item-desc" data-field="description" type="text" list="lineItemSuggestions" value="${item.description || ''}" placeholder="Description" style="width:99%;margin-top:-2px;">
+    </td>
+  `;
+
+  const descriptionInput = descRow.querySelector('[data-field="description"]');
   const qtyInput = row.querySelector('[data-field="quantity"]');
   const unitPriceInput = row.querySelector('[data-field="unitPrice"]');
   const removeBtn = row.querySelector('[data-field="remove"]');
@@ -279,21 +289,24 @@ function addLineItemRow(item = {}) {
     }, 200);
   });
 
-  qtyInput.addEventListener('input', () => handleLineItemInput(row));
-  unitPriceInput.addEventListener('input', () => handleLineItemInput(row));
+  qtyInput.addEventListener('input', () => handleLineItemInput(row, descriptionInput));
+  unitPriceInput.addEventListener('input', () => handleLineItemInput(row, descriptionInput));
 
   removeBtn.addEventListener('click', () => {
     row.remove();
+    descRow.remove();
     updateLineItemsNet();
   });
 
   if (role === 'viewer') {
     row.querySelectorAll('input').forEach(input => input.disabled = true);
+    descriptionInput.disabled = true;
     removeBtn.disabled = true;
   }
 
   lineItemsBody.appendChild(row);
-  handleLineItemInput(row);
+  lineItemsBody.appendChild(descRow);
+  handleLineItemInput(row, descriptionInput);
 }
 
 function collectLineItems() {

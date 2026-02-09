@@ -1,3 +1,165 @@
+@media (max-width: 600px) {
+  .details-actions {
+    margin-top: 18px;
+    margin-bottom: 18px;
+    padding: 0 8px !important;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+  .details-actions > * {
+    width: 100%;
+  }
+  .details-actions .btn, .details-actions button, .details-actions input[type="button"], .details-actions input[type="submit"] {
+    margin-top: 8px;
+    margin-bottom: 8px;
+    margin-left: 0;
+    margin-right: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+@media (max-width: 600px) {
+  .po-table .invoice-container,
+  .details-row .invoice-container {
+    display: none !important;
+  }
+}
+@media (max-width: 600px) {
+  .invoice-container {
+    display: none !important;
+  }
+}
+@media (max-width: 600px) {
+  .line-item-card-fields > .line-items-total,
+  .line-item-card-fields > .line-items-remove {
+    display: none !important;
+  }
+}
+@media (max-width: 600px) {
+  td[colspan] {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-sizing: border-box !important;
+  }
+}
+@media (max-width: 600px) {
+  .line-item-card {
+    padding: 14px 8px 10px 8px;
+    border-radius: 12px;
+    margin-bottom: 18px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    gap: 12px;
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    box-sizing: border-box;
+  }
+    td[colspan] {
+      padding: 0 !important;
+      background: transparent !important;
+      border: none !important;
+    }
+  .line-item-card-fields {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    width: 100%;
+  }
+  .line-item-card-fields > * {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  .line-item-card-desc {
+    font-size: 15px;
+    margin-bottom: 8px;
+    width: 100%;
+  }
+  .line-item-input,
+  .line-item-qty,
+  .line-item-unit,
+  .line-item-cost {
+    font-size: 16px;
+    padding: 10px 8px;
+    border-radius: 7px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .line-items-remove {
+    margin-top: 8px;
+    width: 100%;
+    min-width: 0;
+    font-size: 16px;
+    padding: 10px 0;
+    border-radius: 6px;
+    background: #f8d7da;
+    color: #c62828;
+    border: none;
+    text-align: center;
+    display: block;
+  }
+  .line-items-total {
+    font-size: 16px;
+    text-align: right;
+    margin-top: 4px;
+    width: 100%;
+  }
+}
+.line-item-card-row td {
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+}
+
+.line-item-card {
+  background: #fff;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  padding: 12px 16px 8px 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.line-item-card-desc {
+  margin-bottom: 6px;
+}
+.line-item-card-fields {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.line-item-card-fields .line-item-input {
+  margin-bottom: 0;
+}
+.line-item-card-fields .line-items-total {
+  font-weight: 600;
+  min-width: 60px;
+  text-align: right;
+  display: inline-block;
+}
+.line-item-card-fields .line-items-remove {
+  min-width: 48px;
+  font-size: 13px;
+  padding: 2px 10px;
+}
+.line-item-desc-row {
+  background: #fafbfc;
+}
+
+/* Add whitespace between each line item (desc/main row pair) */
+.line-item-main-row {
+  border-bottom: 12px solid #fff !important;
+}
 .field-with-toggle {
   display: flex;
   align-items: center;
@@ -12,8 +174,7 @@
 
 /* Ensure modal scrolls, not background page */
 .line-items-section .table-responsive {
-  max-height: 350px;
-  overflow-y: auto;
+  /* max-height and overflow-y removed to allow modal to grow with content */
 }
 
 .line-items-table {
@@ -24,9 +185,25 @@
 }
 
 /* Adjust column widths: unit cost is 2/3 its previous size, qty is 50% larger */
-.line-items-table th:nth-child(1),
-.line-items-table td:nth-child(1) {
-  width: 44% !important;
+
+@media (max-width: 600px) {
+  .line-items-table th:nth-child(1),
+  .line-items-table td:nth-child(1) {
+    width: 100% !important;
+  }
+  .line-item-label {
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 2px;
+    display: block;
+    text-align: left;
+  }
+  .line-item-label-small {
+    font-size: 10px;
+    color: #888;
+    margin-top: 0;
+    text-align: left;
+  }
 }
 
 .line-items-table th:nth-child(2),
@@ -106,8 +283,29 @@
   min-width: 0;
 }
 
+
 .line-items-table td {
   vertical-align: middle;
+}
+
+/* Style for the new two-row line item layout */
+.line-item-main-row td {
+  border-bottom: none !important;
+  padding-bottom: 2px !important;
+}
+.line-item-desc-row td {
+  border-top: none !important;
+  background: #fafbfc;
+  padding-top: 2px !important;
+  padding-bottom: 8px !important;
+}
+.line-item-desc-row input.line-item-desc {
+  font-size: 13px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 3px;
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 .line-items-remove {
@@ -136,7 +334,7 @@
 
 /* Ensure modal scrolls, not background page */
 .modal-dialog-scrollable .modal-content {
-  max-height: 80vh;
+  max-height: 90vh;
   overflow-y: auto;
 }
 
