@@ -85,12 +85,12 @@
     <table class="po-table">
       <thead>
         <tr>
-          <th>PO Number</th>
-          <th>Date</th>
-          <th>Supplier</th>
-          <th>Location</th>
-          <th>Stage</th>
-          <th>Net (<span data-currency-symbol>€</span>)</th>
+          <th onclick="sortPOs('po_number')" class="sortable">PO Number <span class="sort-indicator"></span></th>
+          <th onclick="sortPOs('po_date')" class="sortable">Date <span class="sort-indicator"></span></th>
+          <th onclick="sortPOs('supplier')" class="sortable">Supplier <span class="sort-indicator"></span></th>
+          <th onclick="sortPOs('location')" class="sortable">Location <span class="sort-indicator"></span></th>
+          <th onclick="sortPOs('stage')" class="sortable">Stage <span class="sort-indicator"></span></th>
+          <th onclick="sortPOs('total_amount')" class="sortable">Net (<span data-currency-symbol>€</span>) <span class="sort-indicator"></span></th>
         </tr>
       </thead>
       <tbody id="poTable"></tbody>

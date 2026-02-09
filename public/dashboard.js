@@ -23,6 +23,8 @@ const poCountEl = document.getElementById("poCount");
 let openDetailsRow = null;
 
 let allPOs = [];
+let sortColumn = 'po_date';
+let sortAscending = false;
 
 let createLineItems = null;
 let editLineItems = null;
@@ -496,17 +498,67 @@ function applyFilters() {
     return true;
   });
 
-  filtered.forEach((po) => {
+  filtered
+    .sort((a, b) => {
+      let aVal = a[sortColumn];
+      let bVal = b[sortColumn];
+
+      if (['total_amount', 'net_amount'].includes(sortColumn)) {
+        aVal = num(aVal);
+        bVal = num(bVal);
+      } else if (sortColumn === 'po_date') {
+        aVal = new Date(aVal);
+        bVal = new Date(bVal);
+      } else {
+        aVal = String(aVal || '').toLowerCase();
+        bVal = String(bVal || '').toLowerCase();
+      }
+
+      if (sortAscending) {
+        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      }
+      return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+    })
+    .forEach((po) => {
     totalNet += num(po.net_amount);
     totalGross += num(po.total_amount);
     renderPO(po);
-  });
+    });
 
   poCountEl.textContent = filtered.length;
 
   // Update totals bar
   totalNetEl.textContent = euro(totalNet);
   totalGrossEl.textContent = euro(totalGross);
+
+  updateSortIndicators();
+}
+
+function sortPOs(column) {
+  if (sortColumn === column) {
+    sortAscending = !sortAscending;
+  } else {
+    sortColumn = column;
+    sortAscending = true;
+  }
+  applyFilters();
+}
+
+function updateSortIndicators() {
+  const headers = document.querySelectorAll('th.sortable');
+  const columnMap = ['po_number', 'po_date', 'supplier', 'location', 'stage', 'total_amount'];
+
+  headers.forEach((header, index) => {
+    const indicator = header.querySelector('.sort-indicator');
+    if (!indicator) return;
+    if (columnMap[index] === sortColumn) {
+      indicator.textContent = sortAscending ? ' ↑' : ' ↓';
+      indicator.style.color = '#2563eb';
+    } else {
+      indicator.textContent = '';
+      indicator.style.color = '#9ca3af';
+    }
+  });
 }
 
 /* ============================

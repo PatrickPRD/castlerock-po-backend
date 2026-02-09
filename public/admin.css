@@ -133,7 +133,6 @@
   box-shadow: 0 8px 20px rgba(0,0,0,0.06);
   margin-bottom: 20px;
 }
-
 h3 {
   margin-bottom: 16px;
 }
@@ -147,6 +146,12 @@ h3 {
   align-items: center;
 }
 
+.po-table th.sortable {
+  cursor: pointer;
+}
+.po-table th.sortable:hover {
+  color: #2563eb;
+}
 /* =====================================================
    FORM ROW
    ===================================================== */
