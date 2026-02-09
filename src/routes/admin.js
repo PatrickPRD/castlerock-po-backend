@@ -544,6 +544,7 @@ router.get(
            last_name,
            pps_number,
            weekly_take_home,
+           weekly_cost,
            date_of_employment,
            employee_id,
            notes,
@@ -572,6 +573,7 @@ router.post(
       last_name,
       pps_number,
       weekly_take_home,
+      weekly_cost,
       date_of_employment,
       employee_id,
       notes
@@ -584,13 +586,14 @@ router.post(
     try {
       await db.query(
         `INSERT INTO workers
-         (first_name, last_name, pps_number, weekly_take_home, date_of_employment, employee_id, notes, active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+         (first_name, last_name, pps_number, weekly_take_home, weekly_cost, date_of_employment, employee_id, notes, active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
         [
           first_name.trim(),
           last_name.trim(),
           pps_number || null,
           weekly_take_home ?? null,
+          weekly_cost ?? null,
           date_of_employment || null,
           employee_id || null,
           notes || null
@@ -616,6 +619,7 @@ router.put(
       last_name,
       pps_number,
       weekly_take_home,
+      weekly_cost,
       date_of_employment,
       employee_id,
       notes
@@ -633,6 +637,7 @@ router.put(
            last_name = ?,
            pps_number = ?,
            weekly_take_home = ?,
+           weekly_cost = ?,
            date_of_employment = ?,
            employee_id = ?,
            notes = ?
@@ -642,6 +647,7 @@ router.put(
           last_name.trim(),
           pps_number || null,
           weekly_take_home ?? null,
+          weekly_cost ?? null,
           date_of_employment || null,
           employee_id || null,
           notes || null,

@@ -479,7 +479,7 @@ router.get(
           s.name AS site,
           l.id AS location_id,
           l.name AS location,
-          SUM(COALESCE(w.weekly_take_home, 0) / 5) AS labour_cost
+          SUM(COALESCE(w.weekly_cost, 0) / 5) AS labour_cost
         FROM timesheet_entries te
         JOIN workers w ON w.id = te.worker_id
         JOIN sites s ON s.id = te.site_id

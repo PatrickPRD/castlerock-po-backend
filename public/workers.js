@@ -61,6 +61,7 @@ function renderWorkers() {
     const isActive = Number(worker.active) === 1;
     const fullName = `${worker.first_name || ''} ${worker.last_name || ''}`.trim();
     const weeklyPay = worker.weekly_take_home != null ? formatMoney(worker.weekly_take_home) : '—';
+    const weeklyCost = worker.weekly_cost != null ? formatMoney(worker.weekly_cost) : '—';
 
     const mainRow = document.createElement('tr');
     mainRow.className = 'main-row';
@@ -69,19 +70,21 @@ function renderWorkers() {
       <td>${escapeHtml(worker.employee_id) || '—'}</td>
       <td>${escapeHtml(worker.pps_number) || '—'}</td>
       <td>${weeklyPay}</td>
+      <td>${weeklyCost}</td>
       <td>${isActive ? 'Active' : 'Inactive'}</td>
     `;
 
     const detailsRow = document.createElement('tr');
     detailsRow.className = 'details-row';
     detailsRow.innerHTML = `
-      <td colspan="5">
+      <td colspan="6">
         <div class="details-grid">
           <div><strong>First name:</strong> ${escapeHtml(worker.first_name) || '—'}</div>
           <div><strong>Last name:</strong> ${escapeHtml(worker.last_name) || '—'}</div>
           <div><strong>Employee ID:</strong> ${escapeHtml(worker.employee_id) || '—'}</div>
           <div><strong>PPS Number:</strong> ${escapeHtml(worker.pps_number) || '—'}</div>
           <div><strong>Weekly take home:</strong> ${weeklyPay}</div>
+          <div><strong>Weekly cost:</strong> ${weeklyCost}</div>
           <div><strong>Date of employment:</strong> ${formatDate(worker.date_of_employment)}</div>
           <div><strong>Status:</strong> ${isActive ? 'Active' : 'Inactive'}</div>
           <div><strong>Left at:</strong> ${formatDate(worker.left_at)}</div>
@@ -144,6 +147,7 @@ function resetWorkerForm() {
   document.getElementById('workerEmployeeId').value = '';
   document.getElementById('workerPpsNumber').value = '';
   document.getElementById('workerWeeklyPay').value = '';
+  document.getElementById('workerWeeklyCost').value = '';
   document.getElementById('workerEmploymentDate').value = '';
   document.getElementById('workerNotes').value = '';
 }
@@ -162,6 +166,7 @@ function editWorker(id) {
   document.getElementById('workerEmployeeId').value = worker.employee_id || '';
   document.getElementById('workerPpsNumber').value = worker.pps_number || '';
   document.getElementById('workerWeeklyPay').value = worker.weekly_take_home != null ? worker.weekly_take_home : '';
+  document.getElementById('workerWeeklyCost').value = worker.weekly_cost != null ? worker.weekly_cost : '';
   document.getElementById('workerEmploymentDate').value = worker.date_of_employment || '';
   document.getElementById('workerNotes').value = worker.notes || '';
 
@@ -175,6 +180,7 @@ async function saveWorker() {
   const employeeId = document.getElementById('workerEmployeeId').value.trim();
   const ppsNumber = document.getElementById('workerPpsNumber').value.trim();
   const weeklyPayRaw = document.getElementById('workerWeeklyPay').value.trim();
+  const weeklyCostRaw = document.getElementById('workerWeeklyCost').value.trim();
   const employmentDate = document.getElementById('workerEmploymentDate').value;
   const notes = document.getElementById('workerNotes').value.trim();
 
@@ -189,12 +195,19 @@ async function saveWorker() {
     return;
   }
 
+  const weeklyCost = weeklyCostRaw ? Number(weeklyCostRaw) : null;
+  if (weeklyCostRaw && !Number.isFinite(weeklyCost)) {
+    showToast('Weekly cost must be a valid number', 'error');
+    return;
+  }
+
   const payload = {
     first_name: firstName,
     last_name: lastName,
     employee_id: employeeId || null,
     pps_number: ppsNumber || null,
     weekly_take_home: weeklyPay,
+    weekly_cost: weeklyCost,
     date_of_employment: employmentDate || null,
     notes: notes || null
   };

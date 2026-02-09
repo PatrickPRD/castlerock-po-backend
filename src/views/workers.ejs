@@ -23,6 +23,7 @@
           <th>Employee ID</th>
           <th>PPS Number</th>
           <th>Weekly Take Home (<span data-currency-symbol>EUR</span>)</th>
+          <th>Weekly Cost (<span data-currency-symbol>EUR</span>)</th>
           <th>Status</th>
         </tr>
       </thead>
@@ -57,6 +58,10 @@
         <div>
           <label for="workerWeeklyPay">Weekly take home (<span data-currency-symbol>EUR</span>)</label>
           <input id="workerWeeklyPay" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0.00" class="form-control">
+        </div>
+        <div>
+          <label for="workerWeeklyCost">Weekly cost (<span data-currency-symbol>EUR</span>)</label>
+          <input id="workerWeeklyCost" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0.00" class="form-control">
         </div>
         <div>
           <label for="workerEmploymentDate">Date of employment</label>
