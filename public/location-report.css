@@ -4,19 +4,69 @@
   table-layout: fixed;
 }
 
+.report-table-card {
+  position: relative;
+}
+
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.75);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 2;
+}
+
+.loading-overlay.active {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.loading-spinner {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid #e5e7eb;
+  border-top-color: #2563eb;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.po-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.po-table th.sorted {
+  color: #111827;
+}
+
+.sort-indicator {
+  margin-left: 6px;
+  font-size: 0.8em;
+  color: #6b7280;
+}
+
 /* Lock parent columns */
 
 
 .po-table th:nth-child(2),
-.po-table td:nth-child(2) { width: 32%; }
+.po-table td:nth-child(2) { width: 34%; }
 
 .po-table th:nth-child(3),
 .po-table td:nth-child(3),
 .po-table th:nth-child(4),
-.po-table td:nth-child(4),
-.po-table th:nth-child(5),
-.po-table td:nth-child(5) {
-  width: 16%;
+.po-table td:nth-child(4) {
+  width: 20%;
   text-align: right;
 }
 
@@ -35,15 +85,14 @@ background-color: #8d888841;
 
 .inner-table th:nth-child(1),
 .inner-table td:nth-child(1) {
-  width: 50%;
+  width: 35%;
 }
 
 .inner-table th:nth-child(2),
 .inner-table td:nth-child(2),
 .inner-table th:nth-child(3),
-.inner-table td:nth-child(3),
-.inner-table th:nth-child(4),
-.inner-table td:nth-child(4) {
+.inner-table td:nth-child(3) {
+  width: 32.5%;
   text-align: right;
 }
 
@@ -87,6 +136,39 @@ background-color: #8d888841;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.report-filters {
+  margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .report-controls {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 12px;
+  }
+
+  .report-filters {
+    width: 100%;
+  }
+
+  .report-filters .form-group,
+  .report-filters select,
+  .report-controls button {
+    width: 100%;
+  }
+
+  .report-filters .checkbox-row {
+    margin-left: 0 !important;
+    justify-content: center;
+  }
+
+  .report-filters .spread-toggle {
+    text-align: center;
+  }
+
 }
 
 
@@ -116,11 +198,26 @@ background-color: #8d888841;
   }
 
   /* Stack cells */
-  .po-table td {
-    display: block;
+  .po-table > tbody > tr.main-row td {
+    display: block !important;
     width: 100%;
-    text-align: left;
+    text-align: left !important;
+    justify-content: flex-start !important;
   }
+
+  .po-table > tbody > tr.main-row td::before {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #6b7280;
+    margin-bottom: 2px;
+  }
+
+  .po-table > tbody > tr.main-row td:nth-child(1)::before { content: "Site" !important; }
+  .po-table > tbody > tr.main-row td:nth-child(2)::before { content: "Location" !important; }
+  .po-table > tbody > tr.main-row td:nth-child(3)::before { content: "Total Net" !important; }
+  .po-table > tbody > tr.main-row td:nth-child(4)::before { content: "Inc. Labour" !important; }
 
   /* Details row content */
   .details-row td {
@@ -186,6 +283,4 @@ background-color: #8d888841;
     font-weight: 500;
   }
 
-  .inner-table td:nth-child(4)::before {
-    content: "Uninvoiced: ";
-    fo
+}

@@ -1,0 +1,47 @@
+<%- include('partials/head', { title: 'Workers Information | Castlerock Homes', styles: ['admin.css', 'workers-information.css'] }) %>
+<%- include('partials/header', { pageTitle: 'Workers Information' }) %>
+
+<main class="container py-4">
+  <div class="card p-4">
+    <div class="report-header">
+      <div>
+        <h3 class="mb-1">Workers Information</h3>
+        <p class="text-muted mb-0">Active workers details and leave totals for the selected leave year.</p>
+        <small class="text-muted" id="leaveYearLabel"></small>
+      </div>
+      <div class="report-actions">
+        <label class="form-label mb-1" for="leaveYearSelect">Leave year</label>
+        <select id="leaveYearSelect" class="form-select form-select-sm"></select>
+        <input type="text" id="searchInput" class="form-control search-input" placeholder="Search worker..." />
+      </div>
+    </div>
+
+    <div class="leave-report-loading" id="leaveReportLoading" aria-live="polite" aria-busy="true">
+      <div class="spinner"></div>
+      <span>Loading workers information...</span>
+    </div>
+
+    <div class="table-responsive mt-3 leave-report-table-wrapper">
+      <table class="po-table leave-report-table">
+        <thead>
+          <tr>
+            <th class="sortable" data-column="name"><span class="header-label">Worker</span> <span class="sort-indicator"></span></th>
+            <th class="sortable" data-column="paid_sick"><span class="header-label">Paid Sick</span> <span class="sort-indicator"></span></th>
+            <th class="sortable" data-column="paid_sick_remaining"><span class="header-label">Paid Sick Remaining</span> <span class="sort-indicator"></span></th>
+            <th class="sortable" data-column="sick"><span class="header-label">Unpaid Sick</span> <span class="sort-indicator"></span></th>
+            <th class="sortable" data-column="annual_leave"><span class="header-label">Annual Leave</span> <span class="sort-indicator"></span></th>
+            <th class="sortable" data-column="annual_leave_remaining"><span class="header-label">Annual Leave Remaining</span> <span class="sort-indicator"></span></th>
+            <th class="sortable" data-column="unpaid_leave"><span class="header-label">Unpaid Leave</span> <span class="sort-indicator"></span></th>
+            <th class="sortable" data-column="bank_holiday"><span class="header-label">Bank Holidays</span> <span class="sort-indicator"></span></th>
+            <th class="sortable" data-column="bank_holiday_remaining"><span class="header-label">Bank Holidays Remaining</span> <span class="sort-indicator"></span></th>
+            <th class="sortable" data-column="absent"><span class="header-label">Absent</span> <span class="sort-indicator"></span></th>
+            <th class="pdf-col"><span class="header-label">PDF</span></th>
+          </tr>
+        </thead>
+        <tbody id="reportTable"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/footer', { scripts: ['/ui.js', 'workers-information.js'], includeNavScript: true }) %>

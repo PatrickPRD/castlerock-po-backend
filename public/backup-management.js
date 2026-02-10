@@ -191,7 +191,7 @@ async function restoreBackup() {
     // For SQL backups, skip validation and go straight to confirmation
     if (backupMode === 'sql') {
       const confirmed = await confirm(
-        '⚠️ WARNING: SQL Backup\n\nThis will replace all POs, invoices, sites, locations, and suppliers with the backup data. User accounts will NOT be affected.\n\nThis action CANNOT be undone.\n\nContinue?'
+        '⚠️ WARNING: SQL Backup\n\nThis will replace all application data with the backup data. User accounts will NOT be affected.\n\nThis action CANNOT be undone.\n\nContinue?'
       );
       if (!confirmed) return;
       
@@ -274,7 +274,7 @@ function showValidationReport(report, onConfirm) {
   }
   
   html += '</div>';
-  html += '<p style="margin-bottom: 20px;"><strong>This will replace all POs, invoices, sites, locations, and suppliers with the backup data. User accounts will NOT be affected.</strong></p>';
+  html += '<p style="margin-bottom: 20px;"><strong>This will replace all application data with the backup data. User accounts will NOT be affected.</strong></p>';
   html += '<p style="margin-bottom: 20px; color: #d32f2f;"><strong>This action CANNOT be undone.</strong></p>';
 
   // Create a custom confirmation modal

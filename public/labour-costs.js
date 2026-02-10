@@ -9,6 +9,10 @@ const table = document.getElementById('labourTable');
 const siteFilter = document.getElementById('siteFilter');
 const workerFilter = document.getElementById('workerFilter');
 const locationFilter = document.getElementById('locationFilter');
+const labourTotalEl = document.getElementById('labourTotal');
+const labourDaysWorkedEl = document.getElementById('labourDaysWorked');
+const labourStartDateEl = document.getElementById('labourStartDate');
+const labourEndDateEl = document.getElementById('labourEndDate');
 
 let allData = [];
 let sortColumn = 'site';
@@ -16,6 +20,12 @@ let sortAscending = true;
 
 const num = v => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const money = v => (window.formatMoney ? window.formatMoney(v) : `€${num(v).toFixed(2)}`);
+const formatDate = dateStr => {
+  if (!dateStr) return '-';
+  const safeDate = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(safeDate.getTime())) return '-';
+  return safeDate.toLocaleDateString('en-IE', { year: 'numeric', month: 'short', day: 'numeric' });
+};
 
 async function loadSites() {
   try {
@@ -85,6 +95,26 @@ function renderReport() {
   const filtered = locationId
     ? allData.filter(row => String(row.location_id) === String(locationId))
     : allData;
+
+  const totalLabour = filtered.reduce((sum, row) => sum + num(row.labour_cost), 0);
+  const totalDaysWorked = filtered.reduce((sum, row) => sum + num(row.days_worked), 0);
+  const startDates = filtered.map(row => row.start_date).filter(Boolean);
+  const endDates = filtered.map(row => row.end_date).filter(Boolean);
+  const startDate = startDates.length ? startDates.sort()[0] : null;
+  const endDate = endDates.length ? endDates.sort().slice(-1)[0] : null;
+
+  if (labourTotalEl) {
+    labourTotalEl.textContent = money(totalLabour);
+  }
+  if (labourDaysWorkedEl) {
+    labourDaysWorkedEl.textContent = String(totalDaysWorked);
+  }
+  if (labourStartDateEl) {
+    labourStartDateEl.textContent = formatDate(startDate);
+  }
+  if (labourEndDateEl) {
+    labourEndDateEl.textContent = formatDate(endDate);
+  }
 
   if (!filtered.length) {
     table.innerHTML = `

@@ -20,6 +20,33 @@
   justify-content: flex-end;
 }
 
+.timesheets-actions .btn:disabled,
+.timesheets-actions .btn.disabled {
+  background-color: #9ca3af;
+  border-color: #9ca3af;
+  color: #ffffff;
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.timesheets-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.timesheets-filters .filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.timesheets-filters label {
+  font-weight: 600;
+  color: #374151;
+}
+
 .timesheets-table th {
   display: table-cell;
   white-space: nowrap;
@@ -69,6 +96,20 @@
   font-size: 0.9rem;
 }
 
+.day-summary.leave-summary {
+  font-weight: 600;
+  color: #374151;
+  background: #fef9c3;
+}
+
+.day-summary.leave-summary.leave-summary-paid {
+  background: #fef9c3;
+}
+
+.day-summary.leave-summary.leave-summary-unpaid {
+  background: #fef2f2;
+}
+
 .timesheet-day-list {
   display: flex;
   flex-direction: column;
@@ -77,9 +118,38 @@
 
 .timesheet-day-row {
   display: grid;
-  grid-template-columns: 160px 1fr 1fr;
+  grid-template-columns: 160px 1fr 1fr 1fr;
   gap: 0.75rem;
   align-items: center;
+}
+
+.timesheet-day-row.leave-row {
+  background: #fef9c3;
+}
+
+.timesheet-day-row.leave-row.leave-row-paid {
+  background: #fef9c3;
+}
+
+.timesheet-day-row.leave-row.leave-row-unpaid {
+  background: #fef2f2;
+}
+
+.timesheet-day-row.leave-row label {
+  color: #374151;
+}
+
+.timesheet-day-row.leave-row.leave-row-paid label {
+  color: #374151;
+}
+
+.timesheet-day-row.leave-row.leave-row-unpaid label {
+  color: #374151;
+}
+
+.timesheet-day-row .location-select.leave-selected {
+  border-color: #f97316;
+  box-shadow: 0 0 0 0.15rem rgba(249, 115, 22, 0.25);
 }
 
 .timesheet-day-row label {

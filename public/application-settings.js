@@ -33,6 +33,10 @@ const currentCompanyCroNumber = document.getElementById('currentCompanyCroNumber
 const companyResetBtn = document.getElementById('companyResetBtn');
 const financialForm = document.getElementById('financialForm');
 const currencyCodeSelect = document.getElementById('currencyCode');
+const sickDaysPerYearInput = document.getElementById('sickDaysPerYear');
+const annualLeaveDaysPerYearInput = document.getElementById('annualLeaveDaysPerYear');
+const bankHolidaysPerYearInput = document.getElementById('bankHolidaysPerYear');
+const leaveYearStartDateInput = document.getElementById('leaveYearStartDate');
 const vatInput = document.getElementById('vatInput');
 const vatAddBtn = document.getElementById('vatAddBtn');
 const vatList = document.getElementById('vatList');
@@ -151,6 +155,22 @@ function readFileAsDataUrl(file) {
   });
 }
 
+function formatLeaveYearStart(value) {
+  const parts = String(value || '').split('-');
+  if (parts.length !== 2) return '';
+  const month = parts[0].padStart(2, '0');
+  const day = parts[1].padStart(2, '0');
+  const year = new Date().getFullYear();
+  return `${year}-${month}-${day}`;
+}
+
+function parseLeaveYearStart(value) {
+  if (!value) return null;
+  const parts = String(value).split('-');
+  if (parts.length !== 3) return null;
+  return `${parts[1]}-${parts[2]}`;
+}
+
 async function loadBrandingSettings() {
   const settings = await api('/settings/branding');
 
@@ -195,6 +215,24 @@ async function loadFinancialSettings() {
   vatUsage = settings.usage || {};
   if (currencyCodeSelect) {
     currencyCodeSelect.value = (settings.currency_code || 'EUR').toUpperCase();
+  }
+  if (sickDaysPerYearInput) {
+    sickDaysPerYearInput.value = Number.isFinite(Number(settings.sick_days_per_year))
+      ? Number(settings.sick_days_per_year)
+      : 0;
+  }
+  if (annualLeaveDaysPerYearInput) {
+    annualLeaveDaysPerYearInput.value = Number.isFinite(Number(settings.annual_leave_days_per_year))
+      ? Number(settings.annual_leave_days_per_year)
+      : 0;
+  }
+  if (bankHolidaysPerYearInput) {
+    bankHolidaysPerYearInput.value = Number.isFinite(Number(settings.bank_holidays_per_year))
+      ? Number(settings.bank_holidays_per_year)
+      : 0;
+  }
+  if (leaveYearStartDateInput) {
+    leaveYearStartDateInput.value = formatLeaveYearStart(settings.leave_year_start || '01-01');
   }
   renderVatList();
 }
@@ -245,7 +283,11 @@ function handleAddVat() {
 async function saveFinancialSettings() {
   const payload = {
     currencyCode: currencyCodeSelect?.value || 'EUR',
-    vatRates: financialVatRates
+    vatRates: financialVatRates,
+    sickDaysPerYear: Number(sickDaysPerYearInput?.value || 0),
+    annualLeaveDaysPerYear: Number(annualLeaveDaysPerYearInput?.value || 0),
+    bankHolidaysPerYear: Number(bankHolidaysPerYearInput?.value || 0),
+    leaveYearStart: parseLeaveYearStart(leaveYearStartDateInput?.value) || '01-01'
   };
   const res = await api('/settings/financial', 'PUT', payload);
   financialVatRates = res.vat_rates || financialVatRates;

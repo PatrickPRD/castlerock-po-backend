@@ -131,7 +131,7 @@ function renderRules() {
   if (rules.length === 0) {
     rulesTable.innerHTML = `
       <tr>
-        <td colspan="2" style="text-align:center; padding: 2rem; color: #9ca3af;">
+        <td colspan="3" style="text-align:center; padding: 2rem; color: #9ca3af;">
           No spread rules found
         </td>
       </tr>
@@ -139,15 +139,24 @@ function renderRules() {
     return;
   }
 
+  const getAffectedSitesLabel = (rule) => {
+    const names = new Set();
+    (rule.sites || []).forEach(site => {
+      if (site.siteName) names.add(site.siteName);
+    });
+    return names.size ? Array.from(names).join(', ') : '—';
+  };
+
   rules.forEach((rule, index) => {
     const rowId = `rule-${index}`;
     rulesTable.innerHTML += `
       <tr class="main-row" data-target="${rowId}">
         <td>${rule.sourceLocationName}</td>
         <td>${rule.name || ''}</td>
+        <td>${getAffectedSitesLabel(rule)}</td>
       </tr>
       <tr class="details-row" id="${rowId}">
-        <td colspan="2">
+        <td colspan="3">
           <div class="details-wrapper">
             <div class="spread-actions">
               <button class="btn btn-outline-primary" onclick="event.stopPropagation(); openEditRuleModal(${rule.id});">Edit</button>

@@ -4,10 +4,51 @@ const ExcelJS = require('exceljs');
 const db = require('../db');
 const { authenticate } = require('../middleware/auth');
 const authorizeRoles = require('../middleware/authorizeRoles');
+const SettingsService = require('../services/settingsService');
 
 /* ======================================================
    LOCATION SPREAD HELPERS
    ====================================================== */
+function normalizeLeaveYearStart(value) {
+  const match = String(value || '').trim().match(/^(\d{2})-(\d{2})$/);
+  if (!match) return '01-01';
+  const month = Number(match[1]);
+  const day = Number(match[2]);
+  if (month < 1 || month > 12) return '01-01';
+  const test = new Date(2000, month - 1, day);
+  if (test.getMonth() + 1 !== month || test.getDate() !== day) return '01-01';
+  return `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function formatDate(value) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getLeaveYearBounds(anchorDate, leaveYearStart) {
+  const [monthStr, dayStr] = leaveYearStart.split('-');
+  const startMonth = Number(monthStr);
+  const startDay = Number(dayStr);
+  const anchor = new Date(anchorDate.getFullYear(), anchorDate.getMonth(), anchorDate.getDate());
+  let startDate = new Date(anchor.getFullYear(), startMonth - 1, startDay);
+
+  if (anchor < startDate) {
+    startDate = new Date(anchor.getFullYear() - 1, startMonth - 1, startDay);
+  }
+
+  const endDate = new Date(startDate.getFullYear() + 1, startMonth - 1, startDay);
+  return { startDate, endDate };
+}
+
+function getLeaveYearStartDate(startYear, leaveYearStart) {
+  const [monthStr, dayStr] = leaveYearStart.split('-');
+  const startMonth = Number(monthStr);
+  const startDay = Number(dayStr);
+  return new Date(startYear, startMonth - 1, startDay);
+}
+
 async function getLocationBreakdownData(showSpreadLocations) {
   const [locations] = await db.query(`
     SELECT
@@ -59,6 +100,21 @@ async function getLocationBreakdownData(showSpreadLocations) {
     ORDER BY si.name, l.name
   `);
 
+  const [labourTotals] = await db.query(`
+    SELECT
+      l.id AS location_id,
+      COALESCE(SUM(COALESCE(w.weekly_cost, 0) / 5), 0) AS labour_cost
+    FROM timesheet_entries te
+    JOIN workers w ON w.id = te.worker_id
+    JOIN locations l ON l.id = te.location_id
+    GROUP BY l.id
+  `);
+
+  const labourMap = new Map();
+  labourTotals.forEach(row => {
+    labourMap.set(row.location_id, Number(row.labour_cost || 0));
+  });
+
   const totalsMap = new Map();
   locationTotals.forEach(l => {
     totalsMap.set(l.location_id, {
@@ -68,7 +124,24 @@ async function getLocationBreakdownData(showSpreadLocations) {
       location_id: l.location_id,
       total_net: Number(l.total_net),
       total_gross: Number(l.total_gross),
-      total_invoiced: Number(l.total_invoiced)
+      total_invoiced: Number(l.total_invoiced),
+      total_labour: labourMap.get(l.location_id) || 0
+    });
+  });
+
+  labourMap.forEach((labourCost, locationId) => {
+    if (totalsMap.has(locationId)) return;
+    const info = locationMap.get(locationId);
+    if (!info) return;
+    totalsMap.set(locationId, {
+      site: info.site,
+      site_id: info.site_id,
+      location: info.name,
+      location_id: info.id,
+      total_net: 0,
+      total_gross: 0,
+      total_invoiced: 0,
+      total_labour: labourCost
     });
   });
 
@@ -176,6 +249,7 @@ async function getLocationBreakdownData(showSpreadLocations) {
         const shareNet = sourceTotals.total_net / targets.length;
         const shareGross = sourceTotals.total_gross / targets.length;
         const shareInvoiced = sourceTotals.total_invoiced / targets.length;
+        const shareLabour = (sourceTotals.total_labour || 0) / targets.length;
 
         targets.forEach(targetId => {
           // Skip if this target is itself a source location in another rule
@@ -200,6 +274,7 @@ async function getLocationBreakdownData(showSpreadLocations) {
           targetTotals.total_net += shareNet;
           targetTotals.total_gross += shareGross;
           targetTotals.total_invoiced += shareInvoiced;
+          targetTotals.total_labour += shareLabour;
         });
 
         const sourceStages = stageMap.get(sourceId) || new Map();
@@ -247,7 +322,8 @@ async function getLocationBreakdownData(showSpreadLocations) {
       totals: {
         net: Number(loc.total_net),
         gross: Number(loc.total_gross),
-        uninvoiced: Number(loc.total_gross) - Number(loc.total_invoiced)
+        uninvoiced: Number(loc.total_gross) - Number(loc.total_invoiced),
+        labour: Number(loc.total_labour || 0)
       },
       stages: Array.from((stageMap.get(loc.location_id) || new Map()).values()).map(s => ({
         stage: s.stage,
@@ -260,10 +336,6 @@ async function getLocationBreakdownData(showSpreadLocations) {
 
   return result;
 }
-
-
-
-
 
 /* ======================================================
    PO TOTALS BY LOCATION (SUPER ADMIN ONLY)
@@ -357,14 +429,14 @@ router.get(
         let rowCursor = 1;
 
         // Site title
-        sheet.mergeCells(rowCursor, 1, rowCursor, 4);
+        sheet.mergeCells(rowCursor, 1, rowCursor, 3);
         sheet.getCell(rowCursor, 1).value = siteName;
         sheet.getCell(rowCursor, 1).font = { size: 16, bold: true };
         rowCursor += 2;
 
         rows.forEach(loc => {
           // Location title
-          sheet.mergeCells(rowCursor, 1, rowCursor, 4);
+          sheet.mergeCells(rowCursor, 1, rowCursor, 3);
           sheet.getCell(rowCursor, 1).value = loc.location;
           sheet.getCell(rowCursor, 1).font = { size: 13, bold: true };
           rowCursor++;
@@ -373,8 +445,7 @@ router.get(
 const tableRows = loc.stages.map(s => ([
   s.stage,
   s.net,
-  s.gross,
-  s.uninvoiced
+  s.gross
 ]));
 
 // Create Excel table (with filters + totals)
@@ -390,14 +461,13 @@ sheet.addTable({
   columns: [
     { name: 'Stage', totalsRowLabel: 'TOTAL' },
     { name: 'Net (€)', totalsRowFunction: 'sum' },
-    { name: 'Gross (€)', totalsRowFunction: 'sum' },
-    { name: 'Uninvoiced (€)', totalsRowFunction: 'sum' }
+    { name: 'Gross (€)', totalsRowFunction: 'sum' }
   ],
   rows: tableRows
 });
 
 // Currency formatting
-['B', 'C', 'D'].forEach(col => {
+['B', 'C'].forEach(col => {
   sheet.getColumn(col).numFmt = '€#,##0.00';
 });
 
@@ -408,7 +478,7 @@ rowCursor += tableRows.length + 3;
 
         // Formatting
         sheet.getColumn('A').width = 30;
-        ['B', 'C', 'D'].forEach(col => {
+        ['B', 'C'].forEach(col => {
           sheet.getColumn(col).numFmt = '€#,##0.00';
           sheet.getColumn(col).width = 18;
         });
@@ -456,8 +526,8 @@ router.get(
   async (req, res) => {
     const siteId = String(req.query.siteId || '').trim();
     const workerId = String(req.query.workerId || '').trim();
-    const params = [];
-    const filters = [];
+    const params = ['paid_sick', 'annual_leave', 'bank_holiday'];
+    const filters = ['(te.leave_type IS NULL OR te.leave_type IN (?, ?, ?))'];
 
     if (siteId) {
       filters.push('s.id = ?');
@@ -479,7 +549,10 @@ router.get(
           s.name AS site,
           l.id AS location_id,
           l.name AS location,
-          SUM(COALESCE(w.weekly_cost, 0) / 5) AS labour_cost
+          SUM(COALESCE(w.weekly_cost, 0) / 5) AS labour_cost,
+          COUNT(*) AS days_worked,
+          DATE_FORMAT(MIN(te.work_date), '%Y-%m-%d') AS start_date,
+          DATE_FORMAT(MAX(te.work_date), '%Y-%m-%d') AS end_date
         FROM timesheet_entries te
         JOIN workers w ON w.id = te.worker_id
         JOIN sites s ON s.id = te.site_id
@@ -497,7 +570,10 @@ router.get(
         site: row.site,
         location_id: row.location_id,
         location: row.location,
-        labour_cost: Number(row.labour_cost || 0)
+        labour_cost: Number(row.labour_cost || 0),
+        days_worked: Number(row.days_worked || 0),
+        start_date: row.start_date || null,
+        end_date: row.end_date || null
       })));
     } catch (err) {
       console.error('LABOUR COSTS REPORT ERROR:', err);
@@ -516,7 +592,7 @@ router.get(
         `
         SELECT id, first_name, last_name
         FROM workers
-        WHERE active = 1
+        WHERE left_at IS NULL OR left_at >= CURDATE()
         ORDER BY last_name, first_name
         `
       );
@@ -528,6 +604,119 @@ router.get(
     } catch (err) {
       console.error('LABOUR COSTS WORKERS ERROR:', err);
       res.status(500).json({ error: 'Failed to load workers' });
+    }
+  }
+);
+
+/* ======================================================
+  WORKERS INFORMATION REPORT
+   ====================================================== */
+router.get(
+  '/workers-information',
+  authenticate,
+  authorizeRoles('super_admin', 'admin'),
+  async (req, res) => {
+    try {
+      const settings = await SettingsService.getSettings();
+      const leaveYearStart = normalizeLeaveYearStart(settings.leave_year_start || '01-01');
+      const paidSickAllowance = Number(settings.sick_days_per_year || 0);
+      const annualLeaveAllowance = Number(settings.annual_leave_days_per_year || 0);
+      const bankHolidayAllowance = Number(settings.bank_holidays_per_year || 0);
+      const today = new Date();
+      const { startDate: currentStartDate } = getLeaveYearBounds(today, leaveYearStart);
+
+      const requestedYear = Number(req.query.year);
+      const hasRequestedYear = Number.isInteger(requestedYear) && requestedYear >= 2000 && requestedYear <= 2100;
+      const selectedStartYear = hasRequestedYear ? requestedYear : currentStartDate.getFullYear();
+      const startDate = getLeaveYearStartDate(selectedStartYear, leaveYearStart);
+      const endDate = getLeaveYearStartDate(selectedStartYear + 1, leaveYearStart);
+
+      const [[rangeRow]] = await db.query(
+        `
+        SELECT
+          MIN(work_date) AS min_date,
+          MAX(work_date) AS max_date
+        FROM timesheet_entries
+        WHERE leave_type IS NOT NULL
+        `
+      );
+
+      let minStartYear = currentStartDate.getFullYear();
+      let maxStartYear = currentStartDate.getFullYear();
+
+      if (rangeRow?.min_date) {
+        const minBounds = getLeaveYearBounds(new Date(rangeRow.min_date), leaveYearStart);
+        minStartYear = minBounds.startDate.getFullYear();
+      }
+
+      if (rangeRow?.max_date) {
+        const maxBounds = getLeaveYearBounds(new Date(rangeRow.max_date), leaveYearStart);
+        maxStartYear = maxBounds.startDate.getFullYear();
+      }
+
+      const availableYears = [];
+      const startYear = Math.min(minStartYear, currentStartDate.getFullYear());
+      const endYear = Math.max(maxStartYear, currentStartDate.getFullYear());
+
+      for (let year = endYear; year >= startYear; year -= 1) {
+        availableYears.push(year);
+      }
+
+      const [rows] = await db.query(
+        `
+        SELECT
+          w.id,
+          w.first_name,
+          w.last_name,
+          SUM(CASE WHEN te.leave_type = 'paid_sick' THEN 1 ELSE 0 END) AS paid_sick,
+          SUM(CASE WHEN te.leave_type = 'sick' THEN 1 ELSE 0 END) AS sick,
+          SUM(CASE WHEN te.leave_type = 'annual_leave' THEN 1 ELSE 0 END) AS annual_leave,
+          SUM(CASE WHEN te.leave_type = 'unpaid_leave' THEN 1 ELSE 0 END) AS unpaid_leave,
+          SUM(CASE WHEN te.leave_type = 'bank_holiday' THEN 1 ELSE 0 END) AS bank_holiday,
+          SUM(CASE WHEN te.leave_type = 'absent' THEN 1 ELSE 0 END) AS absent
+        FROM workers w
+        LEFT JOIN timesheet_entries te
+          ON te.worker_id = w.id
+          AND te.leave_type IS NOT NULL
+          AND te.work_date >= ?
+          AND te.work_date < ?
+        WHERE w.left_at IS NULL OR w.left_at >= CURDATE()
+        GROUP BY w.id, w.first_name, w.last_name
+        ORDER BY w.last_name, w.first_name
+        `,
+        [formatDate(startDate), formatDate(endDate)]
+      );
+
+      res.json({
+        start_date: formatDate(startDate),
+        end_date: formatDate(endDate),
+        leave_year_start: leaveYearStart,
+        leave_year_start_date: formatDate(startDate),
+        leave_year_end_date: formatDate(endDate),
+        leave_year_start_year: startDate.getFullYear(),
+        available_years: availableYears,
+        allowances: {
+          paid_sick: paidSickAllowance,
+          annual_leave: annualLeaveAllowance,
+          bank_holiday: bankHolidayAllowance
+        },
+        rows: rows.map(row => ({
+          id: row.id,
+          name: `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Unnamed worker',
+          paid_sick: Number(row.paid_sick || 0),
+          paid_sick_remaining: Math.max(paidSickAllowance - Number(row.paid_sick || 0), 0),
+          sick: Number(row.sick || 0),
+          annual_leave: Number(row.annual_leave || 0),
+          annual_leave_remaining: Math.max(annualLeaveAllowance - Number(row.annual_leave || 0), 0),
+          unpaid_leave: Number(row.unpaid_leave || 0),
+          bank_holiday: Number(row.bank_holiday || 0),
+          bank_holiday_remaining: Math.max(bankHolidayAllowance - Number(row.bank_holiday || 0), 0),
+          absent: Number(row.absent || 0)
+        }))
+      });
+    } catch (err) {
+      console.error('WORKERS INFORMATION REPORT ERROR:', err);
+      res.status(500).json({ error: 'Failed to load workers information report' });
     }
   }
 );

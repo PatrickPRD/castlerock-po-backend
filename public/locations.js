@@ -59,6 +59,7 @@ async function loadSitesForLocations() {
    ============================ */
 async function loadLocations() {
   const locations = await api("/admin/locations");
+  locations.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base', numeric: true }));
   locationTable.innerHTML = "";
 
   locations.forEach((l) => {

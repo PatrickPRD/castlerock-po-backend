@@ -82,7 +82,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  if (navRole === "super_admin") {
+  if (navRole && ["super_admin", "admin"].includes(navRole)) {
     if (reportsDropdown) reportsDropdown.style.display = "block";
   } else {
     reportsDropdown?.remove();

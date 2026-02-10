@@ -14,21 +14,34 @@
         <button class="btn btn-outline-secondary" id="prevWeekBtn">Previous Week</button>
         <button class="btn btn-outline-secondary" id="nextWeekBtn">Next Week</button>
         <button class="btn btn-outline-secondary" id="currentWeekBtn">Current Week</button>
-        <button class="btn btn-primary" id="saveWeekBtn">Save Week</button>
+        <button class="btn btn-primary" id="saveWeekBtn" disabled>Save Week</button>
       </div>
     </div>
+
+    <div class="timesheets-filters">
+      <div class="filter-field">
+        <label for="workerSearch">Worker</label>
+        <input type="text" id="workerSearch" class="form-control" placeholder="Search workers...">
+      </div>
+      <div class="filter-field">
+        <label for="weekSelect">Week with entries</label>
+        <select id="weekSelect" class="form-select"></select>
+      </div>
+    </div>
+
+    <div id="timesheetWarnings" class="alert alert-warning" style="display: none;"></div>
 
     <table class="po-table timesheets-table">
       <thead>
         <tr>
           <th>Worker</th>
-          <th>Mon</th>
-          <th>Tue</th>
-          <th>Wed</th>
-          <th>Thu</th>
-          <th>Fri</th>
-          <th>Sat</th>
-          <th>Sun</th>
+          <th id="dayHeader0">Mon</th>
+          <th id="dayHeader1">Tue</th>
+          <th id="dayHeader2">Wed</th>
+          <th id="dayHeader3">Thu</th>
+          <th id="dayHeader4">Fri</th>
+          <th id="dayHeader5">Sat</th>
+          <th id="dayHeader6">Sun</th>
         </tr>
       </thead>
       <tbody id="timesheetTable"></tbody>

@@ -40,6 +40,15 @@
   cursor: pointer;
 }
 
+.workers-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.workers-table .sort-indicator {
+  font-weight: 600;
+}
+
 .workers-table .main-row:hover {
   background-color: #f9fafb;
 }
@@ -47,6 +56,17 @@
 .workers-table .main-row.open {
   background-color: #eef2ff;
   box-shadow: inset 4px 0 0 #4f46e5;
+}
+
+.workers-table .main-row.safe-pass-ok {
+  background-color: #dcfce7;
+}
+
+.workers-table .main-row.safe-pass-warning {
+  background-color: #fef9c3;
+}
+.workers-table .main-row.safe-pass-expired {
+  background-color: #fee2e2;
 }
 
 .workers-table .details-row td {
@@ -77,6 +97,15 @@
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+.expired-date {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.bulk-upload-actions {
+  margin-bottom: 1rem;
 }
 
 @media (max-width: 768px) {
@@ -115,6 +144,23 @@
 
   .workers-table .details-row td {
     display: block;
+    width: 100%;
+    padding: 12px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    background: #fff;
+  }
+
+  .workers-table .details-row {
+    display: none;
+  }
+
+  .workers-table .details-row.open {
+    display: block;
+  }
+
+  .workers-table .details-row td > * {
+    width: 100%;
   }
 
   .details-grid {

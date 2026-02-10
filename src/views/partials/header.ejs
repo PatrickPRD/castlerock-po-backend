@@ -58,22 +58,25 @@
             </ul>
           </li>
 
-          <li class="nav-item dropdown" data-roles="super_admin">
+          <li class="nav-item dropdown" data-roles="super_admin,admin">
             <a class="nav-link dropdown-toggle px-3" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
               <i class="bi bi-bar-chart-fill me-1"></i>Reports
             </a>
             <ul class="dropdown-menu">
-              <li><a class="dropdown-item" href="location-report.html">
+              <li data-roles="super_admin"><a class="dropdown-item" href="location-report.html">
                 <i class="bi bi-pin-map-fill me-2"></i>By Location
               </a></li>
-              <li><a class="dropdown-item" href="supplier-report.html">
+              <li data-roles="super_admin"><a class="dropdown-item" href="supplier-report.html">
                 <i class="bi bi-building me-2"></i>By Supplier
               </a></li>
-              <li><a class="dropdown-item" href="invoice-report.html">
+              <li data-roles="super_admin"><a class="dropdown-item" href="invoice-report.html">
                 <i class="bi bi-receipt-cutoff me-2"></i>Invoices
               </a></li>
-              <li><a class="dropdown-item" href="labour-costs.html">
+              <li data-roles="super_admin"><a class="dropdown-item" href="labour-costs.html">
                 <i class="bi bi-people me-2"></i>Labour Costs
+              </a></li>
+              <li data-roles="super_admin,admin"><a class="dropdown-item" href="workers-information.html">
+                <i class="bi bi-calendar2-heart me-2"></i>Workers Information
               </a></li>
             </ul>
           </li>

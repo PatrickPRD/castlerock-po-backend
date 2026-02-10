@@ -1,5 +1,45 @@
 const pool = require('../db');
 
+const EXCLUDED_TABLES = new Set(['users', 'schema_migrations']);
+
+const BACKUP_TABLES = [
+  'site_settings',
+  'po_stages',
+  'suppliers',
+  'sites',
+  'site_letters',
+  'locations',
+  'location_spread_rules',
+  'location_spread_rule_sites',
+  'location_spread_rule_locations',
+  'purchase_orders',
+  'po_line_items',
+  'invoices',
+  'po_sequences',
+  'workers',
+  'timesheets',
+  'timesheet_entries'
+];
+
+const RESTORE_ORDER = [
+  'site_settings',
+  'po_stages',
+  'suppliers',
+  'sites',
+  'site_letters',
+  'locations',
+  'location_spread_rules',
+  'location_spread_rule_sites',
+  'location_spread_rule_locations',
+  'purchase_orders',
+  'po_line_items',
+  'invoices',
+  'po_sequences',
+  'workers',
+  'timesheets',
+  'timesheet_entries'
+];
+
 async function clearDatabaseExceptUsers(connection) {
   const [tables] = await connection.query(
     `
@@ -10,26 +50,11 @@ async function clearDatabaseExceptUsers(connection) {
     `
   );
 
-  // Clear in reverse order of creation (respecting foreign keys)
-  const clearOrder = [
-    'invoices',
-    'location_spread_rule_locations',
-    'location_spread_rule_sites',
-    'location_spread_rules',
-    'purchase_orders',
-    'po_sequences',
-    'locations',
-    'sites',
-    'suppliers',
-    'po_stages',
-    'audit_log'
-  ];
+  const clearOrder = tables
+    .map(t => t.tableName)
+    .filter(table => !EXCLUDED_TABLES.has(table));
 
   for (const table of clearOrder) {
-    const exists = tables.some(t => t.tableName === table);
-    if (!exists || table === 'users') {
-      continue;
-    }
 
     try {
       // Get count before clear
@@ -76,17 +101,7 @@ async function createBackup() {
       tables: {}
     };
 
-    // Tables to backup (excluding users and audit_log)
-    const tables = [
-      'purchase_orders',
-      'invoices',
-      'sites',
-      'locations',
-      'suppliers',
-      'po_stages'
-    ];
-
-    for (const table of tables) {
+    for (const table of BACKUP_TABLES) {
       const [rows] = await connection.query(`SELECT * FROM ${table}`);
       backup.tables[table] = rows;
     }
@@ -118,15 +133,6 @@ async function validateBackup(backupData) {
       totalRecords: 0
     };
 
-    const restoreOrder = [
-      'po_stages',
-      'suppliers',
-      'sites',
-      'locations',
-      'purchase_orders',
-      'invoices'
-    ];
-
     // Get current database schema
     const [dbTables] = await connection.query(
       `SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()`
@@ -134,7 +140,7 @@ async function validateBackup(backupData) {
     const existingTables = new Set(dbTables.map(t => t.table_name));
 
     // Validate each table
-    for (const table of restoreOrder) {
+    for (const table of RESTORE_ORDER) {
       const rows = backupData.tables[table];
 
       if (!rows) {
@@ -157,11 +163,19 @@ async function validateBackup(backupData) {
       // Get current table columns
       const [columns] = await connection.query(`SHOW COLUMNS FROM \`${table}\``);
       const currentColumns = new Set(columns.map(c => c.Field));
+      const restorableColumns = new Set(
+        columns
+          .filter(c => !String(c.Extra || '').toLowerCase().includes('generated'))
+          .map(c => c.Field)
+      );
       const backupColumns = Object.keys(rows[0]);
 
-      // Check for missing columns in current schema
+      // Check for missing or non-restorable columns in current schema
       const missingColumns = backupColumns.filter(col => !currentColumns.has(col));
-      const validColumns = backupColumns.filter(col => currentColumns.has(col));
+      const skippedColumns = backupColumns.filter(
+        col => currentColumns.has(col) && !restorableColumns.has(col)
+      );
+      const validColumns = backupColumns.filter(col => restorableColumns.has(col));
 
       if (missingColumns.length > 0) {
         report.warnings.push(
@@ -169,11 +183,17 @@ async function validateBackup(backupData) {
         );
       }
 
+      if (skippedColumns.length > 0) {
+        report.warnings.push(
+          `Table '${table}': generated columns will be skipped: ${skippedColumns.join(', ')}`
+        );
+      }
+
       report.tables[table] = {
         rowCount: rows.length,
-        status: missingColumns.length > 0 ? 'WARNING' : 'OK',
+        status: missingColumns.length > 0 || skippedColumns.length > 0 ? 'WARNING' : 'OK',
         validColumns: validColumns,
-        skippedColumns: missingColumns
+        skippedColumns: missingColumns.concat(skippedColumns)
       };
 
       report.totalRecords += rows.length;
@@ -212,22 +232,13 @@ async function restoreBackup(backupData) {
       console.log('✅ Database cleared');
 
       // Restore data
-      const restoreOrder = [
-        'po_stages',
-        'suppliers',
-        'sites',
-        'locations',
-        'purchase_orders',
-        'invoices'
-      ];
-
       const restoreReport = {
         restored: {},
         skipped: {},
         errors: []
       };
 
-      for (const table of restoreOrder) {
+      for (const table of RESTORE_ORDER) {
         const rows = backupData.tables[table];
 
         if (!rows || rows.length === 0) {
@@ -240,8 +251,12 @@ async function restoreBackup(backupData) {
           
           // Get current table columns to filter backup columns
           const [columns] = await connection.query(`SHOW COLUMNS FROM \`${table}\``);
-          const currentColumns = new Set(columns.map(c => c.Field));
-          const backupColumns = Object.keys(rows[0]).filter(col => currentColumns.has(col));
+          const restorableColumns = new Set(
+            columns
+              .filter(c => !String(c.Extra || '').toLowerCase().includes('generated'))
+              .map(c => c.Field)
+          );
+          const backupColumns = Object.keys(rows[0]).filter(col => restorableColumns.has(col));
 
           if (backupColumns.length === 0) {
             restoreReport.errors.push({

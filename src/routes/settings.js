@@ -12,6 +12,17 @@ const { authenticate } = require('../middleware/auth');
 const authorizeRoles = require('../middleware/authorizeRoles');
 const db = require('../db');
 
+function normalizeLeaveYearStart(value) {
+  const match = String(value || '').trim().match(/^(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const month = Number(match[1]);
+  const day = Number(match[2]);
+  if (month < 1 || month > 12) return null;
+  const test = new Date(2000, month - 1, day);
+  if (test.getMonth() + 1 !== month || test.getDate() !== day) return null;
+  return `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
 /**
  * GET /settings/public
  * Public read-only header branding settings used by shared navbar
@@ -112,6 +123,16 @@ router.get(
     try {
       const settings = await SettingsService.getSettings();
       const currency_code = settings.currency_code || 'EUR';
+      const sick_days_per_year = Number.isFinite(Number(settings.sick_days_per_year))
+        ? Number(settings.sick_days_per_year)
+        : 0;
+      const annual_leave_days_per_year = Number.isFinite(Number(settings.annual_leave_days_per_year))
+        ? Number(settings.annual_leave_days_per_year)
+        : 0;
+      const bank_holidays_per_year = Number.isFinite(Number(settings.bank_holidays_per_year))
+        ? Number(settings.bank_holidays_per_year)
+        : 0;
+      const leave_year_start = normalizeLeaveYearStart(settings.leave_year_start || '01-01') || '01-01';
       const vatRates = settings.vat_rates
         ? JSON.parse(settings.vat_rates)
         : [0, 13.5, 23];
@@ -142,6 +163,10 @@ router.get(
 
       res.json({
         currency_code,
+        sick_days_per_year,
+        annual_leave_days_per_year,
+        bank_holidays_per_year,
+        leave_year_start,
         vat_rates: vatRates,
         usage
       });
@@ -162,7 +187,14 @@ router.put(
   authorizeRoles('super_admin'),
   async (req, res) => {
     try {
-      const { currencyCode, vatRates } = req.body || {};
+      const {
+        currencyCode,
+        vatRates,
+        sickDaysPerYear,
+        annualLeaveDaysPerYear,
+        bankHolidaysPerYear,
+        leaveYearStart
+      } = req.body || {};
 
       const currency = String(currencyCode || 'EUR').toUpperCase();
       if (!/^[A-Z]{3}$/.test(currency)) {
@@ -179,6 +211,28 @@ router.put(
       }
       if (normalizedRates.some(r => r < 0 || r > 100)) {
         return res.status(400).json({ error: 'vatRates must be between 0 and 100' });
+      }
+
+      const leaveValues = [
+        { key: 'sickDaysPerYear', value: sickDaysPerYear },
+        { key: 'annualLeaveDaysPerYear', value: annualLeaveDaysPerYear },
+        { key: 'bankHolidaysPerYear', value: bankHolidaysPerYear }
+      ];
+
+      for (const entry of leaveValues) {
+        const numeric = Number(entry.value);
+        if (!Number.isFinite(numeric) || numeric < 0 || numeric > 365) {
+          return res.status(400).json({
+            error: `${entry.key} must be a number between 0 and 365`
+          });
+        }
+      }
+
+      const normalizedLeaveYearStart = normalizeLeaveYearStart(leaveYearStart || '01-01');
+      if (!normalizedLeaveYearStart) {
+        return res.status(400).json({
+          error: 'leaveYearStart must be in MM-DD format'
+        });
       }
 
       // Current usage
@@ -210,8 +264,20 @@ router.put(
 
       await SettingsService.updateSetting('currency_code', currency);
       await SettingsService.updateSetting('vat_rates', JSON.stringify(normalizedRates));
+      await SettingsService.updateSetting('sick_days_per_year', Number(sickDaysPerYear));
+      await SettingsService.updateSetting('annual_leave_days_per_year', Number(annualLeaveDaysPerYear));
+      await SettingsService.updateSetting('bank_holidays_per_year', Number(bankHolidaysPerYear));
+      await SettingsService.updateSetting('leave_year_start', normalizedLeaveYearStart);
 
-      res.json({ success: true, currency_code: currency, vat_rates: normalizedRates });
+      res.json({
+        success: true,
+        currency_code: currency,
+        vat_rates: normalizedRates,
+        sick_days_per_year: Number(sickDaysPerYear),
+        annual_leave_days_per_year: Number(annualLeaveDaysPerYear),
+        bank_holidays_per_year: Number(bankHolidaysPerYear),
+        leave_year_start: normalizedLeaveYearStart
+      });
     } catch (error) {
       console.error('Error updating financial settings:', error);
       res.status(500).json({ error: 'Failed to update financial settings' });

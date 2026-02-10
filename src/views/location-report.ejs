@@ -1,33 +1,43 @@
-<%- include('partials/head', { title: 'PO Totals by Location | Castlerock Homes', styles: ['location-report.css'] }) %>
-<%- include('partials/header', { pageTitle: 'PO Totals by Location' }) %>
+<%- include('partials/head', { title: 'Inc. Labour (€) | Castlerock Homes', styles: ['location-report.css'] }) %>
+<%- include('partials/header', { pageTitle: 'Inc. Labour (€)' }) %>
 
 <main class="container">
   <div class="card">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <div class="form-row" style="margin-bottom:0;">
-        <div class="form-group">
+    <div class="report-controls d-flex justify-content-between align-items-center mb-3">
+      <div class="row g-2 report-filters align-items-md-center">
+        <div class="col-12 col-md-5 form-group">
           <label for="siteFilter">Site</label>
           <select id="siteFilter">
             <option value="">All Sites</option>
           </select>
         </div>
-        <label class="checkbox-row" style="white-space: nowrap; margin-left: 1rem;">
-          <input type="checkbox" id="showSpreadLocations">
-          Show Spread Locations
-        </label>
+        <div class="col-12 col-md-5 form-group">
+          <label for="locationFilter">Location</label>
+          <select id="locationFilter">
+            <option value="">All Locations</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-auto spread-toggle text-md-start">
+          <label class="checkbox-row mb-0">
+            <input type="checkbox" id="showSpreadLocations">
+            Show Spread Locations
+          </label>
+        </div>
       </div>
       <button class="btn btn-outline-primary" onclick="exportExcel()">Export to Excel</button>
     </div>
   </div>
-  <div class="card">
+  <div class="card report-table-card">
+    <div id="reportLoading" class="loading-overlay" aria-hidden="true">
+      <div class="loading-spinner" aria-label="Loading"></div>
+    </div>
     <table class="po-table">
       <thead>
         <tr>
-          <th>Site</th>
-          <th>Location</th>
-          <th>Total Net (<span data-currency-symbol>€</span>)</th>
-          <th>Total Gross (<span data-currency-symbol>€</span>)</th>
-          <th>Uninvoiced (<span data-currency-symbol>€</span>)</th>
+          <th class="sortable" data-sort="site">Site <span class="sort-indicator"></span></th>
+          <th class="sortable" data-sort="location">Location <span class="sort-indicator"></span></th>
+          <th class="sortable" data-sort="total">Total Net (<span data-currency-symbol>€</span>) <span class="sort-indicator"></span></th>
+          <th class="sortable" data-sort="labour">Inc. Labour (<span data-currency-symbol>€</span>) <span class="sort-indicator"></span></th>
         </tr>
       </thead>
       <tbody id="reportTable"></tbody>

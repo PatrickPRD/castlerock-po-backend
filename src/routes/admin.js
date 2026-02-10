@@ -5,8 +5,36 @@ const { authenticate } = require('../middleware/auth');
 const authorizeRoles = require('../middleware/authorizeRoles');
 const db = require('../db');
 const crypto = require('crypto');
+const ExcelJS = require('exceljs');
+const multer = require('multer');
 const { sendPasswordSetupEmail } =
   require('../services/userEmailService');
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }
+});
+
+function toIsoDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+  if (typeof value === 'number') {
+    const date = new Date(Math.round((value - 25569) * 86400 * 1000));
+    return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+  }
+  const raw = String(value).trim();
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const ukMatch = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (ukMatch) {
+    const [, day, month, year] = ukMatch;
+    return `${year}-${month}-${day}`;
+  }
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
+}
 
 
 
@@ -155,10 +183,7 @@ if (email) {
     /* ======================================================
        ❌ RULE 1: Super Admin cannot disable themselves
        ====================================================== */
-    if (
-      userId === actingUserId &&
-      active === 0
-    ) {
+    if (userId === actingUserId && active === 0) {
       return res.status(400).json({
         error: 'You cannot disable your own account'
       });
@@ -343,11 +368,20 @@ router.post(
     }
 
     try {
-      await db.query(
+      const [result] = await db.query(
         `INSERT INTO sites (name, site_letter, address)
          VALUES (?, ?, ?)`,
         [name.trim(), site_code.toUpperCase(), address || null]
       );
+
+      const siteId = result.insertId;
+      if (siteId) {
+        await db.query(
+          `INSERT INTO locations (name, type, site_id, active)
+           VALUES ('Site', 'system', ?, 1)`,
+          [siteId]
+        );
+      }
 
       res.json({ success: true });
 
@@ -390,8 +424,6 @@ router.put(
     res.json({ success: true });
   }
 );
-
-
 
 /* ❌ DELETE SITE – BLOCK IF ACTIVE POs EXIST */
 router.delete(
@@ -534,7 +566,7 @@ router.get(
   authorizeRoles('super_admin'),
   async (req, res) => {
     const includeInactive = String(req.query.include_inactive) === '1';
-    const whereClause = includeInactive ? '' : 'WHERE active = 1';
+    const whereClause = includeInactive ? '' : 'WHERE left_at IS NULL OR left_at >= CURDATE()';
 
     try {
       const [rows] = await db.query(
@@ -542,14 +574,20 @@ router.get(
            id,
            first_name,
            last_name,
+          nickname,
            pps_number,
            weekly_take_home,
            weekly_cost,
+           safe_pass_number,
+           safe_pass_expiry_date,
            date_of_employment,
            employee_id,
            notes,
-           active,
-           left_at
+           left_at,
+           CASE
+             WHEN left_at IS NULL OR left_at >= CURDATE() THEN 1
+             ELSE 0
+           END AS active
          FROM workers
          ${whereClause}
          ORDER BY last_name, first_name`
@@ -571,10 +609,14 @@ router.post(
     const {
       first_name,
       last_name,
+      nickname,
       pps_number,
       weekly_take_home,
       weekly_cost,
+      safe_pass_number,
+      safe_pass_expiry_date,
       date_of_employment,
+      left_at,
       employee_id,
       notes
     } = req.body;
@@ -583,20 +625,70 @@ router.post(
       return res.status(400).json({ error: 'First and last name are required' });
     }
 
+    const normalizedFirst = first_name.trim();
+    const normalizedLast = last_name.trim();
+    const normalizedNickname = nickname ? nickname.trim() : null;
+    const normalizedDate = date_of_employment ? toIsoDate(date_of_employment) : null;
+    const normalizedLeftAt = left_at ? toIsoDate(left_at) : null;
+
+    if (date_of_employment && !normalizedDate) {
+      return res.status(400).json({
+        error: 'Date of employment must be DD-MM-YYYY'
+      });
+    }
+
+    if (left_at && !normalizedLeftAt) {
+      return res.status(400).json({
+        error: 'Date ceased employment must be DD-MM-YYYY'
+      });
+    }
+
+    const [[nameMatch]] = await db.query(
+      `SELECT id FROM workers WHERE first_name = ? AND last_name = ? LIMIT 1`,
+      [normalizedFirst, normalizedLast]
+    );
+
+    if (nameMatch) {
+      return res.status(400).json({
+        error: 'A worker with the same first and last name already exists'
+      });
+    }
+
+    if (employee_id) {
+      const [[employeeMatch]] = await db.query(
+        `SELECT id FROM workers WHERE employee_id = ? LIMIT 1`,
+        [employee_id]
+      );
+
+      if (employeeMatch) {
+        return res.status(400).json({
+          error: 'This employee ID is already in use'
+        });
+      }
+    }
+
     try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const isActive = !normalizedLeftAt || new Date(`${normalizedLeftAt}T00:00:00`) >= today;
       await db.query(
         `INSERT INTO workers
-         (first_name, last_name, pps_number, weekly_take_home, weekly_cost, date_of_employment, employee_id, notes, active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+         (first_name, last_name, nickname, pps_number, weekly_take_home, weekly_cost, safe_pass_number, safe_pass_expiry_date, date_of_employment, left_at, employee_id, notes, active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          first_name.trim(),
-          last_name.trim(),
+          normalizedFirst,
+          normalizedLast,
+          normalizedNickname || null,
           pps_number || null,
           weekly_take_home ?? null,
           weekly_cost ?? null,
-          date_of_employment || null,
+          safe_pass_number || null,
+          toIsoDate(safe_pass_expiry_date),
+          normalizedDate,
+          normalizedLeftAt,
           employee_id || null,
-          notes || null
+          notes || null,
+          isActive ? 1 : 0
         ]
       );
 
@@ -617,10 +709,14 @@ router.put(
     const {
       first_name,
       last_name,
+      nickname,
       pps_number,
       weekly_take_home,
       weekly_cost,
+      safe_pass_number,
+      safe_pass_expiry_date,
       date_of_employment,
+      left_at,
       employee_id,
       notes
     } = req.body;
@@ -629,28 +725,83 @@ router.put(
       return res.status(400).json({ error: 'First and last name are required' });
     }
 
+    const normalizedFirst = first_name.trim();
+    const normalizedLast = last_name.trim();
+    const normalizedNickname = nickname ? nickname.trim() : null;
+    const normalizedDate = date_of_employment ? toIsoDate(date_of_employment) : null;
+    const normalizedLeftAt = left_at ? toIsoDate(left_at) : null;
+
+    if (date_of_employment && !normalizedDate) {
+      return res.status(400).json({
+        error: 'Date of employment must be DD-MM-YYYY'
+      });
+    }
+
+    if (left_at && !normalizedLeftAt) {
+      return res.status(400).json({
+        error: 'Date ceased employment must be DD-MM-YYYY'
+      });
+    }
+
+    const [[nameMatch]] = await db.query(
+      `SELECT id FROM workers WHERE first_name = ? AND last_name = ? AND id <> ? LIMIT 1`,
+      [normalizedFirst, normalizedLast, workerId]
+    );
+
+    if (nameMatch) {
+      return res.status(400).json({
+        error: 'A worker with the same first and last name already exists'
+      });
+    }
+
+    if (employee_id) {
+      const [[employeeMatch]] = await db.query(
+        `SELECT id FROM workers WHERE employee_id = ? AND id <> ? LIMIT 1`,
+        [employee_id, workerId]
+      );
+
+      if (employeeMatch) {
+        return res.status(400).json({
+          error: 'This employee ID is already in use'
+        });
+      }
+    }
+
     try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const isActive = !normalizedLeftAt || new Date(`${normalizedLeftAt}T00:00:00`) >= today;
       await db.query(
         `UPDATE workers
          SET
            first_name = ?,
            last_name = ?,
+           nickname = ?,
            pps_number = ?,
            weekly_take_home = ?,
            weekly_cost = ?,
+           safe_pass_number = ?,
+           safe_pass_expiry_date = ?,
            date_of_employment = ?,
+           left_at = ?,
            employee_id = ?,
-           notes = ?
+           notes = ?,
+           active = ?
          WHERE id = ?`,
         [
-          first_name.trim(),
-          last_name.trim(),
+          normalizedFirst,
+          normalizedLast,
+          normalizedNickname || null,
           pps_number || null,
           weekly_take_home ?? null,
           weekly_cost ?? null,
-          date_of_employment || null,
+          safe_pass_number || null,
+          toIsoDate(safe_pass_expiry_date),
+          normalizedDate,
+          normalizedLeftAt,
           employee_id || null,
           notes || null,
+          isActive ? 1 : 0,
           workerId
         ]
       );
@@ -683,6 +834,210 @@ router.put(
     } catch (err) {
       console.error('UPDATE WORKER STATUS ERROR:', err);
       res.status(500).json({ error: 'Failed to update worker status' });
+    }
+  }
+);
+
+router.get(
+  '/workers/template',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (_req, res) => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Workers');
+
+      sheet.columns = [
+        { header: 'First Name', key: 'first_name', width: 20 },
+        { header: 'Last Name', key: 'last_name', width: 20 },
+        { header: 'Nickname', key: 'nickname', width: 18 },
+        { header: 'PPS Number', key: 'pps_number', width: 18 },
+        { header: 'Weekly Take Home', key: 'weekly_take_home', width: 18 },
+        { header: 'Weekly Cost', key: 'weekly_cost', width: 16 },
+        { header: 'Safe Pass Number', key: 'safe_pass_number', width: 18 },
+        { header: 'Safe Pass Expiry (DD-MM-YYYY)', key: 'safe_pass_expiry_date', width: 26 },
+        { header: 'Date of Employment (DD-MM-YYYY)', key: 'date_of_employment', width: 26 },
+        { header: 'Employee ID', key: 'employee_id', width: 16 },
+        { header: 'Notes', key: 'notes', width: 30 }
+      ];
+
+      sheet.addRow({
+        first_name: 'John',
+        last_name: 'Doe',
+        nickname: 'Johnny',
+        pps_number: 'PPS1234567',
+        weekly_take_home: 750,
+        weekly_cost: 900,
+        safe_pass_number: 'SAFE-12345',
+        safe_pass_expiry_date: '09-02-2027',
+        date_of_employment: '09-02-2026',
+        employee_id: 'EMP-001',
+        notes: 'Sample worker'
+      });
+
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      res.setHeader(
+        'Content-Disposition',
+        'attachment; filename="workers-template.xlsx"'
+      );
+
+      await workbook.xlsx.write(res);
+      res.end();
+    } catch (err) {
+      console.error('WORKERS TEMPLATE ERROR:', err);
+      res.status(500).json({ error: 'Failed to generate template' });
+    }
+  }
+);
+
+function normalizeHeader(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_');
+}
+
+router.post(
+  '/workers/bulk',
+  authenticate,
+  authorizeRoles('super_admin'),
+  upload.single('file'),
+  async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: 'File is required' });
+    }
+
+    try {
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(req.file.buffer);
+      const sheet = workbook.worksheets[0];
+      if (!sheet) {
+        return res.status(400).json({ error: 'No worksheet found in file' });
+      }
+
+      const [existingWorkers] = await db.query(
+        'SELECT first_name, last_name, employee_id FROM workers'
+      );
+      const existingNames = new Set(
+        existingWorkers.map(w => `${String(w.first_name).trim().toLowerCase()}|${String(w.last_name).trim().toLowerCase()}`)
+      );
+      const existingEmployeeIds = new Set(
+        existingWorkers
+          .map(w => String(w.employee_id || '').trim())
+          .filter(Boolean)
+      );
+      const seenNames = new Set();
+      const seenEmployeeIds = new Set();
+
+      const headerRow = sheet.getRow(1);
+      const headerMap = {};
+      headerRow.eachCell((cell, colNumber) => {
+        headerMap[normalizeHeader(cell.value)] = colNumber;
+      });
+
+      const rowsToInsert = [];
+      const skipped = [];
+
+      for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
+        const row = sheet.getRow(rowNumber);
+        if (!row || row.actualCellCount === 0) continue;
+
+        const firstName = String(row.getCell(headerMap.first_name || 1).value || '').trim();
+        const lastName = String(row.getCell(headerMap.last_name || 2).value || '').trim();
+
+        if (!firstName || !lastName) {
+          skipped.push({ row: rowNumber, reason: 'Missing first or last name' });
+          continue;
+        }
+
+        const nameKey = `${firstName.toLowerCase()}|${lastName.toLowerCase()}`;
+        if (existingNames.has(nameKey) || seenNames.has(nameKey)) {
+          skipped.push({ row: rowNumber, reason: 'Duplicate first and last name' });
+          continue;
+        }
+
+        const ppsNumber = row.getCell(headerMap.pps_number || 4).value;
+        const nicknameValue = row.getCell(headerMap.nickname || 3).value;
+        const weeklyTakeHomeValue = row.getCell(headerMap.weekly_take_home || 5).value;
+        const weeklyCostValue = row.getCell(headerMap.weekly_cost || 6).value;
+        const safePassNumberValue = row.getCell(headerMap.safe_pass_number || 7).value;
+        const safePassExpiryValue = row.getCell(headerMap.safe_pass_expiry_date || 8).value;
+        const dateValue = row.getCell(headerMap.date_of_employment || 9).value;
+        const employeeId = row.getCell(headerMap.employee_id || 10).value;
+        const notes = row.getCell(headerMap.notes || 11).value;
+
+        const weeklyTakeHome = weeklyTakeHomeValue !== null && weeklyTakeHomeValue !== ''
+          ? Number(weeklyTakeHomeValue)
+          : null;
+        const weeklyCost = weeklyCostValue !== null && weeklyCostValue !== ''
+          ? Number(weeklyCostValue)
+          : null;
+
+        if ((weeklyTakeHome !== null && !Number.isFinite(weeklyTakeHome)) ||
+            (weeklyCost !== null && !Number.isFinite(weeklyCost))) {
+          skipped.push({ row: rowNumber, reason: 'Weekly amounts must be numbers' });
+          continue;
+        }
+
+        const normalizedEmployeeId = employeeId ? String(employeeId).trim() : '';
+        if (normalizedEmployeeId && (existingEmployeeIds.has(normalizedEmployeeId) || seenEmployeeIds.has(normalizedEmployeeId))) {
+          skipped.push({ row: rowNumber, reason: 'Duplicate employee ID' });
+          continue;
+        }
+
+        const normalizedDate = toIsoDate(dateValue);
+        if (dateValue && !normalizedDate) {
+          skipped.push({ row: rowNumber, reason: 'Invalid date of employment (DD-MM-YYYY)' });
+          continue;
+        }
+
+        const normalizedSafePassExpiry = toIsoDate(safePassExpiryValue);
+        if (safePassExpiryValue && !normalizedSafePassExpiry) {
+          skipped.push({ row: rowNumber, reason: 'Invalid safe pass expiry (DD-MM-YYYY)' });
+          continue;
+        }
+
+        seenNames.add(nameKey);
+        if (normalizedEmployeeId) {
+          seenEmployeeIds.add(normalizedEmployeeId);
+        }
+
+        rowsToInsert.push([
+          firstName,
+          lastName,
+          nicknameValue ? String(nicknameValue).trim() : null,
+          ppsNumber ? String(ppsNumber).trim() : null,
+          weeklyTakeHome,
+          weeklyCost,
+          safePassNumberValue ? String(safePassNumberValue).trim() : null,
+          normalizedSafePassExpiry,
+          normalizedDate,
+          normalizedEmployeeId || null,
+          notes ? String(notes).trim() : null,
+          1
+        ]);
+      }
+
+      if (rowsToInsert.length > 0) {
+        await db.query(
+          `INSERT INTO workers
+           (first_name, last_name, nickname, pps_number, weekly_take_home, weekly_cost, safe_pass_number, safe_pass_expiry_date, date_of_employment, employee_id, notes, active)
+           VALUES ?`,
+          [rowsToInsert]
+        );
+      }
+
+      res.json({
+        success: true,
+        inserted: rowsToInsert.length,
+        skipped
+      });
+    } catch (err) {
+      console.error('BULK WORKER UPLOAD ERROR:', err);
+      res.status(500).json({ error: 'Failed to import workers' });
     }
   }
 );

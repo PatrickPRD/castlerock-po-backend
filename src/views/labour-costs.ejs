@@ -48,6 +48,25 @@
       <tbody id="labourTable"></tbody>
     </table>
   </div>
+
+  <div id="totalsBar" class="totals-bar">
+    <div>
+      <strong>Days Worked:</strong>
+      <span id="labourDaysWorked">0</span>
+    </div>
+    <div>
+      <strong>Total Labour Spend:</strong>
+      <span id="labourTotal"><span data-currency-symbol>€</span>0.00</span>
+    </div>
+    <div>
+      <strong>Start Date:</strong>
+      <span id="labourStartDate">-</span>
+    </div>
+    <div>
+      <strong>End Date:</strong>
+      <span id="labourEndDate">-</span>
+    </div>
+  </div>
 </main>
 
 <%- include('partials/footer', { scripts: ['/ui.js', 'labour-costs.js'], includeNavScript: true }) %>

@@ -111,6 +111,31 @@
       </div>
 
       <div>
+        <label class="form-label">Worker Leave Allowances (Days per Year)</label>
+        <div class="row g-3">
+          <div class="col-12 col-md-4">
+            <label for="sickDaysPerYear" class="form-label">Sick Days</label>
+            <input id="sickDaysPerYear" type="number" min="0" max="365" step="0.5" class="form-control" placeholder="e.g. 10" />
+          </div>
+          <div class="col-12 col-md-4">
+            <label for="annualLeaveDaysPerYear" class="form-label">Annual Leave</label>
+            <input id="annualLeaveDaysPerYear" type="number" min="0" max="365" step="0.5" class="form-control" placeholder="e.g. 20" />
+          </div>
+          <div class="col-12 col-md-4">
+            <label for="bankHolidaysPerYear" class="form-label">Bank Holidays</label>
+            <input id="bankHolidaysPerYear" type="number" min="0" max="365" step="0.5" class="form-control" placeholder="e.g. 10" />
+          </div>
+        </div>
+        <small class="text-muted">These values are applied to new worker leave balances.</small>
+      </div>
+
+      <div>
+        <label for="leaveYearStartDate" class="form-label">Leave Year Start Date</label>
+        <input id="leaveYearStartDate" type="date" class="form-control" />
+        <small class="text-muted">Used to reset leave allowances each year.</small>
+      </div>
+
+      <div>
         <label class="form-label">VAT Rates (%)</label>
         <div class="d-flex gap-2 mb-3">
           <input id="vatInput" type="number" step="0.1" min="0" max="100" class="form-control" placeholder="e.g. 13.5" />

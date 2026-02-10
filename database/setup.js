@@ -160,9 +160,12 @@ async function setupDatabase() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         first_name VARCHAR(100) NOT NULL,
         last_name VARCHAR(100) NOT NULL,
+        nickname VARCHAR(100) DEFAULT NULL,
         pps_number VARCHAR(50),
         weekly_take_home DECIMAL(12, 2) DEFAULT NULL,
         weekly_cost DECIMAL(12, 2) DEFAULT NULL,
+        safe_pass_number VARCHAR(100),
+        safe_pass_expiry_date DATE DEFAULT NULL,
         date_of_employment DATE DEFAULT NULL,
         employee_id VARCHAR(100),
         notes TEXT,
@@ -197,6 +200,8 @@ async function setupDatabase() {
         work_date DATE NOT NULL,
         site_id INT NOT NULL,
         location_id INT NOT NULL,
+        stage_id INT DEFAULT NULL,
+        leave_type VARCHAR(40) DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         UNIQUE KEY uniq_timesheet_worker_date (timesheet_id, worker_id, work_date),
@@ -204,8 +209,11 @@ async function setupDatabase() {
         FOREIGN KEY (worker_id) REFERENCES workers(id) ON DELETE RESTRICT,
         FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE RESTRICT,
         FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE RESTRICT,
+        FOREIGN KEY (stage_id) REFERENCES po_stages(id) ON DELETE SET NULL,
         INDEX idx_worker_id (worker_id),
-        INDEX idx_work_date (work_date)
+        INDEX idx_work_date (work_date),
+        INDEX idx_stage_id (stage_id),
+        INDEX idx_leave_type (leave_type)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log('✅ Timesheet entries table created');
@@ -423,6 +431,10 @@ async function setupDatabase() {
       ('accent_color', '#1e40af', 'Accent color for highlights'),
       ('currency_code', 'EUR', 'Default currency code'),
       ('vat_rates', '[0,13.5,23]', 'Default VAT rates (percent)'),
+      ('sick_days_per_year', '3', 'Default sick days per worker per year'),
+      ('annual_leave_days_per_year', '20', 'Default annual leave days per worker per year'),
+      ('bank_holidays_per_year', '10', 'Default bank holidays per worker per year'),
+      ('leave_year_start', '01-01', 'Leave year start date (MM-DD)'),
       ('company_name', 'Castlerock Homes', 'Company name for branding'),
       ('company_trading_name', '', 'Trading as name for branding'),
       ('company_address', '', 'Company address for PO footer'),

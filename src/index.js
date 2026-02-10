@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const pool = require('./db');
+const { ensureLeaveDefaults } = require('./services/leaveService');
 
 const app = express();
 
@@ -43,6 +44,8 @@ app.get('/header-branding.html', (req, res) => res.redirect('/application-settin
 app.get('/location-report.html', (req, res) => res.render('location-report'));
 app.get('/supplier-report.html', (req, res) => res.render('supplier-report'));
 app.get('/invoice-report.html', (req, res) => res.render('invoice-report'));
+app.get('/workers-information.html', (req, res) => res.render('workers-information'));
+app.get('/leave-report.html', (req, res) => res.redirect('/workers-information.html'));
 app.get('/labour-costs.html', (req, res) => res.render('labour-costs'));
 
 // Health check with database connectivity test
@@ -129,4 +132,8 @@ app.listen(PORT, HOST, () => {
   console.log(`🚀 Server running on ${HOST}:${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🗄️  Database: ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
+
+  ensureLeaveDefaults().catch(error => {
+    console.error('Failed to ensure leave defaults:', error);
+  });
 });
