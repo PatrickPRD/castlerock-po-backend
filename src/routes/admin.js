@@ -582,6 +582,7 @@ router.get(
            safe_pass_expiry_date,
            date_of_employment,
            employee_id,
+           login_no,
            notes,
            left_at,
            CASE
@@ -618,6 +619,7 @@ router.post(
       date_of_employment,
       left_at,
       employee_id,
+      login_no,
       notes
     } = req.body;
 
@@ -630,6 +632,9 @@ router.post(
     const normalizedNickname = nickname ? nickname.trim() : null;
     const normalizedDate = date_of_employment ? toIsoDate(date_of_employment) : null;
     const normalizedLeftAt = left_at ? toIsoDate(left_at) : null;
+    const normalizedLoginNo = login_no != null && String(login_no).trim() !== ''
+      ? String(login_no).trim()
+      : null;
 
     if (date_of_employment && !normalizedDate) {
       return res.status(400).json({
@@ -667,14 +672,33 @@ router.post(
       }
     }
 
+    if (normalizedLoginNo && !/^\d+$/.test(normalizedLoginNo)) {
+      return res.status(400).json({
+        error: 'Login number must be numeric'
+      });
+    }
+
+    if (normalizedLoginNo) {
+      const [[loginNoMatch]] = await db.query(
+        `SELECT id FROM workers WHERE login_no = ? LIMIT 1`,
+        [normalizedLoginNo]
+      );
+
+      if (loginNoMatch) {
+        return res.status(400).json({
+          error: 'This login number is already in use'
+        });
+      }
+    }
+
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const isActive = !normalizedLeftAt || new Date(`${normalizedLeftAt}T00:00:00`) >= today;
       await db.query(
         `INSERT INTO workers
-         (first_name, last_name, nickname, pps_number, weekly_take_home, weekly_cost, safe_pass_number, safe_pass_expiry_date, date_of_employment, left_at, employee_id, notes, active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (first_name, last_name, nickname, pps_number, weekly_take_home, weekly_cost, safe_pass_number, safe_pass_expiry_date, date_of_employment, left_at, employee_id, login_no, notes, active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           normalizedFirst,
           normalizedLast,
@@ -687,6 +711,7 @@ router.post(
           normalizedDate,
           normalizedLeftAt,
           employee_id || null,
+          normalizedLoginNo,
           notes || null,
           isActive ? 1 : 0
         ]
@@ -718,6 +743,7 @@ router.put(
       date_of_employment,
       left_at,
       employee_id,
+      login_no,
       notes
     } = req.body;
 
@@ -730,6 +756,9 @@ router.put(
     const normalizedNickname = nickname ? nickname.trim() : null;
     const normalizedDate = date_of_employment ? toIsoDate(date_of_employment) : null;
     const normalizedLeftAt = left_at ? toIsoDate(left_at) : null;
+    const normalizedLoginNo = login_no != null && String(login_no).trim() !== ''
+      ? String(login_no).trim()
+      : null;
 
     if (date_of_employment && !normalizedDate) {
       return res.status(400).json({
@@ -767,6 +796,25 @@ router.put(
       }
     }
 
+    if (normalizedLoginNo && !/^\d+$/.test(normalizedLoginNo)) {
+      return res.status(400).json({
+        error: 'Login number must be numeric'
+      });
+    }
+
+    if (normalizedLoginNo) {
+      const [[loginNoMatch]] = await db.query(
+        `SELECT id FROM workers WHERE login_no = ? AND id <> ? LIMIT 1`,
+        [normalizedLoginNo, workerId]
+      );
+
+      if (loginNoMatch) {
+        return res.status(400).json({
+          error: 'This login number is already in use'
+        });
+      }
+    }
+
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -785,6 +833,7 @@ router.put(
            date_of_employment = ?,
            left_at = ?,
            employee_id = ?,
+           login_no = ?,
            notes = ?,
            active = ?
          WHERE id = ?`,
@@ -800,6 +849,7 @@ router.put(
           normalizedDate,
           normalizedLeftAt,
           employee_id || null,
+          normalizedLoginNo,
           notes || null,
           isActive ? 1 : 0,
           workerId
@@ -857,7 +907,7 @@ router.get(
         { header: 'Safe Pass Number', key: 'safe_pass_number', width: 18 },
         { header: 'Safe Pass Expiry (DD-MM-YYYY)', key: 'safe_pass_expiry_date', width: 26 },
         { header: 'Date of Employment (DD-MM-YYYY)', key: 'date_of_employment', width: 26 },
-        { header: 'Employee ID', key: 'employee_id', width: 16 },
+        { header: 'Login No', key: 'login_no', width: 16 },
         { header: 'Notes', key: 'notes', width: 30 }
       ];
 
@@ -871,7 +921,7 @@ router.get(
         safe_pass_number: 'SAFE-12345',
         safe_pass_expiry_date: '09-02-2027',
         date_of_employment: '09-02-2026',
-        employee_id: 'EMP-001',
+        login_no: 1001,
         notes: 'Sample worker'
       });
 
@@ -919,18 +969,22 @@ router.post(
       }
 
       const [existingWorkers] = await db.query(
-        'SELECT first_name, last_name, employee_id FROM workers'
+        'SELECT id, first_name, last_name, login_no FROM workers'
       );
-      const existingNames = new Set(
-        existingWorkers.map(w => `${String(w.first_name).trim().toLowerCase()}|${String(w.last_name).trim().toLowerCase()}`)
+      const existingByName = new Map(
+        existingWorkers.map(worker => [
+          `${String(worker.first_name).trim().toLowerCase()}|${String(worker.last_name).trim().toLowerCase()}`,
+          worker
+        ])
       );
-      const existingEmployeeIds = new Set(
+      const existingNames = new Set(existingByName.keys());
+      const existingLoginNos = new Map(
         existingWorkers
-          .map(w => String(w.employee_id || '').trim())
-          .filter(Boolean)
+          .filter(worker => worker.login_no != null && String(worker.login_no).trim() !== '')
+          .map(worker => [String(worker.login_no).trim(), worker.id])
       );
       const seenNames = new Set();
-      const seenEmployeeIds = new Set();
+      const seenLoginNos = new Map();
 
       const headerRow = sheet.getRow(1);
       const headerMap = {};
@@ -939,6 +993,7 @@ router.post(
       });
 
       const rowsToInsert = [];
+      const rowsToUpdate = [];
       const skipped = [];
 
       for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
@@ -954,7 +1009,7 @@ router.post(
         }
 
         const nameKey = `${firstName.toLowerCase()}|${lastName.toLowerCase()}`;
-        if (existingNames.has(nameKey) || seenNames.has(nameKey)) {
+        if (seenNames.has(nameKey)) {
           skipped.push({ row: rowNumber, reason: 'Duplicate first and last name' });
           continue;
         }
@@ -966,7 +1021,7 @@ router.post(
         const safePassNumberValue = row.getCell(headerMap.safe_pass_number || 7).value;
         const safePassExpiryValue = row.getCell(headerMap.safe_pass_expiry_date || 8).value;
         const dateValue = row.getCell(headerMap.date_of_employment || 9).value;
-        const employeeId = row.getCell(headerMap.employee_id || 10).value;
+        const loginNo = row.getCell(headerMap.login_no || 10).value;
         const notes = row.getCell(headerMap.notes || 11).value;
 
         const weeklyTakeHome = weeklyTakeHomeValue !== null && weeklyTakeHomeValue !== ''
@@ -982,9 +1037,11 @@ router.post(
           continue;
         }
 
-        const normalizedEmployeeId = employeeId ? String(employeeId).trim() : '';
-        if (normalizedEmployeeId && (existingEmployeeIds.has(normalizedEmployeeId) || seenEmployeeIds.has(normalizedEmployeeId))) {
-          skipped.push({ row: rowNumber, reason: 'Duplicate employee ID' });
+        const normalizedLoginNo = loginNo != null && String(loginNo).trim() !== ''
+          ? String(loginNo).trim()
+          : '';
+        if (normalizedLoginNo && !/^\d+$/.test(normalizedLoginNo)) {
+          skipped.push({ row: rowNumber, reason: 'Login number must be numeric' });
           continue;
         }
 
@@ -1000,10 +1057,53 @@ router.post(
           continue;
         }
 
-        seenNames.add(nameKey);
-        if (normalizedEmployeeId) {
-          seenEmployeeIds.add(normalizedEmployeeId);
+        const existingWorker = existingByName.get(nameKey);
+        if (existingWorker) {
+          if (normalizedLoginNo) {
+            const currentMatchId = existingLoginNos.get(normalizedLoginNo);
+            const seenMatchId = seenLoginNos.get(normalizedLoginNo);
+            if ((currentMatchId && currentMatchId !== existingWorker.id) ||
+                (seenMatchId && seenMatchId !== existingWorker.id)) {
+              skipped.push({ row: rowNumber, reason: 'Duplicate login number' });
+              continue;
+            }
+            seenLoginNos.set(normalizedLoginNo, existingWorker.id);
+          }
+
+          rowsToUpdate.push([
+            firstName,
+            lastName,
+            nicknameValue ? String(nicknameValue).trim() : null,
+            ppsNumber ? String(ppsNumber).trim() : null,
+            weeklyTakeHome,
+            weeklyCost,
+            safePassNumberValue ? String(safePassNumberValue).trim() : null,
+            normalizedSafePassExpiry,
+            normalizedDate,
+            normalizedLoginNo || null,
+            notes ? String(notes).trim() : null,
+            existingWorker.id
+          ]);
+          seenNames.add(nameKey);
+          continue;
         }
+
+        if (existingNames.has(nameKey) || seenNames.has(nameKey)) {
+          skipped.push({ row: rowNumber, reason: 'Duplicate first and last name' });
+          continue;
+        }
+
+        if (normalizedLoginNo) {
+          const currentMatchId = existingLoginNos.get(normalizedLoginNo);
+          const seenMatchId = seenLoginNos.get(normalizedLoginNo);
+          if (currentMatchId || seenMatchId) {
+            skipped.push({ row: rowNumber, reason: 'Duplicate login number' });
+            continue;
+          }
+          seenLoginNos.set(normalizedLoginNo, -1);
+        }
+
+        seenNames.add(nameKey);
 
         rowsToInsert.push([
           firstName,
@@ -1015,7 +1115,7 @@ router.post(
           safePassNumberValue ? String(safePassNumberValue).trim() : null,
           normalizedSafePassExpiry,
           normalizedDate,
-          normalizedEmployeeId || null,
+          normalizedLoginNo || null,
           notes ? String(notes).trim() : null,
           1
         ]);
@@ -1024,15 +1124,38 @@ router.post(
       if (rowsToInsert.length > 0) {
         await db.query(
           `INSERT INTO workers
-           (first_name, last_name, nickname, pps_number, weekly_take_home, weekly_cost, safe_pass_number, safe_pass_expiry_date, date_of_employment, employee_id, notes, active)
+           (first_name, last_name, nickname, pps_number, weekly_take_home, weekly_cost, safe_pass_number, safe_pass_expiry_date, date_of_employment, login_no, notes, active)
            VALUES ?`,
           [rowsToInsert]
         );
       }
 
+      if (rowsToUpdate.length > 0) {
+        for (const updateValues of rowsToUpdate) {
+          await db.query(
+            `UPDATE workers
+             SET
+               first_name = ?,
+               last_name = ?,
+               nickname = ?,
+               pps_number = ?,
+               weekly_take_home = ?,
+               weekly_cost = ?,
+               safe_pass_number = ?,
+               safe_pass_expiry_date = ?,
+               date_of_employment = ?,
+               login_no = ?,
+               notes = ?
+             WHERE id = ?`,
+            updateValues
+          );
+        }
+      }
+
       res.json({
         success: true,
         inserted: rowsToInsert.length,
+        updated: rowsToUpdate.length,
         skipped
       });
     } catch (err) {

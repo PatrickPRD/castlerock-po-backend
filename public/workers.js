@@ -162,6 +162,8 @@ function sortWorkers(list) {
       result = compareStrings(a.pps_number, b.pps_number);
     } else if (sortColumn === 'weekly_take_home') {
       result = compareNumbers(a.weekly_take_home, b.weekly_take_home);
+    } else if (sortColumn === 'login_no') {
+      result = compareNumbers(a.login_no, b.login_no);
     } else if (sortColumn === 'status') {
       const aValue = isWorkerActive(a.left_at) ? 0 : 1;
       const bValue = isWorkerActive(b.left_at) ? 0 : 1;
@@ -210,20 +212,20 @@ function renderWorkers() {
     mainRow.innerHTML = `
       <td>${escapeHtml(fullName) || '—'}</td>
       <td>${escapeHtml(nickname) || '—'}</td>
-      <td>${escapeHtml(worker.pps_number) || '—'}</td>
-      <td>${weeklyPay}</td>
+      <td>${escapeHtml(worker.login_no) || '—'}</td>
       <td>${isActive ? 'Active' : 'Inactive'}</td>
     `;
 
     const detailsRow = document.createElement('tr');
     detailsRow.className = 'details-row';
     detailsRow.innerHTML = `
-      <td colspan="5">
+      <td colspan="4">
         <div class="details-grid">
           <div><strong>First name:</strong> ${escapeHtml(worker.first_name) || '—'}</div>
           <div><strong>Last name:</strong> ${escapeHtml(worker.last_name) || '—'}</div>
           <div><strong>Nickname:</strong> ${escapeHtml(nickname) || '—'}</div>
           <div><strong>Employee ID:</strong> ${escapeHtml(worker.employee_id) || '—'}</div>
+          <div><strong>Login No:</strong> ${escapeHtml(worker.login_no) || '—'}</div>
           <div><strong>PPS Number:</strong> ${escapeHtml(worker.pps_number) || '—'}</div>
           <div><strong>Weekly take home:</strong> ${weeklyPay}</div>
           <div><strong>Weekly cost:</strong> ${weeklyCost}</div>
@@ -298,6 +300,7 @@ function resetWorkerForm() {
   document.getElementById('workerLastName').value = '';
   document.getElementById('workerNickname').value = '';
   document.getElementById('workerEmployeeId').value = '';
+  document.getElementById('workerLoginNo').value = '';
   document.getElementById('workerPpsNumber').value = '';
   document.getElementById('workerWeeklyPay').value = '';
   document.getElementById('workerWeeklyCost').value = '';
@@ -321,6 +324,7 @@ function editWorker(id) {
   document.getElementById('workerLastName').value = worker.last_name || '';
   document.getElementById('workerNickname').value = worker.nickname || '';
   document.getElementById('workerEmployeeId').value = worker.employee_id || '';
+  document.getElementById('workerLoginNo').value = worker.login_no != null ? worker.login_no : '';
   document.getElementById('workerPpsNumber').value = worker.pps_number || '';
   document.getElementById('workerWeeklyPay').value = worker.weekly_take_home != null ? worker.weekly_take_home : '';
   document.getElementById('workerWeeklyCost').value = worker.weekly_cost != null ? worker.weekly_cost : '';
@@ -353,6 +357,7 @@ async function saveWorker() {
   const lastName = document.getElementById('workerLastName').value.trim();
   const nickname = document.getElementById('workerNickname').value.trim();
   const employeeId = document.getElementById('workerEmployeeId').value.trim();
+  const loginNoRaw = document.getElementById('workerLoginNo').value.trim();
   const ppsNumber = document.getElementById('workerPpsNumber').value.trim();
   const weeklyPayRaw = document.getElementById('workerWeeklyPay').value.trim();
   const weeklyCostRaw = document.getElementById('workerWeeklyCost').value.trim();
@@ -394,11 +399,17 @@ async function saveWorker() {
     return;
   }
 
+  if (loginNoRaw && !/^\d+$/.test(loginNoRaw)) {
+    showToast('Login number must be numeric', 'error');
+    return;
+  }
+
   const payload = {
     first_name: firstName,
     last_name: lastName,
     nickname: nickname || null,
     employee_id: employeeId || null,
+    login_no: loginNoRaw || null,
     pps_number: ppsNumber || null,
     weekly_take_home: weeklyPay,
     weekly_cost: weeklyCost,
@@ -474,9 +485,13 @@ async function uploadWorkerFile() {
     }
 
     const skippedCount = Array.isArray(data.skipped) ? data.skipped.length : 0;
-    const message = skippedCount
-      ? `Uploaded ${data.inserted} workers, skipped ${skippedCount}`
-      : `Uploaded ${data.inserted} workers`;
+    const insertedCount = Number(data.inserted || 0);
+    const updatedCount = Number(data.updated || 0);
+    const parts = [`Added ${insertedCount}`, `Updated ${updatedCount}`];
+    if (skippedCount) {
+      parts.push(`Skipped ${skippedCount}`);
+    }
+    const message = parts.join(', ');
     showToast(message, 'success');
 
     closeBulkUploadModal();

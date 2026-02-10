@@ -146,14 +146,14 @@ CREATE TABLE `workers` (
   `safe_pass_number` VARCHAR(100),
   `safe_pass_expiry_date` DATE DEFAULT NULL,
   `date_of_employment` DATE DEFAULT NULL,
-  `employee_id` VARCHAR(100),
+  `login_no` VARCHAR(20),
   `notes` TEXT,
   `active` TINYINT(1) NOT NULL DEFAULT 1,
   `left_at` DATE DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX `idx_last_name` (`last_name`),
-  INDEX `idx_employee_id` (`employee_id`),
+  INDEX `idx_login_no` (`login_no`),
   INDEX `idx_pps_number` (`pps_number`),
   INDEX `idx_active` (`active`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

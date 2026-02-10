@@ -1,10 +1,12 @@
 -- Add workers table
+
 CREATE TABLE IF NOT EXISTS workers (
   id INT AUTO_INCREMENT PRIMARY KEY,
   first_name VARCHAR(100) NOT NULL,
   last_name VARCHAR(100) NOT NULL,
   pps_number VARCHAR(50),
   weekly_take_home DECIMAL(12, 2) DEFAULT NULL,
+  weekly_cost DECIMAL(12, 2) DEFAULT NULL,
   date_of_employment DATE DEFAULT NULL,
   employee_id VARCHAR(100),
   notes TEXT,
