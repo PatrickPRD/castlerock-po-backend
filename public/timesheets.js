@@ -382,13 +382,11 @@ function renderWorkers() {
 
     weekDays.forEach(day => {
       const entry = entryMap.get(`${worker.id}|${day.dateString}`);
-      const siteName = entry ? siteMap.get(Number(entry.site_id)) : null;
       const locationName = entry ? getLocationName(entry.site_id, entry.location_id) : null;
-      const stageName = entry ? getStageName(entry.stage_id) : null;
       const summary = entry
         ? (entry.leave_type
-          ? `${siteName || 'Site'} / ${getLeaveLabel(entry.leave_type)}`
-          : `${siteName || 'Site'} / ${locationName || 'Location'} / ${stageName || 'Stage'}`)
+          ? getLeaveLabel(entry.leave_type)
+          : locationName || 'Location')
         : '—';
 
       const cell = document.createElement('td');

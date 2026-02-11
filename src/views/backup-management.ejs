@@ -123,19 +123,6 @@
 
   <div class="backup-section">
     <div class="backup-card">
-      <h3>� Setup Wizard</h3>
-      <p>Auto-populate sites and locations from your Purchase Orders, then configure site letter mappings.</p>
-      <div class="info-box">
-        <strong>Note:</strong> This wizard will guide you through setting up your sites and configuring which letters map to which sites.
-      </div>
-      <div class="backup-actions">
-        <button class="btn-primary btn-backup" onclick="startSetupWizard()">
-          Start Setup Wizard
-        </button>
-      </div>
-    </div>
-
-    <div class="backup-card">
       <h3>📥 Create Backup</h3>
       <p>Export all data (excluding user accounts) from the database. Users will remain unaffected.</p>
       <div class="info-box">
@@ -158,57 +145,6 @@
         <button class="btn-primary btn-backup" onclick="openRestoreModal()">
           Restore from Backup
         </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Setup Wizard Modal -->
-  <div id="setupWizardModal" class="modal">
-    <div class="modal-content" style="max-width: 600px;">
-      <div class="modal-header">
-        <h2>Setup Wizard</h2>
-        <button class="close-btn" onclick="closeSetupWizard()">&times;</button>
-      </div>
-
-      <!-- Step 1: Auto-Populate -->
-      <div id="wizardStep1" class="wizard-step">
-        <h3>Step 1: Auto-Populate Sites & Locations</h3>
-        <p>This will scan your Purchase Orders and automatically create sites and locations based on the data found.</p>
-        <div class="info-box">
-          <strong>Note:</strong> Existing sites and locations will not be modified.
-        </div>
-        <div class="modal-actions">
-          <button class="btn btn-outline-secondary" onclick="closeSetupWizard()">Cancel</button>
-          <button class="btn btn-primary" onclick="executeAutoPopulate()">Auto-Populate Now</button>
-        </div>
-      </div>
-
-      <!-- Step 2: Site Letter Mappings -->
-      <div id="wizardStep2" class="wizard-step" style="display: none;">
-        <h3>Step 2: Configure Site Letter Mappings</h3>
-        <p>Map letters (first character of PO numbers) to sites for better organization.</p>
-        
-        <div class="form-row" style="margin-bottom: 1.5rem;">
-          <input id="mappingLetter" placeholder="Letter" maxlength="1" style="width:80px;text-transform:uppercase">
-          <select id="mappingSiteSelect"></select>
-          <button class="btn btn-primary" onclick="addSiteLetterMappingWizard()">Add Mapping</button>
-        </div>
-
-        <table class="po-table">
-          <thead>
-            <tr>
-              <th>Letter</th>
-              <th>Site</th>
-              <th style="width:160px">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="siteLetterTable"></tbody>
-        </table>
-
-        <div class="modal-actions" style="margin-top: 2rem;">
-          <button class="btn-outline" onclick="wizardPreviousStep()">Back</button>
-          <button class="btn-primary" onclick="closeSetupWizard()">Finish</button>
-        </div>
       </div>
     </div>
   </div>

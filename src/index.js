@@ -4,6 +4,7 @@ const express = require('express');
 const path = require('path');
 const pool = require('./db');
 const { ensureLeaveDefaults } = require('./services/leaveService');
+const { checkSetupRequired } = require('./middleware/setupCheck');
 
 const app = express();
 
@@ -16,10 +17,16 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 app.use(express.static(path.join(__dirname, '../public')));
 
+// ✅ Check if setup is required before accessing protected pages
+app.use(checkSetupRequired);
+
 // Root route → login page
 app.get('/', (req, res) => {
   res.render('login');
 });
+
+// Setup Wizard route
+app.get('/setup-wizard.html', (req, res) => res.render('setup-wizard'));
 
 // Page routes using EJS templates
 app.get('/login.html', (req, res) => res.render('login'));
@@ -79,6 +86,9 @@ app.use('/suppliers', supplierRoutes);
 
 const adminRoutes = require('./routes/admin');
 app.use('/admin', adminRoutes);
+
+const setupWizardRoutes = require('./routes/setupWizard');
+app.use('/setup-wizard', setupWizardRoutes);
 
 const auditRoutes = require('./routes/audit');
 app.use('/audit', auditRoutes);

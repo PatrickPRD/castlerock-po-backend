@@ -383,127 +383,12 @@ function back() {
   location.href = 'dashboard.html';
 }
 
-/* ============================
-   SETUP WIZARD
-   ============================ */
-function startSetupWizard() {
-  document.getElementById('setupWizardModal').style.display = 'flex';
-  document.getElementById('wizardStep1').style.display = 'block';
-  document.getElementById('wizardStep2').style.display = 'none';
-}
-
-function closeSetupWizard() {
-  document.getElementById('setupWizardModal').style.display = 'none';
-  document.getElementById('wizardStep1').style.display = 'block';
-  document.getElementById('wizardStep2').style.display = 'none';
-}
-
-async function executeAutoPopulate() {
-  if (!confirm('This will auto-populate sites and locations from your Purchase Orders. Continue?')) return;
-
-  try {
-    showToast('Auto-populating sites and locations...', 'info');
-    await api('/admin/auto-populate-sites', 'POST', {});
-    showToast('Sites and locations auto-populated successfully!', 'success');
-    
-    // Move to step 2
-    document.getElementById('wizardStep1').style.display = 'none';
-    document.getElementById('wizardStep2').style.display = 'block';
-    
-    // Load sites for mappings
-    loadSitesForWizard();
-    loadSiteLetterMappingsWizard();
-  } catch (err) {
-    showToast('Error: ' + err.message, 'error');
-  }
-}
-
-function wizardPreviousStep() {
-  document.getElementById('wizardStep1').style.display = 'block';
-  document.getElementById('wizardStep2').style.display = 'none';
-}
-
-async function loadSitesForWizard() {
-  try {
-    const sites = await api('/admin/sites');
-    const select = document.getElementById('mappingSiteSelect');
-    select.innerHTML = '<option value="">Select site</option>';
-    sites.forEach(s => {
-      select.innerHTML += `<option value="${s.id}">${s.name}</option>`;
-    });
-  } catch (err) {
-    showToast('Error loading sites: ' + err.message, 'error');
-  }
-}
-
-async function loadSiteLetterMappingsWizard() {
-  try {
-    const mappings = await api('/admin/site-letters');
-    const table = document.getElementById('siteLetterTable');
-    table.innerHTML = '';
-    mappings.forEach(m => {
-      table.innerHTML += `
-        <tr>
-          <td><strong>${m.letter}</strong></td>
-          <td>${m.site_name}</td>
-          <td>
-            <button class="btn btn-outline-primary" onclick="deleteSiteLetterMappingWizard(${m.id})">Delete</button>
-          </td>
-        </tr>
-      `;
-    });
-  } catch (err) {
-    showToast('Error loading mappings: ' + err.message, 'error');
-  }
-}
-
-async function addSiteLetterMappingWizard() {
-  const letter = document.getElementById('mappingLetter').value.trim().toUpperCase();
-  const siteId = document.getElementById('mappingSiteSelect').value;
-
-  if (!letter || !siteId) {
-    showToast('Letter and site are required', 'warning');
-    return;
-  }
-
-  if (letter.length !== 1) {
-    showToast('Letter must be a single character', 'warning');
-    return;
-  }
-
-  try {
-    await api('/admin/site-letters', 'POST', { letter, site_id: parseInt(siteId) });
-    document.getElementById('mappingLetter').value = '';
-    document.getElementById('mappingSiteSelect').value = '';
-    loadSiteLetterMappingsWizard();
-    showToast('Site letter mapping added successfully', 'success');
-  } catch (err) {
-    showToast('Error: ' + err.message, 'error');
-  }
-}
-
-async function deleteSiteLetterMappingWizard(id) {
-  if (!confirm('Delete this site letter mapping?')) return;
-
-  try {
-    await api(`/admin/site-letters/${id}`, 'DELETE');
-    loadSiteLetterMappingsWizard();
-    showToast('Site letter mapping deleted successfully', 'success');
-  } catch (err) {
-    showToast('Error: ' + err.message, 'error');
-  }
-}
-
 // Close modal when clicking outside
 document.addEventListener('click', function (event) {
   const restoreModal = document.getElementById('restoreModal');
-  const wizardModal = document.getElementById('setupWizardModal');
   
   if (event.target === restoreModal) {
     closeRestoreModal();
-  }
-  if (event.target === wizardModal) {
-    closeSetupWizard();
   }
 });
 
