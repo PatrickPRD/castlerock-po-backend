@@ -839,6 +839,36 @@ class PDFService {
             </div>
 
             <div class="section">
+              <div class="section-title">Contact & Address</div>
+              <div class="row">
+                <div class="field">
+                  <div class="field-label">Email Address</div>
+                  <div class="field-value">${this.escapeHtml(workerData.email || 'N/A')}</div>
+                </div>
+                <div class="field">
+                  <div class="field-label">Mobile Number</div>
+                  <div class="field-value">${this.escapeHtml(workerData.mobile_number || 'N/A')}</div>
+                </div>
+              </div>
+              <div class="row full">
+                <div class="field">
+                  <div class="field-label">Address</div>
+                  <div class="field-value">${this.escapeHtml(workerData.address || 'N/A')}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Bank Details</div>
+              <div class="row">
+                <div class="field">
+                  <div class="field-label">Bank Details</div>
+                  <div class="field-value">${this.escapeHtml(workerData.bank_details || 'N/A')}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section">
               <div class="section-title">Employment</div>
               <div class="row">
                 <div class="field">

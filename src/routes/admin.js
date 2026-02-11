@@ -563,7 +563,7 @@ router.delete(
 router.get(
   '/workers',
   authenticate,
-  authorizeRoles('super_admin'),
+  authorizeRoles('super_admin', 'admin'),
   async (req, res) => {
     const includeInactive = String(req.query.include_inactive) === '1';
     const whereClause = includeInactive ? '' : 'WHERE left_at IS NULL OR left_at >= CURDATE()';
@@ -575,6 +575,10 @@ router.get(
            first_name,
            last_name,
           nickname,
+           email,
+           mobile_number,
+           address,
+           bank_details,
            pps_number,
            weekly_take_home,
            weekly_cost,
@@ -605,12 +609,16 @@ router.get(
 router.post(
   '/workers',
   authenticate,
-  authorizeRoles('super_admin'),
+  authorizeRoles('super_admin', 'admin'),
   async (req, res) => {
     const {
       first_name,
       last_name,
       nickname,
+      email,
+      mobile_number,
+      address,
+      bank_details,
       pps_number,
       weekly_take_home,
       weekly_cost,
@@ -630,6 +638,10 @@ router.post(
     const normalizedFirst = first_name.trim();
     const normalizedLast = last_name.trim();
     const normalizedNickname = nickname ? nickname.trim() : null;
+    const normalizedEmail = email ? email.trim().toLowerCase() : null;
+    const normalizedMobileNumber = mobile_number ? mobile_number.trim() : null;
+    const normalizedAddress = address ? address.trim() : null;
+    const normalizedBankDetails = bank_details ? bank_details.trim() : null;
     const normalizedDate = date_of_employment ? toIsoDate(date_of_employment) : null;
     const normalizedLeftAt = left_at ? toIsoDate(left_at) : null;
     const normalizedLoginNo = login_no != null && String(login_no).trim() !== ''
@@ -697,12 +709,16 @@ router.post(
       const isActive = !normalizedLeftAt || new Date(`${normalizedLeftAt}T00:00:00`) >= today;
       await db.query(
         `INSERT INTO workers
-         (first_name, last_name, nickname, pps_number, weekly_take_home, weekly_cost, safe_pass_number, safe_pass_expiry_date, date_of_employment, left_at, employee_id, login_no, notes, active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (first_name, last_name, nickname, email, mobile_number, address, bank_details, pps_number, weekly_take_home, weekly_cost, safe_pass_number, safe_pass_expiry_date, date_of_employment, left_at, employee_id, login_no, notes, active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           normalizedFirst,
           normalizedLast,
           normalizedNickname || null,
+          normalizedEmail || null,
+          normalizedMobileNumber || null,
+          normalizedAddress || null,
+          normalizedBankDetails || null,
           pps_number || null,
           weekly_take_home ?? null,
           weekly_cost ?? null,
@@ -728,13 +744,17 @@ router.post(
 router.put(
   '/workers/:id',
   authenticate,
-  authorizeRoles('super_admin'),
+  authorizeRoles('super_admin', 'admin'),
   async (req, res) => {
     const workerId = Number(req.params.id);
     const {
       first_name,
       last_name,
       nickname,
+      email,
+      mobile_number,
+      address,
+      bank_details,
       pps_number,
       weekly_take_home,
       weekly_cost,
@@ -754,6 +774,10 @@ router.put(
     const normalizedFirst = first_name.trim();
     const normalizedLast = last_name.trim();
     const normalizedNickname = nickname ? nickname.trim() : null;
+    const normalizedEmail = email ? email.trim().toLowerCase() : null;
+    const normalizedMobileNumber = mobile_number ? mobile_number.trim() : null;
+    const normalizedAddress = address ? address.trim() : null;
+    const normalizedBankDetails = bank_details ? bank_details.trim() : null;
     const normalizedDate = date_of_employment ? toIsoDate(date_of_employment) : null;
     const normalizedLeftAt = left_at ? toIsoDate(left_at) : null;
     const normalizedLoginNo = login_no != null && String(login_no).trim() !== ''
@@ -825,6 +849,10 @@ router.put(
            first_name = ?,
            last_name = ?,
            nickname = ?,
+           email = ?,
+           mobile_number = ?,
+           address = ?,
+           bank_details = ?,
            pps_number = ?,
            weekly_take_home = ?,
            weekly_cost = ?,
@@ -841,6 +869,10 @@ router.put(
           normalizedFirst,
           normalizedLast,
           normalizedNickname || null,
+          normalizedEmail || null,
+          normalizedMobileNumber || null,
+          normalizedAddress || null,
+          normalizedBankDetails || null,
           pps_number || null,
           weekly_take_home ?? null,
           weekly_cost ?? null,
@@ -867,7 +899,7 @@ router.put(
 router.put(
   '/workers/:id/status',
   authenticate,
-  authorizeRoles('super_admin'),
+  authorizeRoles('super_admin', 'admin'),
   async (req, res) => {
     const workerId = Number(req.params.id);
     const active = Number(req.body.active) === 1 ? 1 : 0;
@@ -891,7 +923,7 @@ router.put(
 router.get(
   '/workers/template',
   authenticate,
-  authorizeRoles('super_admin'),
+  authorizeRoles('super_admin', 'admin'),
   async (_req, res) => {
     try {
       const workbook = new ExcelJS.Workbook();
@@ -901,6 +933,10 @@ router.get(
         { header: 'First Name', key: 'first_name', width: 20 },
         { header: 'Last Name', key: 'last_name', width: 20 },
         { header: 'Nickname', key: 'nickname', width: 18 },
+        { header: 'Email', key: 'email', width: 25 },
+        { header: 'Mobile Number', key: 'mobile_number', width: 16 },
+        { header: 'Address', key: 'address', width: 30 },
+        { header: 'Bank Details', key: 'bank_details', width: 25 },
         { header: 'PPS Number', key: 'pps_number', width: 18 },
         { header: 'Weekly Take Home', key: 'weekly_take_home', width: 18 },
         { header: 'Weekly Cost', key: 'weekly_cost', width: 16 },
@@ -915,6 +951,10 @@ router.get(
         first_name: 'John',
         last_name: 'Doe',
         nickname: 'Johnny',
+        email: 'john.doe@example.com',
+        mobile_number: '087 123 4567',
+        address: '123 Main Street, City, County',
+        bank_details: 'IE12 BANK 12345678',
         pps_number: 'PPS1234567',
         weekly_take_home: 750,
         weekly_cost: 900,
@@ -953,7 +993,7 @@ function normalizeHeader(value) {
 router.post(
   '/workers/bulk',
   authenticate,
-  authorizeRoles('super_admin'),
+  authorizeRoles('super_admin', 'admin'),
   upload.single('file'),
   async (req, res) => {
     if (!req.file) {
@@ -1016,13 +1056,17 @@ router.post(
 
         const ppsNumber = row.getCell(headerMap.pps_number || 4).value;
         const nicknameValue = row.getCell(headerMap.nickname || 3).value;
-        const weeklyTakeHomeValue = row.getCell(headerMap.weekly_take_home || 5).value;
-        const weeklyCostValue = row.getCell(headerMap.weekly_cost || 6).value;
-        const safePassNumberValue = row.getCell(headerMap.safe_pass_number || 7).value;
-        const safePassExpiryValue = row.getCell(headerMap.safe_pass_expiry_date || 8).value;
-        const dateValue = row.getCell(headerMap.date_of_employment || 9).value;
-        const loginNo = row.getCell(headerMap.login_no || 10).value;
-        const notes = row.getCell(headerMap.notes || 11).value;
+        const emailValue = row.getCell(headerMap.email || 4).value;
+        const mobileNumberValue = row.getCell(headerMap.mobile_number || 5).value;
+        const addressValue = row.getCell(headerMap.address || 6).value;
+        const bankDetailsValue = row.getCell(headerMap.bank_details || 7).value;
+        const weeklyTakeHomeValue = row.getCell(headerMap.weekly_take_home || 9).value;
+        const weeklyCostValue = row.getCell(headerMap.weekly_cost || 10).value;
+        const safePassNumberValue = row.getCell(headerMap.safe_pass_number || 11).value;
+        const safePassExpiryValue = row.getCell(headerMap.safe_pass_expiry_date || 12).value;
+        const dateValue = row.getCell(headerMap.date_of_employment || 13).value;
+        const loginNo = row.getCell(headerMap.login_no || 14).value;
+        const notes = row.getCell(headerMap.notes || 15).value;
 
         const weeklyTakeHome = weeklyTakeHomeValue !== null && weeklyTakeHomeValue !== ''
           ? Number(weeklyTakeHomeValue)
@@ -1074,6 +1118,10 @@ router.post(
             firstName,
             lastName,
             nicknameValue ? String(nicknameValue).trim() : null,
+            emailValue ? String(emailValue).trim().toLowerCase() : null,
+            mobileNumberValue ? String(mobileNumberValue).trim() : null,
+            addressValue ? String(addressValue).trim() : null,
+            bankDetailsValue ? String(bankDetailsValue).trim() : null,
             ppsNumber ? String(ppsNumber).trim() : null,
             weeklyTakeHome,
             weeklyCost,
@@ -1109,6 +1157,10 @@ router.post(
           firstName,
           lastName,
           nicknameValue ? String(nicknameValue).trim() : null,
+          emailValue ? String(emailValue).trim().toLowerCase() : null,
+          mobileNumberValue ? String(mobileNumberValue).trim() : null,
+          addressValue ? String(addressValue).trim() : null,
+          bankDetailsValue ? String(bankDetailsValue).trim() : null,
           ppsNumber ? String(ppsNumber).trim() : null,
           weeklyTakeHome,
           weeklyCost,
@@ -1124,7 +1176,7 @@ router.post(
       if (rowsToInsert.length > 0) {
         await db.query(
           `INSERT INTO workers
-           (first_name, last_name, nickname, pps_number, weekly_take_home, weekly_cost, safe_pass_number, safe_pass_expiry_date, date_of_employment, login_no, notes, active)
+           (first_name, last_name, nickname, email, mobile_number, address, bank_details, pps_number, weekly_take_home, weekly_cost, safe_pass_number, safe_pass_expiry_date, date_of_employment, login_no, notes, active)
            VALUES ?`,
           [rowsToInsert]
         );
@@ -1138,6 +1190,10 @@ router.post(
                first_name = ?,
                last_name = ?,
                nickname = ?,
+               email = ?,
+               mobile_number = ?,
+               address = ?,
+               bank_details = ?,
                pps_number = ?,
                weekly_take_home = ?,
                weekly_cost = ?,

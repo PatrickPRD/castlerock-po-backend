@@ -168,21 +168,39 @@ class SetupWizardService {
         `INSERT INTO workers (
           first_name,
           last_name,
+          nickname,
           email,
-          phone,
-          site_id,
-          location_id,
-          role,
+          mobile_number,
+          address,
+          bank_details,
+          pps_number,
+          weekly_take_home,
+          weekly_cost,
+          safe_pass_number,
+          safe_pass_expiry_date,
+          date_of_employment,
+          employee_id,
+          login_no,
+          notes,
           active
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
         [
           data.first_name,
           data.last_name,
+          data.nickname || null,
           data.email || null,
-          data.phone || null,
-          data.site_id,
-          data.location_id,
-          data.role || 'staff'
+          data.mobile_number || null,
+          data.address || null,
+          data.bank_details || null,
+          data.pps_number || null,
+          data.weekly_take_home || null,
+          data.weekly_cost || null,
+          data.safe_pass_number || null,
+          data.safe_pass_expiry_date || null,
+          data.date_of_employment || null,
+          data.employee_id || null,
+          data.login_no || null,
+          data.notes || null
         ]
       );
 
@@ -190,11 +208,20 @@ class SetupWizardService {
         id: result.insertId,
         first_name: data.first_name,
         last_name: data.last_name,
+        nickname: data.nickname || null,
         email: data.email || null,
-        phone: data.phone || null,
-        site_id: data.site_id,
-        location_id: data.location_id,
-        role: data.role || 'staff'
+        mobile_number: data.mobile_number || null,
+        address: data.address || null,
+        bank_details: data.bank_details || null,
+        pps_number: data.pps_number || null,
+        weekly_take_home: data.weekly_take_home || null,
+        weekly_cost: data.weekly_cost || null,
+        safe_pass_number: data.safe_pass_number || null,
+        safe_pass_expiry_date: data.safe_pass_expiry_date || null,
+        date_of_employment: data.date_of_employment || null,
+        employee_id: data.employee_id || null,
+        login_no: data.login_no || null,
+        notes: data.notes || null
       };
     } catch (error) {
       throw new Error(`Failed to create worker: ${error.message}`);

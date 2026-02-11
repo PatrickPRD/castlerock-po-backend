@@ -224,6 +224,10 @@ function renderWorkers() {
           <div><strong>First name:</strong> ${escapeHtml(worker.first_name) || '—'}</div>
           <div><strong>Last name:</strong> ${escapeHtml(worker.last_name) || '—'}</div>
           <div><strong>Nickname:</strong> ${escapeHtml(nickname) || '—'}</div>
+          <div><strong>Email:</strong> ${escapeHtml(worker.email) || '—'}</div>
+          <div><strong>Mobile number:</strong> ${escapeHtml(worker.mobile_number) || '—'}</div>
+          <div><strong>Address:</strong> ${escapeHtml(worker.address) || '—'}</div>
+          <div><strong>Bank details:</strong> ${escapeHtml(worker.bank_details) || '—'}</div>
           <div><strong>Employee ID:</strong> ${escapeHtml(worker.employee_id) || '—'}</div>
           <div><strong>Login No:</strong> ${escapeHtml(worker.login_no) || '—'}</div>
           <div><strong>PPS Number:</strong> ${escapeHtml(worker.pps_number) || '—'}</div>
@@ -299,6 +303,10 @@ function resetWorkerForm() {
   document.getElementById('workerFirstName').value = '';
   document.getElementById('workerLastName').value = '';
   document.getElementById('workerNickname').value = '';
+  document.getElementById('workerEmail').value = '';
+  document.getElementById('workerMobileNumber').value = '';
+  document.getElementById('workerAddress').value = '';
+  document.getElementById('workerBankDetails').value = '';
   document.getElementById('workerEmployeeId').value = '';
   document.getElementById('workerLoginNo').value = '';
   document.getElementById('workerPpsNumber').value = '';
@@ -323,6 +331,10 @@ function editWorker(id) {
   document.getElementById('workerFirstName').value = worker.first_name || '';
   document.getElementById('workerLastName').value = worker.last_name || '';
   document.getElementById('workerNickname').value = worker.nickname || '';
+  document.getElementById('workerEmail').value = worker.email || '';
+  document.getElementById('workerMobileNumber').value = worker.mobile_number || '';
+  document.getElementById('workerAddress').value = worker.address || '';
+  document.getElementById('workerBankDetails').value = worker.bank_details || '';
   document.getElementById('workerEmployeeId').value = worker.employee_id || '';
   document.getElementById('workerLoginNo').value = worker.login_no != null ? worker.login_no : '';
   document.getElementById('workerPpsNumber').value = worker.pps_number || '';
@@ -356,6 +368,10 @@ async function saveWorker() {
   const firstName = document.getElementById('workerFirstName').value.trim();
   const lastName = document.getElementById('workerLastName').value.trim();
   const nickname = document.getElementById('workerNickname').value.trim();
+  const email = document.getElementById('workerEmail').value.trim();
+  const mobileNumber = document.getElementById('workerMobileNumber').value.trim();
+  const address = document.getElementById('workerAddress').value.trim();
+  const bankDetails = document.getElementById('workerBankDetails').value.trim();
   const employeeId = document.getElementById('workerEmployeeId').value.trim();
   const loginNoRaw = document.getElementById('workerLoginNo').value.trim();
   const ppsNumber = document.getElementById('workerPpsNumber').value.trim();
@@ -408,6 +424,10 @@ async function saveWorker() {
     first_name: firstName,
     last_name: lastName,
     nickname: nickname || null,
+    email: email || null,
+    mobile_number: mobileNumber || null,
+    address: address || null,
+    bank_details: bankDetails || null,
     employee_id: employeeId || null,
     login_no: loginNoRaw || null,
     pps_number: ppsNumber || null,

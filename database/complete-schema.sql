@@ -140,12 +140,17 @@ CREATE TABLE `workers` (
   `first_name` VARCHAR(100) NOT NULL,
   `last_name` VARCHAR(100) NOT NULL,
   `nickname` VARCHAR(100) DEFAULT NULL,
+  `email` VARCHAR(255) DEFAULT NULL,
+  `mobile_number` VARCHAR(20) DEFAULT NULL,
+  `address` TEXT DEFAULT NULL,
+  `bank_details` VARCHAR(255) DEFAULT NULL,
   `pps_number` VARCHAR(50),
   `weekly_take_home` DECIMAL(12, 2) DEFAULT NULL,
   `weekly_cost` DECIMAL(12, 2) DEFAULT NULL,
   `safe_pass_number` VARCHAR(100),
   `safe_pass_expiry_date` DATE DEFAULT NULL,
   `date_of_employment` DATE DEFAULT NULL,
+  `employee_id` VARCHAR(100),
   `login_no` VARCHAR(20),
   `notes` TEXT,
   `active` TINYINT(1) NOT NULL DEFAULT 1,
@@ -155,6 +160,8 @@ CREATE TABLE `workers` (
   INDEX `idx_last_name` (`last_name`),
   INDEX `idx_login_no` (`login_no`),
   INDEX `idx_pps_number` (`pps_number`),
+  INDEX `idx_email` (`email`),
+  INDEX `idx_mobile_number` (`mobile_number`),
   INDEX `idx_active` (`active`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
