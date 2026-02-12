@@ -276,6 +276,44 @@
     .required-asterisk {
       color: #e74c3c;
     }
+
+    .preview-box {
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 12px;
+      background: #f9fafb;
+      margin-top: 1.5rem;
+    }
+
+    .preview-label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #666;
+      margin-bottom: 0.75rem;
+      display: block;
+    }
+
+    .preview-bar {
+      min-height: 56px;
+      border-radius: 6px;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      background: #212529;
+      transition: background-color 0.3s ease;
+    }
+
+    #wizardPreviewImage {
+      height: 34px;
+      width: auto;
+      object-fit: contain;
+    }
+
+    #wizardPreviewText {
+      color: #fff;
+      font-weight: 600;
+      font-size: 1rem;
+    }
   </style>
 </head>
 <body>
@@ -466,8 +504,14 @@
             <label for="logoFile">Upload Company Logo (Optional)</label>
             <input type="file" id="logoFile" name="logoFile" accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml">
             <small class="text-muted">Accepted formats: PNG, JPG, WEBP, SVG. Max size 2 MB. You can skip this and add it later from Application Settings.</small>
-            <div id="logoPreview" style="display: none; margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 6px; text-align: center;">
-              <img id="logoPreviewImage" src="" alt="Logo preview" style="max-width: 200px; max-height: 80px;">
+          </div>
+
+          <!-- Header Preview -->
+          <div class="preview-box">
+            <span class="preview-label">Header Preview:</span>
+            <div id="wizardPreviewBar" class="preview-bar">
+              <img id="wizardPreviewImage" src="/assets/Logo.png" alt="Logo preview" />
+              <span id="wizardPreviewText" style="display: none;">Castlerock Homes</span>
             </div>
           </div>
 

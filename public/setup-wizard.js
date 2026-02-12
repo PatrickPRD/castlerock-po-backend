@@ -53,10 +53,12 @@ function setupColorPickers() {
   if (headerColor && headerColorHex) {
     headerColor.addEventListener('change', (e) => {
       headerColorHex.value = e.target.value;
+      updateHeaderPreview();
     });
     headerColorHex.addEventListener('change', (e) => {
       if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
         headerColor.value = e.target.value;
+        updateHeaderPreview();
       }
     });
   }
@@ -72,6 +74,37 @@ function setupColorPickers() {
       }
     });
   }
+
+  // Initialize preview
+  updateHeaderPreview();
+}
+
+/**
+ * Update the header preview bar
+ */
+function updateHeaderPreview() {
+  const headerColorHex = document.getElementById('headerColorHex');
+  const previewBar = document.getElementById('wizardPreviewBar');
+  const previewImage = document.getElementById('wizardPreviewImage');
+  const previewText = document.getElementById('wizardPreviewText');
+
+  if (!previewBar) return;
+
+  // Update background color
+  const color = /^#[0-9A-F]{6}$/i.test(headerColorHex.value) ? headerColorHex.value : '#212529';
+  previewBar.style.backgroundColor = color;
+
+  // Update logo/text
+  if (selectedLogoDataUrl) {
+    previewText.style.display = 'none';
+    previewImage.style.display = 'inline-block';
+    previewImage.src = selectedLogoDataUrl;
+  } else {
+    // Default: show Castlerock Homes logo
+    previewText.style.display = 'none';
+    previewImage.style.display = 'inline-block';
+    previewImage.src = '/assets/Logo.png';
+  }
 }
 
 /**
@@ -79,8 +112,6 @@ function setupColorPickers() {
  */
 function setupLogoUpload() {
   const logoFileInput = document.getElementById('logoFile');
-  const logoPreview = document.getElementById('logoPreview');
-  const logoPreviewImage = document.getElementById('logoPreviewImage');
 
   if (!logoFileInput) return;
 
@@ -89,7 +120,7 @@ function setupLogoUpload() {
     
     if (!file) {
       selectedLogoDataUrl = null;
-      if (logoPreview) logoPreview.style.display = 'none';
+      updateHeaderPreview();
       return;
     }
 
@@ -98,7 +129,7 @@ function setupLogoUpload() {
     if (!allowedTypes.includes(file.type)) {
       logoFileInput.value = '';
       selectedLogoDataUrl = null;
-      if (logoPreview) logoPreview.style.display = 'none';
+      updateHeaderPreview();
       showError('Invalid file type. Please use PNG, JPG, WEBP, or SVG');
       return;
     }
@@ -107,7 +138,7 @@ function setupLogoUpload() {
     if (file.size > 2 * 1024 * 1024) {
       logoFileInput.value = '';
       selectedLogoDataUrl = null;
-      if (logoPreview) logoPreview.style.display = 'none';
+      updateHeaderPreview();
       showError('Image too large. Maximum size is 2 MB');
       return;
     }
@@ -117,16 +148,12 @@ function setupLogoUpload() {
       const dataUrl = await readFileAsDataUrl(file);
       selectedLogoDataUrl = dataUrl;
 
-      // Show preview
-      if (logoPreview && logoPreviewImage) {
-        logoPreviewImage.src = dataUrl;
-        logoPreview.style.display = 'block';
-      }
-
+      // Update preview
+      updateHeaderPreview();
       hideError();
     } catch (err) {
       selectedLogoDataUrl = null;
-      if (logoPreview) logoPreview.style.display = 'none';
+      updateHeaderPreview();
       showError('Failed to read image file');
     }
   });
