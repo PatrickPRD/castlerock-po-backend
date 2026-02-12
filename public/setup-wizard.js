@@ -242,9 +242,9 @@ async function completeSetup() {
     loadingSpinner.style.display = 'none';
     successMessage.style.display = 'block';
 
-    // Redirect to login/dashboard after 2 seconds
+    // Redirect to dashboard after 2 seconds
     setTimeout(() => {
-      window.location.href = '/login.html';
+      window.location.href = '/dashboard.html';
     }, 2000);
   } catch (error) {
     console.error('Setup error:', error);

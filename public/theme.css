@@ -29,6 +29,12 @@ html, body {
   background: var(--md-bg);
   color: var(--md-text);
   overflow-x: hidden;
+  min-height: 100vh;
+  height: auto;
+}
+
+body {
+  overflow-y: auto;
 }
 
 /* =========================================================
@@ -137,6 +143,15 @@ tr:hover { background: #f9f9f9; }
   border: 1px solid #ddd;
   display: none;
   z-index: 20;
+}
+
+/* Portal dropdowns - ensure they don't affect body scrolling */
+.dropdown-menu.portal {
+  position: fixed;
+  display: block;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  border-radius: 6px;
+  pointer-events: auto;
 }
 
 .dropdown-menu button {

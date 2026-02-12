@@ -1,5 +1,14 @@
 # 🚀 Quick Start Guide
 
+**👉 For production deployment on AWS EC2 + RDS:**
+- See [AWS_EC2_RDS_DEPLOYMENT.md](AWS_EC2_RDS_DEPLOYMENT.md)
+- Use `npm run setup-multi-app` for automated configuration
+- Supports running multiple app versions on the same server
+
+---
+
+## Local Development Setup
+
 ## Step 1: Update MySQL Connection Details
 
 Open [.env](.env) and update your MySQL server connection details:

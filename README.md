@@ -1,211 +1,260 @@
-# Castlerock PO Backend - Local Setup Guide
+# Castlerock PO Backend
 
-## Prerequisites
+Complete purchase order and worker management system for construction companies.
 
-1. **Node.js** (v14 or higher)
-2. **MySQL Server** running on `127.0.0.1:3306`
-3. **Database**: `castlerock_dev`
+## 📚 Documentation
 
-## Quick Start (VSCode)
+- **Quick Start (Local Development)**: See [QUICKSTART.md](QUICKSTART.md)
+- **Production Deployment (AWS EC2 + RDS)**: See [AWS_EC2_RDS_DEPLOYMENT.md](AWS_EC2_RDS_DEPLOYMENT.md)
+- **Multi-App Setup (Automated)**: Use `npm run setup-multi-app` to generate configuration files
 
-### 1. Install Dependencies
+## 🚀 Quick Start
+
+### Local Development
+
 ```bash
+# 1. Install dependencies
 npm install
-```
 
-### 2. Configure Database
-The `.env` file is already configured for local development:
-- **Host**: 127.0.0.1
-- **Port**: 3306
-- **Database**: castlerock_dev
-- **User**: root
-- **Password**: (empty - update if needed)
+# 2. Update .env with your MySQL credentials
+# 3. Initialize database
+npm run setup
 
-**Update the password** in `.env` if your MySQL root user has a password.
-
-### 3. Create Database
-Run this SQL in your MySQL client:
-```sql
-CREATE DATABASE IF NOT EXISTS castlerock_dev;
-USE castlerock_dev;
--- Add your table creation scripts here
-```
-
-### 4. Run the Application
-
-**Option A: Using VSCode Debugger** (Recommended)
-1. Press `F5` or go to Run > Start Debugging
-2. Select "Launch Server" configuration
-3. Server will start with debugging enabled
-
-**Option B: Using Terminal**
-```bash
+# 4. Start development server
 npm run dev
+
+# 5. Open http://localhost:3000
 ```
 
-**Option C: Using npm start**
+See [QUICKSTART.md](QUICKSTART.md) for detailed instructions.
+
+### Production Deployment
+
+For AWS EC2 with RDS MySQL, use the automated setup from your local machine:
+
 ```bash
-npm start
+# 1. Run the setup wizard locally
+node setup-multi-app.js
+
+# 2. When prompted, provide the SSH command
+# ssh -i your-key.pem ec2-user@your-ec2-ip
 ```
 
-### 5. Access the Application
-Open your browser to: http://localhost:3000
+This will interactively prompt for:
+- App folder name (e.g., castlerock-po-v1)
+- SSH command for connection
+- Application name and port
+- Database credentials
+- Domain name
+- **DNS verification** (confirm domain is pointing to EC2)
+- SSL/HTTPS settings
+- **Git branch** to deploy
+- **AWS SES credentials** for email
 
-## Verify Setup
+Then follow the on-screen instructions to install services and start the application.
 
-Test the health endpoint:
+**Important**: Update your domain's DNS A record to point to the EC2 instance's public IP before running the wizard (especially if using HTTPS). The apps directory on EC2 is expected at `/apps`.
+
+See [AWS_EC2_RDS_DEPLOYMENT.md](AWS_EC2_RDS_DEPLOYMENT.md) for manual setup or more details.
+
+## 🛠 Available Scripts
+
 ```bash
-curl http://localhost:3000/health
+npm run dev              # Start development server
+npm run start            # Start production server
+npm run setup            # Initialize database schema
+npm run setup-multi-app  # Interactive multi-app configuration wizard
+npm run migrate          # Run database migrations
+npm run test-db          # Test database connection
+npm run reset-db         # Reset database (⚠️ destructive)
+npm run import-data      # Import sample data
+npm run cleanup-test-data# Remove test data
 ```
 
-Expected response:
-```json
-{
-  "status": "OK",
-  "database": "connected",
-  "environment": "development"
-}
-```
+## 📋 Features
 
-## Environment Variables
+- **Worker Management** - Track employees, safe pass certifications, timesheets
+- **Purchase Orders** - Create, track, and manage POs with line items
+- **Timesheets** - Record and manage worker hours
+- **Reports** - Generate invoices, cost reports, labour analysis
+- **Multi-Site Support** - Manage multiple construction sites
+- **Role-Based Access** - Admin, manager, and worker roles
+- **Admin Panel** - System configuration and user management
 
-The `.env` file contains all configuration. Key variables:
+## 🗄 Database
+
+- **MySQL** 5.7+ (local or RDS)
+- Schema: `CostTracker_db` (auto-created)
+- Migrations: Timestamp-based, located in `database/migrations/`
+
+## 📦 Key Dependencies
+
+- **Express.js** - Web framework
+- **MySQL2** - Database driver
+- **ExcelJS** - Excel generation
+- **Puppeteer** - PDF generation
+- **JWT** - Authentication
+- **Bcrypt** - Password hashing
+- **Nodemailer** - Email sending
+
+## 🔐 Prerequisites
+
+### Local Development
+
+1. **Node.js** (v18+)
+2. **MySQL Server** (5.7+) running locally
+3. **Git** for cloning the repository
+
+### Production (AWS)
+
+1. **EC2 instance** (Amazon Linux 2023)
+2. **RDS MySQL instance** (5.7+)
+3. **SSH access** to EC2
+4. **Domain name** (optional, for SSL)
+
+## 📖 Environment Configuration
+
+Key environment variables in `.env`:
 
 ```env
-DB_HOST=127.0.0.1
-DB_NAME=castlerock_dev
+# Application
+NODE_ENV=development         # or 'production'
 PORT=3000
-NODE_ENV=development
-```
 
-## Deployment to EC2 + RDS
-
-When ready to deploy to AWS:
-
-### 1. Update Environment Variables
-Create `.env` on EC2 with production values:
-```env
-DB_HOST=your-rds-endpoint.region.rds.amazonaws.com
+# Database
+DB_HOST=127.0.0.1           # or RDS endpoint
+DB_NAME=CostTracker_db
 DB_USER=admin
-DB_PASSWORD=your_secure_password
-DB_NAME=castlerock_po
-NODE_ENV=production
+DB_PASSWORD=your_password
+DB_PORT=3306
+
+# Authentication
+JWT_SECRET=your_random_secret_key
+
+# AWS SES Email
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your_iam_access_key
+AWS_SECRET_ACCESS_KEY=your_iam_secret_key
+AWS_SES_FROM_ADDRESS=noreply@yourdomain.com
+
+# Application
+APP_URL=http://localhost:3000
 ```
 
-### 2. Key Changes for Production
-The app automatically adjusts based on `NODE_ENV`:
-- **Development**: Binds to `127.0.0.1` (localhost only)
-- **Production**: Binds to `0.0.0.0` (all interfaces for EC2)
+## 🔗 Deployment Guides
 
-### 3. On EC2 Instance
-```bash
-# Install Node.js
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt-get install -y nodejs
+### Local Development
+Follow [QUICKSTART.md](QUICKSTART.md) for step-by-step local setup.
 
-# Clone repository
-git clone <your-repo-url>
-cd castlerock-po-backend
+### AWS EC2 + RDS Production
+For production deployment to AWS:
 
-# Install dependencies
-npm install
+1. **Automated Setup** (Recommended):
+   ```bash
+   npm run setup-multi-app
+   ```
+   This generates all configuration files interactively.
 
-# Create .env with production values
-nano .env
+2. **Manual Setup**:
+   See [AWS_EC2_RDS_DEPLOYMENT.md](AWS_EC2_RDS_DEPLOYMENT.md) for detailed instructions.
 
-# Run with PM2 (recommended)
-sudo npm install -g pm2
-pm2 start src/index.js --name castlerock-po
-pm2 startup
-pm2 save
+3. **Multi-App Installation**:
+   Deploy multiple versions of the application on the same EC2 instance with separate ports, databases, and systemd services.
 
-# Or run directly
-npm start
-```
+### Puppeteer / PDF Generation
+If using PDF features on EC2, install Chromium dependencies:
 
-### 3a. EC2 (Amazon Linux 2023) - Puppeteer Dependencies
-If you plan to use PDF generation on EC2 with Puppeteer, install the required
-Chromium dependencies on the server:
 ```bash
 sudo dnf update -y
-sudo dnf install -y \
-  atk \
-  cairo \
-  cups-libs \
-  dbus-glib \
-  expat \
-  fontconfig \
-  freetype \
-  glib2 \
-  gtk3 \
-  libX11 \
-  libXcomposite \
-  libXcursor \
-  libXdamage \
-  libXext \
-  libXfixes \
-  libXi \
-  libXrandr \
-  libXrender \
-  libXScrnSaver \
-  libXtst \
-  nss \
-  pango \
-  alsa-lib \
-  xorg-x11-fonts-Type1 \
-  xorg-x11-fonts-misc \
-  xorg-x11-utils
-
-# Optional: add more fonts
-sudo dnf install -y google-noto-sans-fonts
-
-# If running as non-root, ensure Puppeteer cache is writable
-export PUPPETEER_CACHE_DIR=/home/ec2-user/.cache/puppeteer
+sudo dnf install -y chromium
 ```
 
-### 4. Security Group Configuration
-Allow inbound traffic on port 3000 (or your chosen port) in EC2 Security Group.
+See [AWS_EC2_RDS_DEPLOYMENT.md](AWS_EC2_RDS_DEPLOYMENT.md#step-2-prepare-ec2-environment) for full dependency list.
 
-### 5. RDS Setup
-- Create MySQL RDS instance
-- Note the endpoint URL
-- Configure security group to allow EC2 instance access
-- Update `.env` with RDS endpoint
+## 🏗 Architecture
 
-## Troubleshooting
+### Directory Structure
 
-**Database Connection Failed**
-- Verify MySQL is running: `mysql -u root -p`
-- Check database exists: `SHOW DATABASES;`
-- Verify credentials in `.env`
-
-**Port Already in Use**
-- Change `PORT` in `.env` to a different value
-- Or kill process using port 3000: `netstat -ano | findstr :3000`
-
-**Module Not Found**
-- Run `npm install` to install dependencies
-
-## File Structure
 ```
 ├── src/
-│   ├── index.js          # Main application entry
-│   ├── db.js             # Database connection pool
-│   ├── routes/           # API routes
-│   ├── services/         # Business logic
-│   └── middleware/       # Auth & authorization
-├── public/               # Frontend files
-├── .env                  # Environment configuration (local)
-├── .env.example          # Template for .env
-└── package.json          # Dependencies and scripts
+│   ├── index.js                    # Express app entry point
+│   ├── db.js                       # MySQL connection pool
+│   ├── middleware/
+│   │   ├── auth.js                 # JWT authentication
+│   │   └── setupCheck.js           # Setup wizard gate
+│   ├── routes/
+│   │   ├── admin.js                # Admin API endpoints
+│   │   ├── workers.js              # Worker management
+│   │   ├── purchaseOrders.js       # PO endpoints
+│   │   └── ...                     # Other routes
+│   ├── services/
+│   │   ├── setupWizardService.js   # Setup wizard logic
+│   │   ├── pdfService.js           # PDF generation
+│   │   └── ...                     # Other services
+│   └── views/                      # EJS templates
+├── public/
+│   ├── js/                         # Client-side scripts
+│   ├── css/                        # Stylesheets
+│   └── assets/                     # Images, fonts, etc.
+├── database/
+│   ├── setup.js                    # Database initialization
+│   ├── migrate.js                  # Run migrations
+│   ├── migrations/                 # SQL migration files
+│   └── seed.sql                    # Sample data
+├── .env                            # Environment configuration
+├── package.json                    # Dependencies
+└── README.md                       # This file
 ```
 
-## NPM Scripts
+### Technology Stack
 
-- `npm start` - Start server in current environment
-- `npm run dev` - Start with development environment
-- `npm run prod` - Start with production environment
+- **Backend**: Express.js 5.x (Node.js)
+- **Database**: MySQL 5.7+
+- **Frontend**: EJS templates + Bootstrap 5 + Vanilla JS
+- **PDF**: Puppeteer + Chromium
+- **Excel**: ExcelJS
+- **Auth**: JWT + bcrypt
+- **Email**: Nodemailer
 
-## Support
+## 🐛 Troubleshooting
 
-For issues, check the health endpoint and verify database connectivity.
+### Database Connection Issues
+```bash
+# Test connection
+npm run test-db
+
+# Check .env credentials are correct
+cat .env | grep DB_
+```
+
+### Port Already in Use
+```bash
+# On Windows
+netstat -ano | findstr :3000
+
+# On macOS/Linux
+lsof -i :3000
+```
+
+### Module Not Found
+```bash
+# Reinstall dependencies
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### Setup Wizard Not Appearing
+- Only shows on first login before setup is complete
+- To reset and re-run: `npm run reset-db` then `npm run setup`
+
+## 📝 License
+
+ISC
+
+## 🤝 Support
+
+For deployment issues, refer to:
+- Local dev → [QUICKSTART.md](QUICKSTART.md)
+- Production → [AWS_EC2_RDS_DEPLOYMENT.md](AWS_EC2_RDS_DEPLOYMENT.md)
+- Multi-app → Run `npm run setup-multi-app`
+
