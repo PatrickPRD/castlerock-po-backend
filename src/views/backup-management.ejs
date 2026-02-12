@@ -115,6 +115,48 @@
     margin-top: 1.5rem;
     justify-content: flex-end;
   }
+  .danger-zone-toggle {
+    margin-top: 2rem;
+    text-align: center;
+  }
+  .danger-zone-toggle button {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  .danger-zone-toggle button:hover {
+    background: #c82333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+  }
+  .danger-zone-content {
+    display: none;
+    margin-top: 1rem;
+    border: 2px solid #dc3545;
+    border-radius: 8px;
+    padding: 2rem;
+    background: #fff5f5;
+    animation: slideDown 0.3s ease-out;
+  }
+  .danger-zone-content.active {
+    display: block;
+  }
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 </style>
 
 <%- include('partials/header', { pageTitle: 'Backup Management' }) %>
@@ -150,8 +192,14 @@
   </div>
 
   <!-- Danger Zone: Reset to Wizard -->
-  <div class="backup-card" style="border-color: #dc3545; background: #fff5f5; margin-top: 2rem;">
-    <h3 style="color: #dc3545;">🚨 Danger Zone: Reset to Setup Wizard</h3>
+  <div class="danger-zone-toggle">
+    <button onclick="toggleDangerZone()" id="dangerZoneBtn">
+      🚨 Reset Whole Site
+    </button>
+  </div>
+
+  <div class="danger-zone-content" id="dangerZoneContent">
+    <h3 style="color: #dc3545; margin-top: 0;">🚨 Danger Zone: Reset to Setup Wizard</h3>
     <p style="color: #721c24;">Completely reset the application to its initial setup wizard state. This will delete <strong>ALL DATA</strong> including all users, POs, invoices, sites, and settings.</p>
     <div class="warning-box" style="background: #f8d7da; border-color: #dc3545; color: #721c24;">
       <strong>⚠️ EXTREME WARNING:</strong> This action is irreversible!

@@ -380,6 +380,19 @@ async function executeRestore(force = false) {
 /* ============================
    RESET TO WIZARD
    ============================ */
+function toggleDangerZone() {
+  const content = document.getElementById('dangerZoneContent');
+  const btn = document.getElementById('dangerZoneBtn');
+  
+  if (content.classList.contains('active')) {
+    content.classList.remove('active');
+    btn.textContent = '🚨 Reset Whole Site';
+  } else {
+    content.classList.add('active');
+    btn.textContent = '✖ Hide Danger Zone';
+  }
+}
+
 function openResetModal() {
   document.getElementById('resetWizardModal').classList.add('active');
   document.getElementById('resetConfirmText').value = '';
