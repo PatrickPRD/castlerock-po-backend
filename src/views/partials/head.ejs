@@ -17,6 +17,31 @@
   <link rel="icon" type="image/png" sizes="512x512"
         href="https://castlerock-po-assets-eu.s3.eu-north-1.amazonaws.com/POTrackerAssets/android-chrome-512x512.png">
 
+  <script>
+    // Dynamically load custom favicon if set
+    (async function() {
+      try {
+        const res = await fetch('/settings/public', { cache: 'no-store' });
+        if (!res.ok) return;
+        const settings = await res.json();
+        if (settings.favicon_path) {
+          // Update or create favicon link
+          let faviconLink = document.querySelector('link[rel="icon"]');
+          if (faviconLink) {
+            faviconLink.href = settings.favicon_path;
+          } else {
+            faviconLink = document.createElement('link');
+            faviconLink.rel = 'icon';
+            faviconLink.href = settings.favicon_path;
+            document.head.appendChild(faviconLink);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load custom favicon:', err);
+      }
+    })();
+  </script>
+
       <link rel="stylesheet" href="/assets/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="theme.css">

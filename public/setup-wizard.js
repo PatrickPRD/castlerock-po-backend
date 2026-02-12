@@ -13,6 +13,7 @@ const loadingSpinner = document.getElementById('loadingSpinner');
 let currentStep = 1;
 const totalSteps = 5;
 let selectedLogoDataUrl = null;
+let selectedFaviconDataUrl = null;
 
 /**
  * Initialize the wizard
@@ -22,6 +23,7 @@ function initWizard() {
   setupEventListeners();
   setupColorPickers();
   setupLogoUpload();
+  setupFaviconUpload();
 }
 
 /**
@@ -168,6 +170,51 @@ function readFileAsDataUrl(file) {
     reader.onload = (e) => resolve(e.target.result);
     reader.onerror = () => reject(new Error('Failed to read file'));
     reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Setup favicon upload handling
+ */
+function setupFaviconUpload() {
+  const faviconFileInput = document.getElementById('faviconFile');
+
+  if (!faviconFileInput) return;
+
+  faviconFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    
+    if (!file) {
+      selectedFaviconDataUrl = null;
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/x-icon', 'image/png', 'image/svg+xml', 'image/vnd.microsoft.icon'];
+    if (!allowedTypes.includes(file.type)) {
+      faviconFileInput.value = '';
+      selectedFaviconDataUrl = null;
+      showError('Invalid file type. Please use ICO, PNG, or SVG format');
+      return;
+    }
+
+    // Validate file size (500KB max for favicon)
+    if (file.size > 500 * 1024) {
+      faviconFileInput.value = '';
+      selectedFaviconDataUrl = null;
+      showError('Favicon too large. Maximum size is 500 KB');
+      return;
+    }
+
+    try {
+      // Convert to base64
+      const dataUrl = await readFileAsDataUrl(file);
+      selectedFaviconDataUrl = dataUrl;
+      hideError();
+    } catch (err) {
+      selectedFaviconDataUrl = null;
+      showError('Failed to read favicon file');
+    }
   });
 }
 
@@ -329,6 +376,15 @@ async function completeSetup() {
       setupData.logo = {
         dataUrl: selectedLogoDataUrl,
         fileName: logoFileInput.files[0]?.name || 'company-logo'
+      };
+    }
+
+    // Include favicon if one was selected
+    if (selectedFaviconDataUrl) {
+      const faviconFileInput = document.getElementById('faviconFile');
+      setupData.favicon = {
+        dataUrl: selectedFaviconDataUrl,
+        fileName: faviconFileInput.files[0]?.name || 'favicon'
       };
     }
 

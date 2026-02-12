@@ -124,7 +124,7 @@ async function createBackupSql() {
 
     // Header comments
     sqlOutput.push(`-- ========================================`);
-    sqlOutput.push(`-- Castlerock PO System Database Backup`);
+    sqlOutput.push(`-- Castlerock Cost Tracker Database Backup`);
     sqlOutput.push(`-- Generated: ${new Date().toISOString()}`);
     sqlOutput.push(`-- Database: ${process.env.DB_NAME || 'castlerock_po'}`);
     sqlOutput.push(`-- Excludes: users table`);

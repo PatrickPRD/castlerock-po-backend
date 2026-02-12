@@ -14,6 +14,7 @@ const headerColorInput = document.getElementById('headerColor');
 const headerColorHexInput = document.getElementById('headerColorHex');
 const logoModeSelect = document.getElementById('logoMode');
 const logoFileInput = document.getElementById('logoFile');
+const faviconFileInput = document.getElementById('faviconFile');
 const logoTextInput = document.getElementById('logoText');
 const logoImageSection = document.getElementById('logoImageSection');
 const logoTextSection = document.getElementById('logoTextSection');
@@ -52,6 +53,7 @@ const brandPreviewText = document.getElementById('brandPreviewText');
 
 let currentLogoPath = '/assets/Logo.png';
 let selectedFileDataUrl = null;
+let selectedFaviconDataUrl = null;
 let financialVatRates = [];
 let vatUsage = {};
 const BRANDING_EVENT_KEY = 'headerBrandingVersion';
@@ -355,6 +357,15 @@ brandingForm.addEventListener('submit', async (e) => {
       logoFileInput.value = '';
     }
 
+    if (selectedFaviconDataUrl) {
+      await api('/settings/branding/favicon', 'POST', {
+        dataUrl: selectedFaviconDataUrl,
+        fileName: faviconFileInput.files[0]?.name || 'favicon'
+      });
+      selectedFaviconDataUrl = null;
+      faviconFileInput.value = '';
+    }
+
     applyPreview();
     applyLiveHeaderBranding({
       headerColor,
@@ -468,6 +479,37 @@ logoFileInput.addEventListener('change', async () => {
   } catch (err) {
     selectedFileDataUrl = null;
     showToast(err.message || 'Failed to read image', 'error');
+  }
+});
+
+faviconFileInput.addEventListener('change', async () => {
+  const file = faviconFileInput.files[0];
+  if (!file) {
+    selectedFaviconDataUrl = null;
+    return;
+  }
+
+  const allowedTypes = ['image/x-icon', 'image/png', 'image/svg+xml', 'image/vnd.microsoft.icon'];
+  if (!allowedTypes.includes(file.type)) {
+    faviconFileInput.value = '';
+    selectedFaviconDataUrl = null;
+    showToast('Invalid file type. Use ICO, PNG, or SVG', 'warning');
+    return;
+  }
+
+  if (file.size > 500 * 1024) {
+    faviconFileInput.value = '';
+    selectedFaviconDataUrl = null;
+    showToast('Favicon too large. Max size is 500 KB', 'warning');
+    return;
+  }
+
+  try {
+    selectedFaviconDataUrl = await readFileAsDataUrl(file);
+    showToast('Favicon selected. Click Save Branding to apply', 'success');
+  } catch (err) {
+    selectedFaviconDataUrl = null;
+    showToast(err.message || 'Failed to read favicon', 'error');
   }
 });
 

@@ -33,6 +33,7 @@ router.get('/public', async (req, res) => {
     res.json({
       header_color: settings.header_color || '#212529',
       logo_path: settings.logo_path || '/assets/Logo.png',
+      favicon_path: settings.favicon_path || null,
       header_logo_mode: settings.header_logo_mode || 'image',
       header_logo_text: settings.header_logo_text || 'Castlerock Homes',
       company_name: settings.company_name || 'Castlerock Homes',
@@ -351,6 +352,71 @@ router.post(
     } catch (error) {
       console.error('Error uploading branding logo:', error);
       res.status(500).json({ error: 'Failed to upload logo' });
+    }
+  }
+);
+
+/**
+ * POST /settings/branding/favicon
+ * Upload favicon image (super admin only)
+ * Body: { dataUrl: 'data:image/x-icon;base64,...', fileName?: 'favicon.ico' }
+ */
+router.post(
+  '/branding/favicon',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      const { dataUrl, fileName } = req.body || {};
+      if (!dataUrl || typeof dataUrl !== 'string') {
+        return res.status(400).json({ error: 'dataUrl is required' });
+      }
+
+      const match = dataUrl.match(/^data:(image\/(?:x-icon|png|svg\+xml|vnd\.microsoft\.icon));base64,([A-Za-z0-9+/=]+)$/);
+      if (!match) {
+        return res.status(400).json({ error: 'Invalid favicon format. Allowed: ICO, PNG, SVG' });
+      }
+
+      const actualMimeType = match[1];
+      const base64Data = match[2];
+      const imageBuffer = Buffer.from(base64Data, 'base64');
+
+      const maxBytes = 500 * 1024; // 500 KB
+      if (imageBuffer.length > maxBytes) {
+        return res.status(400).json({ error: 'Favicon is too large. Maximum size is 500 KB' });
+      }
+
+      const extByMime = {
+        'image/x-icon': 'ico',
+        'image/vnd.microsoft.icon': 'ico',
+        'image/png': 'png',
+        'image/svg+xml': 'svg'
+      };
+      const ext = extByMime[actualMimeType] || 'ico';
+
+      const safeBaseName = String(fileName || 'favicon')
+        .replace(/\.[^.]+$/, '')
+        .replace(/[^a-zA-Z0-9_-]/g, '')
+        .slice(0, 40) || 'favicon';
+
+      const finalFileName = `${safeBaseName}-${Date.now()}.${ext}`;
+      const brandingDir = path.join(__dirname, '../../public/assets/branding');
+      const outputPath = path.join(brandingDir, finalFileName);
+
+      fs.mkdirSync(brandingDir, { recursive: true });
+      fs.writeFileSync(outputPath, imageBuffer);
+
+      const publicPath = `/assets/branding/${finalFileName}`;
+      await SettingsService.updateSetting('favicon_path', publicPath);
+
+      res.json({
+        success: true,
+        message: 'Favicon uploaded successfully',
+        favicon_path: publicPath
+      });
+    } catch (error) {
+      console.error('Error uploading favicon:', error);
+      res.status(500).json({ error: 'Failed to upload favicon' });
     }
   }
 );

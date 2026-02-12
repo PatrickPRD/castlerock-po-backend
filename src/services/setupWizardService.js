@@ -89,6 +89,7 @@ class SetupWizardService {
     try {
       const defaults = {
         logo_path: settings.logo_path || '/assets/Logo.png',
+        favicon_path: settings.favicon_path || null,
         header_color: settings.header_color || '#212529',
         header_logo_mode: settings.header_logo_mode || 'image',
         header_logo_text: settings.header_logo_text || 'Castlerock Homes',
@@ -361,6 +362,67 @@ class SetupWizardService {
   }
 
   /**
+   * Save favicon file from base64 data URL
+   * @param {Object} faviconData - { dataUrl, fileName }
+   * @returns {Promise<string>} Public path to saved favicon
+   */
+  static async saveFavicon(faviconData) {
+    try {
+      const { dataUrl, fileName } = faviconData;
+
+      if (!dataUrl || typeof dataUrl !== 'string') {
+        throw new Error('Invalid favicon data');
+      }
+
+      // Parse the data URL
+      const match = dataUrl.match(/^data:(image\/(?:x-icon|png|svg\+xml|vnd\.microsoft\.icon));base64,([A-Za-z0-9+/=]+)$/);
+      if (!match) {
+        throw new Error('Invalid favicon format. Allowed: ICO, PNG, SVG');
+      }
+
+      const actualMimeType = match[1];
+      const base64Data = match[2];
+      const imageBuffer = Buffer.from(base64Data, 'base64');
+
+      // Validate size (500KB max for favicon)
+      const maxBytes = 500 * 1024;
+      if (imageBuffer.length > maxBytes) {
+        throw new Error('Favicon is too large. Maximum size is 500 KB');
+      }
+
+      // Determine file extension
+      const extByMime = {
+        'image/x-icon': 'ico',
+        'image/vnd.microsoft.icon': 'ico',
+        'image/png': 'png',
+        'image/svg+xml': 'svg'
+      };
+      const ext = extByMime[actualMimeType] || 'ico';
+
+      // Create safe filename
+      const safeBaseName = String(fileName || 'favicon')
+        .replace(/\.[^.]+$/, '')
+        .replace(/[^a-zA-Z0-9_-]/g, '')
+        .slice(0, 40) || 'favicon';
+
+      const finalFileName = `${safeBaseName}-${Date.now()}.${ext}`;
+      const brandingDir = path.join(__dirname, '../../public/assets/branding');
+      const outputPath = path.join(brandingDir, finalFileName);
+
+      // Ensure directory exists
+      fs.mkdirSync(brandingDir, { recursive: true });
+
+      // Write file
+      fs.writeFileSync(outputPath, imageBuffer);
+
+      // Return public path
+      return `/assets/branding/${finalFileName}`;
+    } catch (error) {
+      throw new Error(`Failed to save favicon: ${error.message}`);
+    }
+  }
+
+  /**
    * Complete full setup with all initial data
    * @param {Object} setupData - Complete setup data
    */
@@ -379,6 +441,15 @@ class SetupWizardService {
         await db.query(
           'INSERT INTO site_settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = ?',
           ['header_logo_mode', 'image', 'image']
+        );
+      }
+
+      // 2b. Upload and save favicon if provided
+      if (setupData.favicon?.dataUrl) {
+        const faviconPath = await this.saveFavicon(setupData.favicon);
+        await db.query(
+          'INSERT INTO site_settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = ?',
+          ['favicon_path', faviconPath, faviconPath]
         );
       }
 
