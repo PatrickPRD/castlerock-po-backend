@@ -1,136 +1,62 @@
 # Castlerock PO Backend - AWS EC2 + RDS Deployment Guide
 
-This guide covers deploying the Castlerock PO Backend application on Amazon EC2 with RDS MySQL database.
+This guide covers deploying the Castlerock PO Backend application on an existing Amazon EC2 instance connected to an RDS MySQL database.
 
 ## Prerequisites
 
-- AWS Account with appropriate permissions
-- Basic understanding of AWS EC2 and RDS
-- SSH client (for accessing EC2 instances)
-- Git installed locally (to clone the repository)
+✅ **Already in place:**
+- Working EC2 instance (Amazon Linux 2023 or similar)
+- Working RDS MySQL instance (version 5.7+)
+- SSH access to EC2 instance
+- RDS connection details (endpoint, username, password)
+- Security groups configured to allow EC2 ↔ RDS communication
 
-## Step 1: Create RDS MySQL Database
+ℹ️ **You will need:**
+- SSH key file for EC2 access
+- RDS database credentials
+- RDS endpoint address
 
-### 1.1 Create RDS Instance
+## Step 1: Connect to EC2 Instance
 
-1. Go to [AWS RDS Console](https://console.aws.amazon.com/rds/)
-2. Click **Create database**
-3. Select **MySQL** as the engine
-4. Choose **MySQL 8.0.x** (latest stable)
-5. Select **Free tier** template (or appropriate tier for production)
-6. Configure Database Details:
-   - **DB instance identifier**: `castlerock-po-db`
-   - **Master username**: `admin`
-   - **Master password**: Choose a strong password (save this!)
-   - **DB instance class**: `db.t3.micro` (free tier) or higher for production
-   - **Storage**: `20 GB` (adjust for your needs)
-
-7. Configure Connectivity:
-   - **VPC**: Use default VPC or select your VPC
-   - **Public accessibility**: **No** (keep it private)
-   - **VPC security group**: Create new or select existing
-     - **Security group name**: `castlerock-rds-sg`
-   - **Availability zone**: Default or specify
-
-8. Additional Configuration:
-   - **Initial database name**: `castlerock_prod`
-   - **Parameter group**: Default
-   - **Option group**: Default
-   - **Backup retention**: 7 days (adjust as needed)
-   - **Monitoring**: Enable Enhanced monitoring (optional)
-
-9. Click **Create database** and wait for it to become available (5-10 minutes)
-
-### 1.2 Note RDS Endpoint
-
-Once the database is created:
-1. Go to RDS Databases
-2. Click your database instance
-3. Note the **Endpoint** (e.g., `castlerock-po-db.xxxxxxxxxx.us-east-1.rds.amazonaws.com`)
-
-## Step 2: Launch EC2 Instance
-
-### 2.1 Create EC2 Instance
-
-1. Go to [AWS EC2 Console](https://console.aws.amazon.com/ec2/)
-2. Click **Launch instance**
-3. Select **Amazon Linux 2023** AMI (free tier eligible)
-4. Instance type: `t3.micro` (free tier) or `t3.small` for production
-5. **Network settings**:
-   - VPC: Same VPC as RDS
-   - Public IP: **Enable** (to access the application)
-   - Security group: Create new
-     - **Name**: `castlerock-app-sg`
-     - **Allow inbound**:
-       - HTTP (port 80) from anywhere
-       - HTTPS (port 443) from anywhere
-       - SSH (port 22) from your IP
-
-6. **Configure storage**: 20 GB gp3 (default is fine)
-
-7. **Advanced details**: User data script (see section 2.2)
-
-8. Click **Launch instance** and create/use existing key pair for SSH access
-
-### 2.2 User Data Script (Optional but Recommended)
-
-Add this script to automate initial setup:
-
-```bash
-#!/bin/bash
-set -e
-
-# Update system
-yum update -y
-
-# Install Node.js 18.x
-curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
-yum install -y nodejs
-
-# Install Git
-yum install -y git
-
-# Install development tools (for native modules)
-yum install -y gcc g++ make python3
-
-# Create app directory
-mkdir -p /home/ec2-user/app
-cd /home/ec2-user/app
-
-# Clone repository
-git clone https://github.com/yourusername/castlerock-po-backend.git .
-
-# Install dependencies
-npm install --production
-
-# Set proper permissions
-chown -R ec2-user:ec2-user /home/ec2-user/app
-```
-
-### 2.3 Configure Security Groups
-
-**RDS Security Group** (`castlerock-rds-sg`):
-- **Inbound Rule**:
-  - Type: MySQL/Aurora
-  - Port: 3306
-  - Source: `castlerock-app-sg` (EC2 security group)
-
-**EC2 Security Group** (`castlerock-app-sg`):
-- **Inbound Rules**:
-  - Type: HTTP, Port: 80, Source: 0.0.0.0/0
-  - Type: HTTPS, Port: 443, Source: 0.0.0.0/0
-  - Type: SSH, Port: 22, Source: Your IP/0.0.0.0/0
-
-## Step 3: Connect to EC2 and Deploy Application
-
-### 3.1 Connect via SSH
+### 1.1 SSH into Your EC2 Instance
 
 ```bash
 chmod 400 your-key-file.pem
 ssh -i your-key-file.pem ec2-user@your-ec2-public-ip
 ```
 
-### 3.2 Clone Repository
+Replace:
+- `your-key-file.pem` - Your SSH private key
+- `your-ec2-public-ip` - Your EC2 instance public IP (from AWS Console)
+
+## Step 2: Prepare EC2 Environment
+
+### 2.1 Install Required Software
+
+```bash
+# Update system
+sudo yum update -y
+
+# Install Node.js 18.x
+curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
+sudo yum install -y nodejs
+
+# Install Git
+sudo yum install -y git
+
+# Install development tools (for native modules)
+sudo yum install -y gcc g++ make python3
+```
+
+### 2.2 Install Puppeteer Dependencies (for PDF generation)
+
+```bash
+sudo yum install -y chromium
+```
+
+## Step 3: Deploy Application
+
+### 3.1 Clone Repository
 
 ```bash
 cd /home/ec2-user
@@ -138,18 +64,10 @@ git clone https://github.com/yourusername/castlerock-po-backend.git app
 cd app
 ```
 
-### 3.3 Install Dependencies
+### 3.2 Install Node Dependencies
 
 ```bash
 npm install --production
-```
-
-For PDF generation support, install Puppeteer dependencies:
-
-```bash
-# Install Chrome/Chromium dependencies
-sudo yum install -y chromium
-npx puppeteer browsers install chrome
 ```
 
 ## Step 4: Configure Environment Variables
@@ -157,11 +75,10 @@ npx puppeteer browsers install chrome
 ### 4.1 Create .env File
 
 ```bash
-cd /home/ec2-user/app
 nano .env
 ```
 
-Add the following configuration:
+Add the following configuration with your **RDS connection details**:
 
 ```env
 # Application
@@ -169,37 +86,62 @@ NODE_ENV=production
 PORT=3000
 
 # Database Configuration (RDS)
-DB_HOST=castlerock-po-db.xxxxxxxxxx.us-east-1.rds.amazonaws.com
-DB_USER=admin
-DB_PASSWORD=your-strong-password-here
-DB_NAME=castlerock_prod
+DB_HOST=your-rds-endpoint.us-east-1.rds.amazonaws.com
+DB_USER=your-rds-username
+DB_PASSWORD=your-rds-password
+DB_NAME=CostTracker_db
 DB_PORT=3306
 
-# JWT Secret (generate a random string)
+# JWT Secret (generate a random string for production)
 JWT_SECRET=your-very-long-random-secret-key-change-this-in-production
 
-# Optional: Email Configuration (for password resets)
-# SMTP_HOST=smtp.gmail.com
-# SMTP_PORT=587
-# SMTP_USER=your-email@gmail.com
-# SMTP_PASSWORD=your-email-password
-# SMTP_FROM=noreply@yourcompany.com
+# Email Configuration (optional - for password resets)
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASSWORD=your-app-password
+EMAIL_FROM=noreply@yourcompany.com
+
+# Application URL
+APP_URL=http://your-ec2-public-ip:3000
 ```
 
-**Important Security Note**: Use AWS Secrets Manager or Parameter Store for sensitive data in production:
+**Replace:**
+- `your-rds-endpoint.us-east-1.rds.amazonaws.com` - Your RDS endpoint
+- `your-rds-username` - Your RDS master username
+- `your-rds-password` - Your RDS master password
+- `your-ec2-public-ip` - Your EC2 public IP address
+
+### 4.2 Security Best Practices
+
+#### Secure the .env File
 
 ```bash
+chmod 600 .env
+```
+
+#### Use AWS Secrets Manager (Recommended for Production)
+
+```bash
+# Store database password
 aws ssm put-parameter \
   --name /castlerock/db-password \
-  --value "your-password" \
+  --value "your-rds-password" \
+  --type "SecureString" \
+  --region us-east-1
+
+# Store JWT secret
+aws ssm put-parameter \
+  --name /castlerock/jwt-secret \
+  --value "your-jwt-secret" \
   --type "SecureString" \
   --region us-east-1
 ```
 
-### 4.2 Secure the .env File
-
-```bash
-chmod 600 .env
+Then reference in .env:
+```env
+DB_PASSWORD=${/castlerock/db-password}
+JWT_SECRET=${/castlerock/jwt-secret}
 ```
 
 ## Step 5: Initialize Database
@@ -211,11 +153,11 @@ npm run setup
 ```
 
 This will:
+- Create the `CostTracker_db` schema on your RDS instance
 - Create all necessary tables
-- Create default super admin user
-- Seed initial settings
+- Create a default super admin user
 
-**Default Admin Credentials** (change these on first login!):
+**⚠️ Default Admin Credentials** (change on first login!):
 - Email: `admin@castlerock.com`
 - Password: `Admin@123`
 
@@ -225,24 +167,35 @@ This will:
 npm run test-db
 ```
 
-Or manually test:
+Expected output:
+```
+✅ Database connection successful
+```
+
+## Step 6: Run the Application
+
+### 6.1 Start Application
 
 ```bash
-curl http://localhost:3000/health
+npm start
 ```
 
-Expected response:
-```json
-{
-  "status": "OK",
-  "database": "connected",
-  "environment": "production"
-}
+You should see:
+```
+✅ Server running on port 3000
+✅ Database connected to CostTracker_db
 ```
 
-## Step 6: Run Application
+### 6.2 Test Application
 
-### 6.1 Simple Start (Development)
+Open in browser:
+```
+http://your-ec2-public-ip:3000
+```
+
+You should be redirected to the Setup Wizard (first-time setup) or login page.
+
+## Step 7: Production Setup (Optional but Recommended)
 
 ```bash
 npm start

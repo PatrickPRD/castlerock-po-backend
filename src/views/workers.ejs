@@ -10,6 +10,9 @@
           <input type="checkbox" id="showInactiveWorkers">
           Show ceased workers
         </label>
+        <button class="btn btn-outline-secondary" onclick="downloadWorkerTemplate()">
+          Download Excel
+        </button>
         <button class="btn btn-outline-secondary" onclick="openBulkUploadModal()">
           Bulk Upload
         </button>
@@ -26,6 +29,7 @@
           <th class="sortable" data-column="nickname">Nickname<span class="sort-indicator"></span></th>
           <th class="sortable" data-column="login_no">Login No<span class="sort-indicator"></span></th>
           <th class="sortable" data-column="status">Status<span class="sort-indicator"></span></th>
+          <th>Safe Pass Expiry</th>
         </tr>
       </thead>
       <tbody id="workerTable"></tbody>

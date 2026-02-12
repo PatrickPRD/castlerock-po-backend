@@ -36,6 +36,32 @@ function toIsoDate(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
 }
 
+function toUkDate(value) {
+  if (!value) return '';
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return '';
+    const day = String(value.getDate()).padStart(2, '0');
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const year = value.getFullYear();
+    return `${day}-${month}-${year}`;
+  }
+
+  const raw = String(value).trim();
+  if (!raw) return '';
+  if (/^\d{2}-\d{2}-\d{4}$/.test(raw)) return raw;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const [year, month, day] = raw.split('-');
+    return `${day}-${month}-${year}`;
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return '';
+  const day = String(parsed.getDate()).padStart(2, '0');
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const year = parsed.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
 
 
 
@@ -926,10 +952,53 @@ router.get(
   authorizeRoles('super_admin', 'admin'),
   async (_req, res) => {
     try {
-      const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet('Workers');
+      const [activeWorkers] = await db.query(
+        `SELECT
+           first_name,
+           last_name,
+           nickname,
+           email,
+           mobile_number,
+           address,
+           bank_details,
+           pps_number,
+           weekly_take_home,
+           weekly_cost,
+           safe_pass_number,
+           safe_pass_expiry_date,
+           date_of_employment,
+           login_no,
+           notes
+         FROM workers
+         WHERE left_at IS NULL OR left_at >= CURDATE()
+         ORDER BY last_name, first_name`
+      );
 
-      sheet.columns = [
+      const [inactiveWorkers] = await db.query(
+        `SELECT
+           first_name,
+           last_name,
+           nickname,
+           email,
+           mobile_number,
+           address,
+           bank_details,
+           pps_number,
+           weekly_take_home,
+           weekly_cost,
+           safe_pass_number,
+           safe_pass_expiry_date,
+           date_of_employment,
+           login_no,
+           notes
+         FROM workers
+         WHERE left_at IS NOT NULL AND left_at < CURDATE()
+         ORDER BY last_name, first_name`
+      );
+
+      const workbook = new ExcelJS.Workbook();
+
+      const columns = [
         { header: 'First Name', key: 'first_name', width: 20 },
         { header: 'Last Name', key: 'last_name', width: 20 },
         { header: 'Nickname', key: 'nickname', width: 18 },
@@ -947,23 +1016,33 @@ router.get(
         { header: 'Notes', key: 'notes', width: 30 }
       ];
 
-      sheet.addRow({
-        first_name: 'John',
-        last_name: 'Doe',
-        nickname: 'Johnny',
-        email: 'john.doe@example.com',
-        mobile_number: '087 123 4567',
-        address: '123 Main Street, City, County',
-        bank_details: 'IE12 BANK 12345678',
-        pps_number: 'PPS1234567',
-        weekly_take_home: 750,
-        weekly_cost: 900,
-        safe_pass_number: 'SAFE-12345',
-        safe_pass_expiry_date: '09-02-2027',
-        date_of_employment: '09-02-2026',
-        login_no: 1001,
-        notes: 'Sample worker'
-      });
+      const addWorkersSheet = (sheetName, rows) => {
+        const sheet = workbook.addWorksheet(sheetName);
+        sheet.columns = columns;
+
+        rows.forEach(worker => {
+          sheet.addRow({
+            first_name: worker.first_name || '',
+            last_name: worker.last_name || '',
+            nickname: worker.nickname || '',
+            email: worker.email || '',
+            mobile_number: worker.mobile_number || '',
+            address: worker.address || '',
+            bank_details: worker.bank_details || '',
+            pps_number: worker.pps_number || '',
+            weekly_take_home: worker.weekly_take_home ?? null,
+            weekly_cost: worker.weekly_cost ?? null,
+            safe_pass_number: worker.safe_pass_number || '',
+            safe_pass_expiry_date: toUkDate(worker.safe_pass_expiry_date),
+            date_of_employment: toUkDate(worker.date_of_employment),
+            login_no: worker.login_no ?? '',
+            notes: worker.notes || ''
+          });
+        });
+      };
+
+      addWorkersSheet('Active Workers', activeWorkers);
+      addWorkersSheet('Inactive Workers', inactiveWorkers);
 
       res.setHeader(
         'Content-Type',

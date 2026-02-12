@@ -55,6 +55,17 @@ function toInputDate(value) {
   return `${year}-${month}-${day}`;
 }
 
+function toUkDateFormat(value) {
+  if (!value) return '';
+  const raw = value instanceof Date ? value : String(value);
+  const date = raw.includes('T') ? new Date(raw) : new Date(`${raw}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return '';
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
 function isWorkerActive(leftAt) {
   if (!leftAt) return true;
   const raw = leftAt instanceof Date ? leftAt : String(leftAt);
@@ -197,7 +208,7 @@ function renderWorkers() {
     const nickname = worker.nickname ? String(worker.nickname).trim() : '';
     const weeklyPay = worker.weekly_take_home != null ? formatMoney(worker.weekly_take_home) : '—';
     const weeklyCost = worker.weekly_cost != null ? formatMoney(worker.weekly_cost) : '—';
-    const safePassExpiry = worker.safe_pass_expiry_date ? toInputDate(worker.safe_pass_expiry_date) : '';
+    const safePassExpiry = worker.safe_pass_expiry_date ? toUkDateFormat(worker.safe_pass_expiry_date) : '';
     const safePassExpired = safePassExpiry ? isPastUkDate(safePassExpiry) : false;
     const safePassDaysLeft = safePassExpiry ? daysUntilUkDate(safePassExpiry) : null;
     let safePassStatusClass = 'safe-pass-expired';
@@ -214,6 +225,7 @@ function renderWorkers() {
       <td>${escapeHtml(nickname) || '—'}</td>
       <td>${escapeHtml(worker.login_no) || '—'}</td>
       <td>${isActive ? 'Active' : 'Inactive'}</td>
+      <td>${safePassExpiry || '—'}</td>
     `;
 
     const detailsRow = document.createElement('tr');

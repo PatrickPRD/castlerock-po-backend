@@ -1,28 +1,32 @@
 # 🚀 Quick Start Guide
 
-## Step 1: Update MySQL Password
+## Step 1: Update MySQL Connection Details
 
-Open [.env](.env) and update the MySQL password:
+Open [.env](.env) and update your MySQL server connection details:
 ```env
-DB_PASSWORD=your_actual_mysql_root_password
+DB_HOST=your_mysql_host        # MySQL server address (default: 127.0.0.1)
+DB_USER=your_mysql_user        # MySQL user (default: admin)
+DB_PASSWORD=your_mysql_password # MySQL password
+DB_PORT=your_mysql_port        # MySQL port (default: 3306)
 ```
 
-## Step 2: Create Database and Tables
+**Note:** The schema `CostTracker_db` will be created automatically on your existing MySQL server.
 
-Run the setup script to create the database and super admin:
+## Step 2: Create Database Schema and Tables
+
+Run the setup script to initialize the schema and tables:
 ```bash
 npm run setup
 ```
 
 This will:
-- Create the `castlerock_dev` database
+- Create the `CostTracker_db` schema on your MySQL server
 - Create all required tables
-- Seed a super admin user
+- Create a default super admin user
 
 **Default Admin Credentials:**
 - 📧 Email: `admin@castlerock.com`
 - 🔑 Password: `Admin@123`
-- ⚠️ Change password after first login!
 
 ## Step 3: Start the Server
 
@@ -31,9 +35,28 @@ Press `F5` in VSCode or run:
 npm run dev
 ```
 
-## Step 4: Access the Application
+## Step 4: Complete Setup Wizard
 
-Open http://localhost:3000 and login with the admin credentials above.
+Open http://localhost:3000 in your browser. You'll be automatically redirected to the **Setup Wizard** if this is a fresh installation.
+
+The Setup Wizard guides you through configuring:
+- ✅ **Admin User** - Confirm or update the admin account
+- ✅ **Site** - Create your first site (e.g., "Main Construction Site")
+- ✅ **Location** - Add a location within the site
+- ✅ **PO Stage** - Create a purchase order stage (e.g., "Draft", "Approved")
+- ✅ **Worker** - Add your first worker
+- ✅ **App Settings** - Configure currency and leave allowances
+
+After completing the wizard, you'll be redirected to the main dashboard.
+
+## Step 5: Log In and Use the Application
+
+Log in with your admin credentials if not already authenticated. You now have access to:
+- Workers management
+- Purchase Orders
+- Timesheets
+- Reports
+- Admin controls
 
 ---
 
@@ -102,7 +125,7 @@ If you prefer to run SQL manually, execute these files in order:
 
 **Database Doesn't Exist:**
 - Run `npm run setup` to create it automatically
-- Or manually create: `CREATE DATABASE castlerock_dev;`
+- Or manually create: `CREATE DATABASE CostTracker_db;`
 
 **Tables Don't Exist:**
 - Run `npm run setup` to create all tables
