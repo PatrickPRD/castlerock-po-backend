@@ -22,11 +22,15 @@ const resetBtn = document.getElementById('resetBtn');
 const companyDetailsForm = document.getElementById('companyDetailsForm');
 const companyNameInput = document.getElementById('companyName');
 const companyTradingNameInput = document.getElementById('companyTradingName');
+const companyEmailInput = document.getElementById('companyEmail');
+const companyPhoneInput = document.getElementById('companyPhone');
 const companyAddressInput = document.getElementById('companyAddress');
 const companyVatNumberInput = document.getElementById('companyVatNumber');
 const companyCroNumberInput = document.getElementById('companyCroNumber');
 const currentCompanyName = document.getElementById('currentCompanyName');
 const currentCompanyTradingName = document.getElementById('currentCompanyTradingName');
+const currentCompanyEmail = document.getElementById('currentCompanyEmail');
+const currentCompanyPhone = document.getElementById('currentCompanyPhone');
 const currentCompanyAddress = document.getElementById('currentCompanyAddress');
 const currentCompanyVatNumber = document.getElementById('currentCompanyVatNumber');
 const currentCompanyCroNumber = document.getElementById('currentCompanyCroNumber');
@@ -198,12 +202,16 @@ async function loadCompanyDetails() {
 
   if (companyNameInput) companyNameInput.value = settings.company_name || '';
   if (companyTradingNameInput) companyTradingNameInput.value = settings.company_trading_name || '';
+  if (companyEmailInput) companyEmailInput.value = settings.company_email || '';
+  if (companyPhoneInput) companyPhoneInput.value = settings.company_phone || '';
   if (companyAddressInput) companyAddressInput.value = settings.company_address || '';
   if (companyVatNumberInput) companyVatNumberInput.value = settings.company_vat_number || '';
   if (companyCroNumberInput) companyCroNumberInput.value = settings.company_cro_number || '';
 
   if (currentCompanyName) currentCompanyName.textContent = settings.company_name || '-';
   if (currentCompanyTradingName) currentCompanyTradingName.textContent = settings.company_trading_name || '-';
+  if (currentCompanyEmail) currentCompanyEmail.textContent = settings.company_email || '-';
+  if (currentCompanyPhone) currentCompanyPhone.textContent = settings.company_phone || '-';
   if (currentCompanyAddress) currentCompanyAddress.textContent = settings.company_address || '-';
   if (currentCompanyVatNumber) currentCompanyVatNumber.textContent = settings.company_vat_number || '-';
   if (currentCompanyCroNumber) currentCompanyCroNumber.textContent = settings.company_cro_number || '-';
@@ -369,6 +377,8 @@ if (companyDetailsForm) {
       await api('/settings/bulk', 'POST', {
         company_name: (companyNameInput?.value || '').trim(),
         company_trading_name: (companyTradingNameInput?.value || '').trim(),
+        company_email: (companyEmailInput?.value || '').trim(),
+        company_phone: (companyPhoneInput?.value || '').trim(),
         company_address: (companyAddressInput?.value || '').trim(),
         company_vat_number: (companyVatNumberInput?.value || '').trim(),
         company_cro_number: (companyCroNumberInput?.value || '').trim()

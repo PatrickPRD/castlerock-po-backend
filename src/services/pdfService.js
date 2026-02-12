@@ -998,6 +998,442 @@ class PDFService {
     };
     return text.replace(/[&<>"']/g, m => map[m]);
   }
+
+  /**
+   * Generate GDPR Privacy Notice PDF
+   * @param {Object} settings - Application settings
+   * @returns {Promise<Buffer>} PDF buffer
+   */
+  static async generateGDPRPDF(settings) {
+    try {
+      if (!puppeteer) {
+        throw new Error('Puppeteer is not installed. Please run: npm install puppeteer');
+      }
+      
+      const html = this.generateGDPRHTML(settings);
+      const pdf = await this.htmlToPDF(html);
+      return pdf;
+    } catch (error) {
+      console.error('Error generating GDPR PDF:', error);
+      throw new Error('Failed to generate PDF: ' + error.message);
+    }
+  }
+
+  /**
+   * Generate HTML for GDPR Privacy Notice PDF
+   * @param {Object} settings - Application settings
+   * @returns {string} HTML content
+   */
+  static generateGDPRHTML(settings) {
+    const branding = this.buildBranding(settings);
+    const {
+      headerColor,
+      logoMode,
+      logoText,
+      logoDataUrl,
+      companyName,
+      companyAddress,
+      companyPhone,
+      companyEmail
+    } = branding;
+    
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GDPR Privacy Notice - ${companyName}</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.6;
+      color: #333;
+      background: #f5f6f8;
+      padding: 15px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .header {
+      background: ${headerColor};
+      color: white;
+      padding: 25px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 3px solid rgba(255,255,255,0.2);
+    }
+    .logo-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .logo-section img {
+      max-height: 50px;
+      width: auto;
+    }
+    .logo-text {
+      font-size: 22pt;
+      font-weight: 700;
+      color: white;
+    }
+    .company-title {
+      font-size: 11pt;
+      font-weight: 400;
+      opacity: 0.95;
+      color: white;
+    }
+    .header-title {
+      text-align: right;
+    }
+    .header-title h1 {
+      font-size: 18pt;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .header-title p {
+      font-size: 11pt;
+      opacity: 0.9;
+    }
+    .content {
+      padding: 30px;
+    }
+    .section {
+      margin-bottom: 25px;
+      page-break-inside: avoid;
+      background: #fafbfc;
+      padding: 20px;
+      border-radius: 6px;
+      border: 1px solid #e9ecef;
+    }
+    .section h2 {
+      color: ${headerColor};
+      font-size: 14pt;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e9ecef;
+      font-weight: 600;
+    }
+    .section h3 {
+      color: #495057;
+      font-size: 12pt;
+      margin-top: 15px;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .section p, .section li {
+      color: #495057;
+      margin-bottom: 10px;
+      font-size: 10.5pt;
+    }
+    .section ul {
+      margin-left: 25px;
+      margin-top: 10px;
+    }
+    .section li {
+      margin-bottom: 6px;
+    }
+    .contact-box {
+      background: white;
+      border: 1px solid ${headerColor};
+      border-left: 4px solid ${headerColor};
+      padding: 15px;
+      margin-top: 12px;
+      border-radius: 4px;
+    }
+    .contact-box p {
+      margin-bottom: 6px;
+      color: #495057;
+    }
+    .footer-info {
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 2px solid #e9ecef;
+      text-align: center;
+      color: #6c757d;
+      font-size: 9pt;
+    }
+    .footer-info p {
+      margin-bottom: 4px;
+    }
+    @media print {
+      body {
+        background: white;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="logo-section">
+        ${logoMode === 'text'
+          ? `<div class="logo-text">${this.escapeHtml(logoText || companyName)}</div>`
+          : (logoDataUrl
+            ? `<img src="${logoDataUrl}" alt="Logo">`
+            : `<div class="logo-text">${this.escapeHtml(companyName)}</div>`)}
+        <div class="company-title">${this.escapeHtml(companyName)}</div>
+      </div>
+      <div class="header-title">
+        <h1>GDPR Privacy Notice</h1>
+        <p>Data Protection & Privacy Rights</p>
+      </div>
+    </div>
+
+    <div class="content">
+
+  <div class="section">
+    <h2>1. Introduction</h2>
+    <p>
+      <strong>${companyName}</strong> ("we", "us", or "our") is committed to protecting your personal data and respecting your privacy rights. This Privacy Notice explains how we collect, use, store, and protect your personal information in accordance with the General Data Protection Regulation (GDPR) (EU) 2016/679 and the Data Protection Act 2018 as implemented in Ireland.
+    </p>
+    <p>
+      This notice applies to all personal data we process about our employees, contractors, suppliers, and other individuals in connection with our construction and property development business operations.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>2. Data Controller</h2>
+    <p>
+      <strong>${companyName}</strong> is the data controller responsible for your personal data. For any queries or concerns about how we handle your data, please contact us using the details provided in Section 11 of this notice.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>3. Personal Data We Collect</h2>
+    <p>We may collect and process the following categories of personal data:</p>
+    
+    <h3>3.1 Identity and Contact Information</h3>
+    <ul>
+      <li>Full name, date of birth, and gender</li>
+      <li>Contact details (email address, phone number, postal address)</li>
+      <li>PPS Number (for employment and payroll purposes)</li>
+      <li>Emergency contact details</li>
+    </ul>
+
+    <h3>3.2 Employment and Financial Information</h3>
+    <ul>
+      <li>Employment records, job title, and work history</li>
+      <li>Bank account details for payroll processing</li>
+      <li>Salary, wages, and payment information</li>
+      <li>Tax and National Insurance details</li>
+      <li>Time and attendance records (timesheets)</li>
+      <li>Leave records and entitlements</li>
+    </ul>
+
+    <h3>3.3 Health and Safety Information</h3>
+    <ul>
+      <li>Safe Pass certification and expiry dates</li>
+      <li>Health and safety training records</li>
+      <li>Accident reports and incident records</li>
+      <li>Medical information relevant to workplace safety</li>
+    </ul>
+
+    <h3>3.4 Technical and System Data</h3>
+    <ul>
+      <li>Login credentials and access logs</li>
+      <li>IP addresses and device information</li>
+      <li>System usage and activity logs</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>4. How We Use Your Personal Data</h2>
+    <p>We use your personal data for the following purposes:</p>
+    
+    <h3>4.1 Employment and Payroll Management</h3>
+    <ul>
+      <li>Processing payroll and making payments</li>
+      <li>Managing employment contracts and benefits</li>
+      <li>Recording attendance and leave</li>
+      <li>Performance management and development</li>
+    </ul>
+
+    <h3>4.2 Legal and Regulatory Compliance</h3>
+    <ul>
+      <li>Complying with employment law and tax obligations</li>
+      <li>Meeting health and safety regulations</li>
+      <li>Maintaining Safe Pass and certification records</li>
+      <li>Responding to legal claims or regulatory investigations</li>
+    </ul>
+
+    <h3>4.3 Business Operations</h3>
+    <ul>
+      <li>Managing purchase orders and supplier relationships</li>
+      <li>Project planning and site management</li>
+      <li>Financial reporting and cost tracking</li>
+      <li>Audit and quality assurance</li>
+    </ul>
+
+    <h3>4.4 System Security and Administration</h3>
+    <ul>
+      <li>Maintaining system security and preventing fraud</li>
+      <li>User access management and authentication</li>
+      <li>System backup and disaster recovery</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>5. Legal Basis for Processing</h2>
+    <p>We process your personal data under the following legal bases:</p>
+    <ul>
+      <li><strong>Contractual necessity:</strong> Processing is necessary to perform our employment or supplier contracts</li>
+      <li><strong>Legal obligation:</strong> We must process your data to comply with employment law, tax law, and health and safety regulations</li>
+      <li><strong>Legitimate interests:</strong> Processing is necessary for our legitimate business interests, such as preventing fraud and maintaining system security</li>
+      <li><strong>Consent:</strong> Where you have given explicit consent for specific processing activities</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>6. Data Sharing and Disclosure</h2>
+    <p>We may share your personal data with the following categories of recipients:</p>
+    <ul>
+      <li><strong>Revenue Commissioners:</strong> For tax and PAYE/PRSI purposes</li>
+      <li><strong>Banks and financial institutions:</strong> For payroll processing</li>
+      <li><strong>Health and Safety Authority (HSA):</strong> For compliance and incident reporting</li>
+      <li><strong>Pension providers and insurers:</strong> For employee benefits administration</li>
+      <li><strong>IT service providers:</strong> For system hosting, maintenance, and support</li>
+      <li><strong>Professional advisors:</strong> Including legal, accounting, and audit services</li>
+      <li><strong>Regulatory authorities:</strong> When required by law</li>
+    </ul>
+    <p>We do not sell or rent your personal data to third parties for marketing purposes.</p>
+  </div>
+
+  <div class="section">
+    <h2>7. International Data Transfers</h2>
+    <p>
+      Your personal data is primarily stored and processed within the European Economic Area (EEA). If we transfer your data outside the EEA, we will ensure appropriate safeguards are in place, such as:
+    </p>
+    <ul>
+      <li>EU-approved Standard Contractual Clauses</li>
+      <li>Adequacy decisions by the European Commission</li>
+      <li>Binding Corporate Rules or other approved mechanisms</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>8. Data Retention</h2>
+    <p>We retain your personal data only for as long as necessary to fulfil the purposes for which it was collected and to comply with legal obligations:</p>
+    <ul>
+      <li><strong>Employment records:</strong> 6 years after employment ends (as required by Irish employment law)</li>
+      <li><strong>Payroll and tax records:</strong> 6 years (as required by Revenue Commissioners)</li>
+      <li><strong>Health and safety records:</strong> Up to 40 years for certain types of injuries or exposure (as required by HSA)</li>
+      <li><strong>Audit logs:</strong> 2 years for operational purposes</li>
+      <li><strong>Purchase order records:</strong> 6 years from date of last transaction</li>
+    </ul>
+    <p>After the retention period expires, we will securely delete or anonymize your personal data.</p>
+  </div>
+
+  <div class="section">
+    <h2>9. Your Rights Under GDPR</h2>
+    <p>You have the following rights in relation to your personal data:</p>
+    
+    <h3>9.1 Right of Access</h3>
+    <p>You can request a copy of the personal data we hold about you.</p>
+
+    <h3>9.2 Right to Rectification</h3>
+    <p>You can request that we correct any inaccurate or incomplete personal data.</p>
+
+    <h3>9.3 Right to Erasure ("Right to be Forgotten")</h3>
+    <p>You can request deletion of your personal data in certain circumstances, subject to legal retention requirements.</p>
+
+    <h3>9.4 Right to Restrict Processing</h3>
+    <p>You can request that we limit how we use your personal data in certain situations.</p>
+
+    <h3>9.5 Right to Data Portability</h3>
+    <p>You can request a copy of your personal data in a structured, machine-readable format.</p>
+
+    <h3>9.6 Right to Object</h3>
+    <p>You can object to processing based on legitimate interests or for direct marketing purposes.</p>
+
+    <h3>9.7 Rights Related to Automated Decision-Making</h3>
+    <p>You have the right not to be subject to decisions based solely on automated processing that produce legal effects.</p>
+
+    <div class="contact-box">
+      <p><strong>To exercise any of these rights, please contact us using the details in Section 11.</strong></p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>10. Data Security</h2>
+    <p>
+      We implement appropriate technical and organizational measures to protect your personal data against unauthorized access, alteration, disclosure, or destruction. These measures include:
+    </p>
+    <ul>
+      <li>Encryption of data in transit and at rest</li>
+      <li>Role-based access controls and authentication</li>
+      <li>Regular security audits and vulnerability assessments</li>
+      <li>Secure backup and disaster recovery procedures</li>
+      <li>Staff training on data protection and security</li>
+      <li>Incident response and breach notification procedures</li>
+    </ul>
+    <p>
+      While we strive to protect your personal data, no method of transmission over the internet or electronic storage is 100% secure. We cannot guarantee absolute security but will notify you and the Data Protection Commission in the event of a data breach where required by law.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>11. Contact Information</h2>
+    <p>If you have any questions, concerns, or requests regarding this Privacy Notice or how we handle your personal data, please contact us:</p>
+    <div class="contact-box">
+      <p><strong>${companyName}</strong></p>
+      ${companyEmail ? `<p>Email: ${companyEmail}</p>` : ''}
+      ${companyPhone ? `<p>Phone: ${companyPhone}</p>` : ''}
+      ${companyAddress ? `<p>Address: ${this.escapeHtml(companyAddress)}</p>` : ''}
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>12. Right to Lodge a Complaint</h2>
+    <p>
+      If you believe we have not handled your personal data in accordance with GDPR, you have the right to lodge a complaint with the Data Protection Commission (DPC), Ireland's supervisory authority for data protection:
+    </p>
+    <div class="contact-box">
+      <p><strong>Data Protection Commission</strong></p>
+      <p>21 Fitzwilliam Square South</p>
+      <p>Dublin 2, D02 RD28</p>
+      <p>Ireland</p>
+      <p>Email: info@dataprotection.ie</p>
+      <p>Phone: +353 57 868 4800</p>
+      <p>Website: www.dataprotection.ie</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>13. Changes to This Privacy Notice</h2>
+    <p>
+      We may update this Privacy Notice from time to time to reflect changes in our practices or legal requirements. We will notify you of any material changes by posting the updated notice on our system and updating the "Last Updated" date below.
+    </p>
+    <p><strong>Last Updated:</strong> February 11, 2026</p>
+  </div>
+
+      <!-- Footer -->
+      <div class="footer-info">
+        ${companyAddress ? `<p><strong>Address:</strong> ${this.escapeHtml(companyAddress)}</p>` : ''}
+        ${companyPhone ? `<p><strong>Phone:</strong> ${companyPhone}</p>` : ''}
+        ${companyEmail ? `<p><strong>Email:</strong> ${companyEmail}</p>` : ''}
+        <p style="margin-top: 15px;">© ${new Date().getFullYear()} ${companyName}. All rights reserved.</p>
+        <p>This document is confidential and intended for authorized personnel only.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+    `;
+  }
 }
 
 module.exports = PDFService;

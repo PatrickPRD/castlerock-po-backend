@@ -54,6 +54,7 @@ app.get('/invoice-report.html', (req, res) => res.render('invoice-report'));
 app.get('/workers-information.html', (req, res) => res.render('workers-information'));
 app.get('/leave-report.html', (req, res) => res.redirect('/workers-information.html'));
 app.get('/labour-costs.html', (req, res) => res.render('labour-costs'));
+app.get('/gdpr.html', (req, res) => res.render('gdpr'));
 
 // Health check with database connectivity test
 app.get('/health', async (req, res) => {

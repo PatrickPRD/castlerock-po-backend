@@ -4,53 +4,89 @@ const fs = require('fs');
 const path = require('path');
 
 (async () => {
+  let conn;
   try {
-    const conn = await mysql.createConnection({
+    conn = await mysql.createConnection({
       host: process.env.DB_HOST,
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
-      port: process.env.DB_PORT
+      port: process.env.DB_PORT,
+      multipleStatements: true
     });
 
-    const migrationPath = path.join(__dirname, 'database', 'migrations', '20260205_fix_vat_rates.sql');
-    const sql = fs.readFileSync(migrationPath, 'utf8');
+    // Create migrations tracking table if it doesn't exist
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        migration_name VARCHAR(255) NOT NULL UNIQUE,
+        executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_migration_name (migration_name)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
 
-    console.log('Running migration: 20260205_fix_vat_rates.sql\n');
-    
-    const statements = sql.split(';').filter(s => s.trim());
-    for (const statement of statements) {
-      if (statement.trim() && !statement.trim().startsWith('--')) {
-        try {
-          const result = await conn.query(statement);
-          if (Array.isArray(result) && result[0] && result[0].constructor.name === 'ResultSetHeader') {
-            if (result[0].affectedRows > 0) {
-              console.log(`✅ Updated ${result[0].affectedRows} rows`);
-            }
-          }
-        } catch (e) {
-          // Ignore warning messages
-          if (!e.message.includes('warning')) {
-            throw e;
-          }
-        }
+    // Get list of already executed migrations
+    const [executedMigrations] = await conn.query(
+      'SELECT migration_name FROM schema_migrations ORDER BY migration_name'
+    );
+    const executedSet = new Set(executedMigrations.map(m => m.migration_name));
+
+    // Read all migration files
+    const migrationsDir = path.join(__dirname, 'database', 'migrations');
+    const migrationFiles = fs.readdirSync(migrationsDir)
+      .filter(file => file.endsWith('.sql'))
+      .sort(); // Sort by filename (timestamp prefix ensures correct order)
+
+    if (migrationFiles.length === 0) {
+      console.log('No migration files found.');
+      await conn.end();
+      return;
+    }
+
+    // Find pending migrations
+    const pendingMigrations = migrationFiles.filter(file => !executedSet.has(file));
+
+    if (pendingMigrations.length === 0) {
+      console.log('✅ Database is up to date. No pending migrations.');
+      await conn.end();
+      return;
+    }
+
+    console.log(`Found ${pendingMigrations.length} pending migration(s):\n`);
+    pendingMigrations.forEach(file => console.log(`  - ${file}`));
+    console.log('');
+
+    // Execute each pending migration
+    for (const migrationFile of pendingMigrations) {
+      console.log(`Running migration: ${migrationFile}`);
+      
+      const migrationPath = path.join(migrationsDir, migrationFile);
+      const sql = fs.readFileSync(migrationPath, 'utf8');
+
+      try {
+        // Execute the migration
+        await conn.query(sql);
+        
+        // Record that this migration has been executed
+        await conn.query(
+          'INSERT INTO schema_migrations (migration_name) VALUES (?)',
+          [migrationFile]
+        );
+        
+        console.log(`✅ ${migrationFile} completed successfully\n`);
+      } catch (err) {
+        console.error(`❌ Error executing ${migrationFile}:`, err.message);
+        throw err;
       }
     }
 
-    console.log('\n✅ Migration completed successfully!');
-
-    const [result] = await conn.query('SHOW COLUMNS FROM purchase_orders WHERE Field = "vat_rate"');
-    console.log('\nUpdated column definition:');
-    console.log(result[0]);
-
-    // Check the VAT rates
-    const [rates] = await conn.query('SELECT DISTINCT vat_rate, COUNT(*) as count FROM purchase_orders GROUP BY vat_rate ORDER BY vat_rate');
-    console.log('\nVAT Rate Distribution after migration:');
-    console.log(rates);
+    console.log(`\n✅ All migrations completed successfully!`);
+    console.log(`   Total migrations executed: ${pendingMigrations.length}`);
 
     await conn.end();
   } catch (err) {
-    console.error('❌ Error:', err.message);
+    console.error('❌ Migration error:', err.message);
+    if (conn) await conn.end();
     process.exit(1);
   }
 })();

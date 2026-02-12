@@ -34,7 +34,10 @@ router.get('/public', async (req, res) => {
       header_color: settings.header_color || '#212529',
       logo_path: settings.logo_path || '/assets/Logo.png',
       header_logo_mode: settings.header_logo_mode || 'image',
-      header_logo_text: settings.header_logo_text || 'Castlerock Homes'
+      header_logo_text: settings.header_logo_text || 'Castlerock Homes',
+      company_name: settings.company_name || 'Castlerock Homes',
+      company_email: settings.company_email || '',
+      company_phone: settings.company_phone || ''
     });
   } catch (error) {
     console.error('Error fetching public settings:', error);

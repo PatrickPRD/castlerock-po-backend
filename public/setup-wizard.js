@@ -217,6 +217,8 @@ async function completeSetup() {
       },
       settings: {
         company_name: document.getElementById('companyName').value,
+        company_email: document.getElementById('companyEmail').value,
+        company_phone: document.getElementById('companyPhone').value,
         header_color: document.getElementById('headerColor').value,
         accent_color: document.getElementById('accentColor').value
       }

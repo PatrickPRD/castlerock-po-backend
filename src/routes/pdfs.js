@@ -376,4 +376,37 @@ router.get(
   }
 );
 
+/**
+ * GET /pdfs/gdpr
+ * Download GDPR Privacy Notice as PDF
+ * Accessible to: all authenticated users
+ */
+router.get(
+  '/gdpr',
+  authenticate,
+  async (req, res) => {
+    try {
+      // Get settings for company details
+      const settings = await SettingsService.getSettings();
+      
+      // Generate GDPR PDF
+      const pdf = await PDFService.generateGDPRPDF(settings);
+
+      const companyName = (settings.company_name || 'Company').replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '');
+      const today = new Date().toISOString().split('T')[0];
+
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="GDPR-Privacy-Notice-${companyName}-${today}.pdf"`,
+        'Content-Length': pdf.length
+      });
+
+      res.send(pdf);
+    } catch (error) {
+      console.error('Error generating GDPR PDF:', error);
+      res.status(500).json({ error: 'Failed to generate PDF: ' + error.message });
+    }
+  }
+);
+
 module.exports = router;
