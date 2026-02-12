@@ -14,7 +14,6 @@ async function checkSetupRequired(req, res, next) {
     if (!setupChecked) {
       try {
         isInitialized = await SetupWizardService.isSystemInitialized();
-        console.log('Setup check: isInitialized=', isInitialized);
       } catch (dbError) {
         // If DB check fails, treat as NOT initialized so wizard shows
         console.warn('Database check failed, showing setup wizard:', dbError.message);
@@ -22,8 +21,6 @@ async function checkSetupRequired(req, res, next) {
       }
       setupChecked = true;
     }
-
-    console.log(`[${req.method} ${req.path}] isInitialized=${isInitialized}, setupChecked=${setupChecked}`);
 
     // If not initialized and trying to access a protected page, redirect to setup
     if (!isInitialized) {
@@ -35,13 +32,13 @@ async function checkSetupRequired(req, res, next) {
         '/login',
         '/login.html',
         '/reset-password.html',
-        '/auth'
+        '/auth',
+        '/api'
       ];
 
       const isAllowedRoute = allowedRoutes.some(route => req.path.startsWith(route));
 
       if (!isAllowedRoute) {
-        console.log(`Redirecting ${req.path} to setup wizard (not in allowed routes)`);
         return res.redirect('/setup-wizard.html');
       }
     }
