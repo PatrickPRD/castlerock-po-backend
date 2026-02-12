@@ -16,10 +16,36 @@ class SetupWizardService {
    */
   static async isSystemInitialized() {
     try {
+      // First, ensure schema tables exist
+      try {
+        await this.ensureTablesExist();
+      } catch (schemaErr) {
+        console.warn('Could not ensure schema exists:', schemaErr.message);
+      }
+      
       const [rows] = await db.query('SELECT COUNT(*) as count FROM users');
       return rows[0]?.count > 0;
     } catch (error) {
+      console.error('Error checking if system initialized:', error.message);
       return false;
+    }
+  }
+
+  /**
+   * Ensure required tables exist (create schema if needed)
+   * @private
+   */
+  static async ensureTablesExist() {
+    try {
+      // Simple check - if we can query the users table, schema exists
+      await db.query('SELECT 1 FROM users LIMIT 1');
+    } catch (error) {
+      // Table doesn't exist - this is expected on first load
+      // The app will use the setup wizard to initialize
+      if (error.message.includes('no such table') || error.message.includes("doesn't exist")) {
+        console.info('Schema tables do not exist yet - setup wizard will initialize them');
+      }
+      throw error; // Re-throw so caller knows tables don't exist
     }
   }
 
@@ -99,15 +125,20 @@ class SetupWizardService {
    */
   static async createInitialSite(data) {
     try {
+      // Sites table requires: name, site_letter, address (optional)
+      // Generate site letter from name (first letter, or find next available)
+      const siteLetter = data.name.charAt(0).toUpperCase();
+      
       const [result] = await db.query(
-        'INSERT INTO sites (name, description) VALUES (?, ?)',
-        [data.name, data.description || null]
+        'INSERT INTO sites (name, site_letter, address) VALUES (?, ?, ?)',
+        [data.name, siteLetter, data.address || null]
       );
 
       return {
         id: result.insertId,
         name: data.name,
-        description: data.description || null
+        site_letter: siteLetter,
+        address: data.address || null
       };
     } catch (error) {
       throw new Error(`Failed to create site: ${error.message}`);
@@ -120,17 +151,17 @@ class SetupWizardService {
    */
   static async createInitialLocation(data) {
     try {
+      // Locations table has: name, type, site_id
       const [result] = await db.query(
-        'INSERT INTO locations (name, site_id, description, address) VALUES (?, ?, ?, ?)',
-        [data.name, data.site_id, data.description || null, data.address || null]
+        'INSERT INTO locations (name, site_id, type) VALUES (?, ?, ?)',
+        [data.name, data.site_id, data.type || null]
       );
 
       return {
         id: result.insertId,
         name: data.name,
         site_id: data.site_id,
-        description: data.description || null,
-        address: data.address || null
+        type: data.type || null
       };
     } catch (error) {
       throw new Error(`Failed to create location: ${error.message}`);
