@@ -319,6 +319,9 @@ function generateNginxConfigHttp(config) {
     listen 80;
     server_name ${config.domain} www.${config.domain};
 
+    # Allow large file uploads for backups
+    client_max_body_size 50M;
+
     location / {
         proxy_pass http://${upstreamName};
         proxy_http_version 1.1;
@@ -367,6 +370,9 @@ server {
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
+
+    # Allow large file uploads for backups
+    client_max_body_size 50M;
 
     location / {
         proxy_pass http://${upstreamName};
