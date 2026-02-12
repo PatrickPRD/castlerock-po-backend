@@ -1115,8 +1115,23 @@ echo "✓ Schema dropped and recreated"`;
         }
       }
       
-      log.info(`${colors.cyan}The setup wizard will appear when you first load the app in your browser.${colors.reset}`);
-      log.info(`You can manually initialize if needed: cd ${appsDir} && npm run setup`);
+      // Create database tables but remove default admin user so wizard appears
+      log.info(`Creating database tables for unique schema: ${config.dbName}...`);
+      try {
+        // Run setup to create tables and initial data
+        runSshCommand(sshBase, `cd ${appsDir} && npm run setup`);
+        log.success(`Database tables created successfully.`);
+        
+        // Remove default admin user so browser wizard will appear on first access
+        log.info('Removing default admin user to enable setup wizard...');
+        runSshCommand(sshBase, `cd ${appsDir} && node clear-users.js`);
+        log.success('Default admin removed.');
+        
+        log.info(`${colors.cyan}The setup wizard will appear when you first load the app in your browser.${colors.reset}`);
+      } catch (err) {
+        log.warn(`Database initialization warning: ${err.message}`);
+        log.info(`You may need to manually run: cd ${appsDir} && npm run setup && node clear-users.js`);
+      }
     } else {
       log.section('Database Initialization');
       log.info(`Initializing shared database schema: ${config.dbName}...`);
