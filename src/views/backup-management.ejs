@@ -149,6 +149,26 @@
     </div>
   </div>
 
+  <!-- Danger Zone: Reset to Wizard -->
+  <div class="backup-card" style="border-color: #dc3545; background: #fff5f5; margin-top: 2rem;">
+    <h3 style="color: #dc3545;">🚨 Danger Zone: Reset to Setup Wizard</h3>
+    <p style="color: #721c24;">Completely reset the application to its initial setup wizard state. This will delete <strong>ALL DATA</strong> including all users, POs, invoices, sites, and settings.</p>
+    <div class="warning-box" style="background: #f8d7da; border-color: #dc3545; color: #721c24;">
+      <strong>⚠️ EXTREME WARNING:</strong> This action is irreversible!
+      <ul style="margin: 0.5rem 0 0 1.5rem; padding: 0;">
+        <li>All data will be permanently deleted</li>
+        <li>All users will be removed (including you)</li>
+        <li>You will be logged out immediately</li>
+        <li>The application will return to setup wizard</li>
+      </ul>
+    </div>
+    <div class="backup-actions">
+      <button class="btn-danger btn-backup" onclick="openResetModal()" style="background: #dc3545;">
+        Reset to Setup Wizard
+      </button>
+    </div>
+  </div>
+
   <div id="restoreModal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -181,6 +201,35 @@
         <button class="btn-outline" onclick="closeRestoreModal()">Cancel</button>
         <button class="btn-primary" id="restoreBtn" onclick="restoreBackup()" disabled>
           Restore Backup
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reset to Wizard Modal -->
+  <div id="resetWizardModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 style="color: #dc3545;">🚨 Reset to Setup Wizard</h2>
+        <button class="close-btn" onclick="closeResetModal()">&times;</button>
+      </div>
+
+      <div class="warning-box" style="background: #f8d7da; border-color: #dc3545; color: #721c24;">
+        <strong>⚠️ FINAL WARNING:</strong> This cannot be undone!
+        <p style="margin: 0.5rem 0 0 0;">All data will be permanently deleted. You will be logged out and the app will return to the setup wizard.</p>
+      </div>
+
+      <div class="form-group">
+        <label for="resetConfirmText">Type <strong>RESET TO WIZARD</strong> to confirm:</label>
+        <input type="text" id="resetConfirmText" placeholder="RESET TO WIZARD" autocomplete="off" 
+               style="font-family: monospace; font-weight: bold;">
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-outline" onclick="closeResetModal()">Cancel</button>
+        <button class="btn-danger" id="confirmResetBtn" onclick="confirmReset()" disabled 
+                style="background: #dc3545;">
+          Yes, Reset Everything
         </button>
       </div>
     </div>

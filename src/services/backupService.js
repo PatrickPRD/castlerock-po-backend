@@ -113,6 +113,92 @@ async function createBackup() {
 }
 
 /**
+ * Create a SQL backup file
+ * Returns SQL INSERT statements for all data except users
+ */
+async function createBackupSql() {
+  const connection = await pool.getConnection();
+
+  try {
+    let sqlOutput = [];
+
+    // Header comments
+    sqlOutput.push(`-- ========================================`);
+    sqlOutput.push(`-- Castlerock PO System Database Backup`);
+    sqlOutput.push(`-- Generated: ${new Date().toISOString()}`);
+    sqlOutput.push(`-- Database: ${process.env.DB_NAME || 'castlerock_po'}`);
+    sqlOutput.push(`-- Excludes: users table`);
+    sqlOutput.push(`-- ========================================\n`);
+
+    sqlOutput.push(`SET FOREIGN_KEY_CHECKS=0;\n`);
+
+    for (const table of BACKUP_TABLES) {
+      const [rows] = await connection.query(`SELECT * FROM \`${table}\``);
+      
+      if (rows.length === 0) {
+        sqlOutput.push(`-- Table '${table}' is empty\n`);
+        continue;
+      }
+
+      sqlOutput.push(`-- ========================================`);
+      sqlOutput.push(`-- Table: ${table}`);
+      sqlOutput.push(`-- Records: ${rows.length}`);
+      sqlOutput.push(`-- ========================================\n`);
+
+      // Get column names from first row
+      const columns = Object.keys(rows[0]);
+      const columnList = columns.map(col => `\`${col}\``).join(', ');
+
+      for (const row of rows) {
+        const values = columns.map(col => {
+          const value = row[col];
+          
+          if (value === null || value === undefined) {
+            return 'NULL';
+          }
+          
+          if (typeof value === 'number') {
+            return value;
+          }
+          
+          if (typeof value === 'boolean') {
+            return value ? 1 : 0;
+          }
+          
+          if (value instanceof Date) {
+            return `'${value.toISOString().slice(0, 19).replace('T', ' ')}'`;
+          }
+          
+          // Escape special characters in strings
+          const escaped = String(value)
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'")
+            .replace(/"/g, '\\"')
+            .replace(/\n/g, '\\n')
+            .replace(/\r/g, '\\r')
+            .replace(/\t/g, '\\t');
+          
+          return `'${escaped}'`;
+        }).join(', ');
+
+        sqlOutput.push(`INSERT INTO \`${table}\` (${columnList}) VALUES (${values});`);
+      }
+
+      sqlOutput.push(''); // Empty line between tables
+    }
+
+    sqlOutput.push(`SET FOREIGN_KEY_CHECKS=1;\n`);
+    sqlOutput.push(`-- ========================================`);
+    sqlOutput.push(`-- Backup completed successfully`);
+    sqlOutput.push(`-- ========================================`);
+
+    return sqlOutput.join('\n');
+  } finally {
+    connection.release();
+  }
+}
+
+/**
  * Validate a backup and generate a restoration report
  * Checks for schema mismatches and counts records to be restored
  */
@@ -383,6 +469,7 @@ async function restoreBackupSql(sqlText) {
 
 module.exports = {
   createBackup,
+  createBackupSql,
   validateBackup,
   restoreBackup,
   restoreBackupSql

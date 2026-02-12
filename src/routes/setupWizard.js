@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const SetupWizardService = require('../services/setupWizardService');
 const { invalidateSetupCache } = require('../middleware/setupCheck');
+const { authenticate } = require('../middleware/auth');
+const authorizeRoles = require('../middleware/authorizeRoles');
 
 /**
  * GET /setup-wizard - Get setup status
@@ -90,5 +92,45 @@ router.post('/complete', async (req, res) => {
     });
   }
 });
+
+/**
+ * POST /setup-wizard/reset - Reset application to setup wizard state
+ * Deletes ALL data including users and returns to setup wizard (super admin only)
+ */
+router.post(
+  '/reset',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      const { confirmText } = req.body;
+
+      // Require exact confirmation text
+      if (confirmText !== 'RESET TO WIZARD') {
+        return res.status(400).json({
+          error: 'Invalid confirmation. Type "RESET TO WIZARD" to confirm.'
+        });
+      }
+
+      console.log('🔄 Resetting application to setup wizard state...');
+      
+      await SetupWizardService.resetToWizard();
+
+      // Invalidate setup cache so middleware redirects to wizard
+      invalidateSetupCache();
+
+      res.json({
+        success: true,
+        message: 'Application reset to setup wizard. All data deleted. You will be redirected to the setup wizard.'
+      });
+    } catch (error) {
+      console.error('Reset error:', error);
+      res.status(500).json({
+        error: 'Reset failed',
+        details: error.message
+      });
+    }
+  }
+);
 
 module.exports = router;

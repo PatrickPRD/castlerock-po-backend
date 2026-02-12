@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   createBackup,
+  createBackupSql,
   validateBackup,
   restoreBackup,
   restoreBackupSql
@@ -18,9 +19,9 @@ router.post(
   authorizeRoles('super_admin'),
   async (req, res) => {
     try {
-      console.log('📦 Creating database backup...');
-      const backup = await createBackup();
-      res.json({ success: true, data: backup });
+      console.log('📦 Creating SQL database backup...');
+      const sqlBackup = await createBackupSql();
+      res.json({ success: true, sql: sqlBackup });
     } catch (err) {
       console.error('❌ Backup error:', err);
       res

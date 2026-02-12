@@ -44,18 +44,19 @@ async function createBackup() {
 
     const response = await api('/backups/create', 'POST');
 
-    if (!response.data) {
+    if (!response.sql) {
       throw new Error('No backup data returned');
     }
 
-    // Create a blob and download
-    const blob = new Blob([JSON.stringify(response.data, null, 2)], {
-      type: 'application/json'
+    // Create a blob and download as SQL file
+    const blob = new Blob([response.sql], {
+      type: 'application/sql'
     });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `backup-${new Date().toISOString().slice(0, 10)}.json`;
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    link.download = `backup-${timestamp}.sql`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -377,6 +378,54 @@ async function executeRestore(force = false) {
 }
 
 /* ============================
+   RESET TO WIZARD
+   ============================ */
+function openResetModal() {
+  document.getElementById('resetWizardModal').classList.add('active');
+  document.getElementById('resetConfirmText').value = '';
+  document.getElementById('confirmResetBtn').disabled = true;
+}
+
+function closeResetModal() {
+  document.getElementById('resetWizardModal').classList.remove('active');
+  document.getElementById('resetConfirmText').value = '';
+  document.getElementById('confirmResetBtn').disabled = true;
+}
+
+async function confirmReset() {
+  const confirmText = document.getElementById('resetConfirmText').value;
+
+  if (confirmText !== 'RESET TO WIZARD') {
+    showToast('❌ Invalid confirmation text. Type exactly: RESET TO WIZARD', 'error');
+    return;
+  }
+
+  try {
+    showToast('🔄 Resetting application to setup wizard...', 'info');
+
+    const response = await api('/setup-wizard/reset', 'POST', {
+      confirmText: confirmText
+    });
+
+    if (!response.success) {
+      throw new Error(response.error || 'Reset failed');
+    }
+
+    showToast('✅ Reset successful. Redirecting to setup wizard...', 'success');
+    
+    // Clear auth and redirect after 2 seconds
+    setTimeout(() => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('role');
+      window.location.href = '/setup-wizard.html';
+    }, 2000);
+  } catch (err) {
+    console.error('Reset error:', err);
+    showToast('❌ Failed to reset: ' + err.message, 'error');
+  }
+}
+
+/* ============================
    NAVIGATION
    ============================ */
 function back() {
@@ -386,9 +435,14 @@ function back() {
 // Close modal when clicking outside
 document.addEventListener('click', function (event) {
   const restoreModal = document.getElementById('restoreModal');
+  const resetModal = document.getElementById('resetWizardModal');
   
   if (event.target === restoreModal) {
     closeRestoreModal();
+  }
+  
+  if (event.target === resetModal) {
+    closeResetModal();
   }
 });
 
@@ -396,4 +450,13 @@ document.addEventListener('click', function (event) {
 const backupFileInput = document.getElementById('backupFile');
 if (backupFileInput) {
   backupFileInput.addEventListener('change', validateBackupFile);
+}
+
+// Add reset confirmation text validation
+const resetConfirmInput = document.getElementById('resetConfirmText');
+const confirmResetBtn = document.getElementById('confirmResetBtn');
+if (resetConfirmInput && confirmResetBtn) {
+  resetConfirmInput.addEventListener('input', function(e) {
+    confirmResetBtn.disabled = e.target.value !== 'RESET TO WIZARD';
+  });
 }

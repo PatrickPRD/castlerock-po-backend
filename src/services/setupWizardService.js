@@ -419,6 +419,50 @@ class SetupWizardService {
       throw new Error(`Setup failed: ${error.message}`);
     }
   }
+
+  /**
+   * Reset application to setup wizard state
+   * Deletes ALL data including users and resets to initial state
+   */
+  static async resetToWizard() {
+    try {
+      console.log('🗑️ Deleting all data including users...');
+
+      // Get all tables
+      const [tables] = await db.query(
+        `SELECT table_name AS tableName
+         FROM information_schema.tables
+         WHERE table_schema = DATABASE()
+           AND table_type = 'BASE TABLE'
+           AND table_name NOT IN ('schema_migrations')`
+      );
+
+      // Disable foreign key checks
+      await db.query('SET FOREIGN_KEY_CHECKS=0');
+
+      // Delete all data from all tables
+      for (const { tableName } of tables) {
+        try {
+          await db.query(`DELETE FROM \`${tableName}\` WHERE 1=1`);
+          console.log(`✅ Cleared table: ${tableName}`);
+        } catch (err) {
+          console.warn(`⚠️ Could not clear table ${tableName}:`, err.message);
+        }
+      }
+
+      // Re-enable foreign key checks
+      await db.query('SET FOREIGN_KEY_CHECKS=1');
+
+      console.log('✅ Application reset to wizard state. All data deleted.');
+
+      return {
+        success: true,
+        message: 'All data deleted. Application reset to setup wizard.'
+      };
+    } catch (error) {
+      throw new Error(`Reset failed: ${error.message}`);
+    }
+  }
 }
 
 module.exports = SetupWizardService;
