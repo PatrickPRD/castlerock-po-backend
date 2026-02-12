@@ -189,6 +189,38 @@ async function setupDatabase() {
     `);
     console.log('✅ Workers table created');
 
+    // Create PO stages before timesheet_entries references it
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS po_stages (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_name (name)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ PO stages table created');
+
+    // Create locations before timesheet_entries references it
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS locations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        type VARCHAR(100) DEFAULT NULL,
+        site_id INT NOT NULL,
+        active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE RESTRICT,
+        INDEX idx_name (name),
+        INDEX idx_type (type),
+        INDEX idx_site_id (site_id),
+        INDEX idx_active (active)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ Locations table created');
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS timesheets (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -225,36 +257,6 @@ async function setupDatabase() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log('✅ Timesheet entries table created');
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS po_stages (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        active TINYINT(1) NOT NULL DEFAULT 1,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_name (name)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    `);
-    console.log('✅ PO stages table created');
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS locations (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        type VARCHAR(100) DEFAULT NULL,
-        site_id INT NOT NULL,
-        active TINYINT(1) NOT NULL DEFAULT 1,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE RESTRICT,
-        INDEX idx_name (name),
-        INDEX idx_type (type),
-        INDEX idx_site_id (site_id),
-        INDEX idx_active (active)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    `);
-    console.log('✅ Locations table created');
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS location_spread_rules (
