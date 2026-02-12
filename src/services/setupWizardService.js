@@ -8,6 +8,8 @@
 
 const db = require('../db');
 const bcrypt = require('bcrypt');
+const fs = require('fs');
+const path = require('path');
 
 class SetupWizardService {
   /**
@@ -297,6 +299,68 @@ class SetupWizardService {
   }
 
   /**
+   * Save logo file from base64 data URL
+   * @param {Object} logoData - Logo data with dataUrl and fileName
+   * @returns {Promise<string>} - Public path to saved logo
+   */
+  static async saveLogo(logoData) {
+    try {
+      const { dataUrl, fileName } = logoData;
+
+      if (!dataUrl || typeof dataUrl !== 'string') {
+        throw new Error('Invalid logo data');
+      }
+
+      // Parse the data URL
+      const match = dataUrl.match(/^data:(image\/(?:png|jpeg|jpg|webp|svg\+xml));base64,([A-Za-z0-9+/=]+)$/);
+      if (!match) {
+        throw new Error('Invalid image format. Allowed: PNG, JPG, JPEG, WEBP, SVG');
+      }
+
+      const mimeType = match[1];
+      const base64Data = match[2];
+      const imageBuffer = Buffer.from(base64Data, 'base64');
+
+      // Validate size (2MB max)
+      const maxBytes = 2 * 1024 * 1024;
+      if (imageBuffer.length > maxBytes) {
+        throw new Error('Image is too large. Maximum size is 2 MB');
+      }
+
+      // Determine file extension
+      const extByMime = {
+        'image/png': 'png',
+        'image/jpeg': 'jpg',
+        'image/jpg': 'jpg',
+        'image/webp': 'webp',
+        'image/svg+xml': 'svg'
+      };
+      const ext = extByMime[mimeType] || 'png';
+
+      // Create safe filename
+      const safeBaseName = String(fileName || 'company-logo')
+        .replace(/\.[^.]+$/, '')
+        .replace(/[^a-zA-Z0-9_-]/g, '')
+        .slice(0, 40) || 'company-logo';
+
+      const finalFileName = `${safeBaseName}-${Date.now()}.${ext}`;
+      const brandingDir = path.join(__dirname, '../../public/assets/branding');
+      const outputPath = path.join(brandingDir, finalFileName);
+
+      // Ensure directory exists
+      fs.mkdirSync(brandingDir, { recursive: true });
+
+      // Write file
+      fs.writeFileSync(outputPath, imageBuffer);
+
+      // Return public path
+      return `/assets/branding/${finalFileName}`;
+    } catch (error) {
+      throw new Error(`Failed to save logo: ${error.message}`);
+    }
+  }
+
+  /**
    * Complete full setup with all initial data
    * @param {Object} setupData - Complete setup data
    */
@@ -305,22 +369,35 @@ class SetupWizardService {
       // 1. Initialize settings
       await this.initializeSettings(setupData.settings || {});
 
-      // 2. Create super admin user
+      // 2. Upload and save logo if provided
+      if (setupData.logo?.dataUrl) {
+        const logoPath = await this.saveLogo(setupData.logo);
+        await db.query(
+          'INSERT INTO site_settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = ?',
+          ['logo_path', logoPath, logoPath]
+        );
+        await db.query(
+          'INSERT INTO site_settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = ?',
+          ['header_logo_mode', 'image', 'image']
+        );
+      }
+
+      // 3. Create super admin user
       const adminUser = await this.createInitialSuperAdmin(setupData.admin);
 
-      // 3. Create initial site
+      // 4. Create initial site
       const site = await this.createInitialSite(setupData.site);
 
-      // 4. Create initial location
+      // 5. Create initial location
       const location = await this.createInitialLocation({
         ...setupData.location,
         site_id: site.id
       });
 
-      // 5. Create initial stage
+      // 6. Create initial stage
       const stage = await this.createInitialStage(setupData.stage);
 
-      // 6. Create initial worker
+      // 7. Create initial worker
       const worker = await this.createInitialWorker({
         ...setupData.worker,
         site_id: site.id,

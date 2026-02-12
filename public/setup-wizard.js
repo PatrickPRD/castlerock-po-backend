@@ -12,6 +12,7 @@ const loadingSpinner = document.getElementById('loadingSpinner');
 
 let currentStep = 1;
 const totalSteps = 5;
+let selectedLogoDataUrl = null;
 
 /**
  * Initialize the wizard
@@ -20,6 +21,7 @@ function initWizard() {
   showStep(1);
   setupEventListeners();
   setupColorPickers();
+  setupLogoUpload();
 }
 
 /**
@@ -70,6 +72,76 @@ function setupColorPickers() {
       }
     });
   }
+}
+
+/**
+ * Setup logo upload handling
+ */
+function setupLogoUpload() {
+  const logoFileInput = document.getElementById('logoFile');
+  const logoPreview = document.getElementById('logoPreview');
+  const logoPreviewImage = document.getElementById('logoPreviewImage');
+
+  if (!logoFileInput) return;
+
+  logoFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    
+    if (!file) {
+      selectedLogoDataUrl = null;
+      if (logoPreview) logoPreview.style.display = 'none';
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'];
+    if (!allowedTypes.includes(file.type)) {
+      logoFileInput.value = '';
+      selectedLogoDataUrl = null;
+      if (logoPreview) logoPreview.style.display = 'none';
+      showError('Invalid file type. Please use PNG, JPG, WEBP, or SVG');
+      return;
+    }
+
+    // Validate file size (2MB max)
+    if (file.size > 2 * 1024 * 1024) {
+      logoFileInput.value = '';
+      selectedLogoDataUrl = null;
+      if (logoPreview) logoPreview.style.display = 'none';
+      showError('Image too large. Maximum size is 2 MB');
+      return;
+    }
+
+    try {
+      // Convert to base64
+      const dataUrl = await readFileAsDataUrl(file);
+      selectedLogoDataUrl = dataUrl;
+
+      // Show preview
+      if (logoPreview && logoPreviewImage) {
+        logoPreviewImage.src = dataUrl;
+        logoPreview.style.display = 'block';
+      }
+
+      hideError();
+    } catch (err) {
+      selectedLogoDataUrl = null;
+      if (logoPreview) logoPreview.style.display = 'none';
+      showError('Failed to read image file');
+    }
+  });
+}
+
+/**
+ * Read file as data URL
+ */
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
 }
 
 /**
@@ -223,6 +295,15 @@ async function completeSetup() {
         accent_color: document.getElementById('accentColor').value
       }
     };
+
+    // Include logo if one was selected
+    if (selectedLogoDataUrl) {
+      const logoFileInput = document.getElementById('logoFile');
+      setupData.logo = {
+        dataUrl: selectedLogoDataUrl,
+        fileName: logoFileInput.files[0]?.name || 'company-logo'
+      };
+    }
 
     const response = await fetch('/setup-wizard/complete', {
       method: 'POST',

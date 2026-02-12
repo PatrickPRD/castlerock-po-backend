@@ -462,6 +462,15 @@
             </div>
           </div>
 
+          <div class="form-group">
+            <label for="logoFile">Upload Company Logo (Optional)</label>
+            <input type="file" id="logoFile" name="logoFile" accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml">
+            <small class="text-muted">Accepted formats: PNG, JPG, WEBP, SVG. Max size 2 MB. You can skip this and add it later from Application Settings.</small>
+            <div id="logoPreview" style="display: none; margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 6px; text-align: center;">
+              <img id="logoPreviewImage" src="" alt="Logo preview" style="max-width: 200px; max-height: 80px;">
+            </div>
+          </div>
+
           <div class="step-counter">Step <strong>5</strong> of 5 (Final Step)</div>
         </div>
       </form>

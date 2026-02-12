@@ -26,7 +26,7 @@ router.get('/status', async (req, res) => {
  */
 router.post('/complete', async (req, res) => {
   try {
-    const { admin, site, location, stage, worker, settings } = req.body;
+    const { admin, site, location, stage, worker, settings, logo } = req.body;
 
     // Validation
     if (!admin?.email || !admin?.password || !admin?.first_name || !admin?.last_name) {
@@ -74,7 +74,8 @@ router.post('/complete', async (req, res) => {
       location,
       stage,
       worker,
-      settings
+      settings,
+      logo
     });
 
     // Invalidate setup cache so middleware knows system is initialized
