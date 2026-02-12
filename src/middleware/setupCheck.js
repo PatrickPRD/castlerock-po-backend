@@ -12,9 +12,18 @@ async function checkSetupRequired(req, res, next) {
   try {
     // Don't check on every request - cache the result
     if (!setupChecked) {
-      isInitialized = await SetupWizardService.isSystemInitialized();
+      try {
+        isInitialized = await SetupWizardService.isSystemInitialized();
+        console.log('Setup check: isInitialized=', isInitialized);
+      } catch (dbError) {
+        // If DB check fails, treat as NOT initialized so wizard shows
+        console.warn('Database check failed, showing setup wizard:', dbError.message);
+        isInitialized = false;
+      }
       setupChecked = true;
     }
+
+    console.log(`[${req.method} ${req.path}] isInitialized=${isInitialized}, setupChecked=${setupChecked}`);
 
     // If not initialized and trying to access a protected page, redirect to setup
     if (!isInitialized) {
@@ -26,21 +35,22 @@ async function checkSetupRequired(req, res, next) {
         '/login',
         '/login.html',
         '/reset-password.html',
-        '/auth',
-        '/'
+        '/auth'
       ];
 
       const isAllowedRoute = allowedRoutes.some(route => req.path.startsWith(route));
 
       if (!isAllowedRoute) {
+        console.log(`Redirecting ${req.path} to setup wizard (not in allowed routes)`);
         return res.redirect('/setup-wizard.html');
       }
     }
 
     next();
   } catch (error) {
-    console.error('Setup check error:', error);
-    next();
+    console.error('Setup check middleware error:', error);
+    // On unexpected error, show wizard to be safe
+    return res.redirect('/setup-wizard.html');
   }
 }
 
