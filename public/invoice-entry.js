@@ -295,5 +295,6 @@ if (purchaseOrdersTextEl) {
       await window.loadCurrencySettings();
     } catch (_) {}
   }
+  await loadVatRates();
   await loadPO();
 })();
