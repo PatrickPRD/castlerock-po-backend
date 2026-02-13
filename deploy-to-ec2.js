@@ -22,6 +22,16 @@ const util = require('util');
 
 const execPromise = util.promisify(exec);
 
+// Helper function to execute commands with timeout
+async function execWithTimeout(command, timeoutMs = 30000) {
+  return Promise.race([
+    execPromise(command, { maxBuffer: 1024 * 1024 * 10 }),
+    new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Command timed out')), timeoutMs)
+    )
+  ]);
+}
+
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
@@ -41,6 +51,7 @@ async function main() {
   let serviceName = '';
   let appPath = '';
   let branch = '';
+  let allServices = []; // Store all available services for later use
 
   try {
     // Step 1: Get SSH connection info first
@@ -48,16 +59,25 @@ async function main() {
     
     // Step 2: Discover all available apps on EC2
     console.log('\n📂 Scanning for deployed apps on EC2...');
-    console.log('   Looking for apps in multiple locations and services...\n');
     
     const appMap = new Map(); // Map to store app info: name -> { path, service }
     
-    // 2a. Find apps from directory listings
-    const dirListCommand = `${sshCommand} "find /apps /home/*/apps /opt/apps -maxdepth 1 -mindepth 1 -type d 2>/dev/null | sort -u || echo ''"`;
+    // 2a. Find apps from directory listings (simplified and faster)
+    console.log('   • Checking /apps directory...');
+    const dirListCommand = `${sshCommand} "find /apps /home/ec2-user/apps /home/*/apps -maxdepth 1 -type d 2>/dev/null | grep -v '^/apps$\\|^/home/ec2-user/apps$\\|^/home/.*/apps$' | head -n 50 || echo ''"`;
     
     try {
-      const { stdout: dirOutput } = await execPromise(dirListCommand);
-      const dirs = dirOutput.trim().split('\n').filter(d => d.trim() !== '');
+      const { stdout: dirOutput } = await execWithTimeout(dirListCommand, 10000);
+      const dirs = dirOutput.trim().split('\n').filter(d => {
+        const trimmed = d.trim();
+        // Filter out empty, parent dirs, and files that look like configs
+        return trimmed !== '' && 
+               trimmed !== '*' && 
+               !trimmed.endsWith('.conf') && 
+               !trimmed.endsWith('.service') &&
+               !trimmed.endsWith('.log') &&
+               !trimmed.endsWith('.txt');
+      });
       
       dirs.forEach(fullPath => {
         const appName = fullPath.split('/').pop();
@@ -65,24 +85,33 @@ async function main() {
           appMap.set(appName, { path: fullPath, service: null });
         }
       });
+      
+      if (dirs.length > 0) {
+        console.log(`   ✓ Found ${dirs.length} app director${dirs.length === 1 ? 'y' : 'ies'}`);
+      }
     } catch (error) {
-      console.log('   ℹ️  Could not scan directories');
+      console.log('   ℹ️  Could not scan directories (this is okay)');
     }
     
-    // 2b. Find apps from systemd services
-    const serviceListCommand = `${sshCommand} "systemctl list-units --type=service --all --no-pager --plain --no-legend | awk '{print \\$1}' | grep -v '@' || echo ''"`;
+    // 2b. Find apps from systemd services (faster approach)
+    console.log('   • Checking systemd services...');
+    const serviceListCommand = `${sshCommand} "systemctl list-units --type=service --all --no-pager --plain --no-legend | awk '{print \\$1}' | grep -E '\\.service$' || echo ''"`;
     
     try {
-      const { stdout: serviceOutput } = await execPromise(serviceListCommand);
-      const services = serviceOutput.trim().split('\n').filter(s => s.trim() !== '' && s.endsWith('.service'));
+      const { stdout: serviceOutput } = await execWithTimeout(serviceListCommand, 10000);
+      allServices = serviceOutput.trim().split('\n').filter(s => s.trim() !== '' && s.endsWith('.service')).map(s => s.replace('.service', ''));
       
-      // Try to extract working directory from each service
-      for (const service of services) {
-        const serviceName = service.replace('.service', '');
+      console.log(`   ✓ Found ${allServices.length} total service${allServices.length === 1 ? '' : 's'}`);
+      
+      // Strategy 1: Match by WorkingDirectory (most accurate but requires property to be set)
+      const servicesToCheck = allServices.slice(0, 20);
+      
+      for (const serviceName of servicesToCheck) {
+        const service = serviceName + '.service';
         const workingDirCommand = `${sshCommand} "systemctl show ${service} -p WorkingDirectory --value 2>/dev/null || echo ''"`;
         
         try {
-          const { stdout: workingDir } = await execPromise(workingDirCommand);
+          const { stdout: workingDir } = await execWithTimeout(workingDirCommand, 3000);
           const path = workingDir.trim();
           
           if (path && path !== '' && path !== '/' && !path.startsWith('[')) {
@@ -101,11 +130,28 @@ async function main() {
             }
           }
         } catch (err) {
-          // Skip if we can't get working directory
+          // Skip if we can't get working directory quickly
         }
       }
+      
+      // Strategy 2: Name-based matching (if WorkingDirectory matching didn't find services)
+      for (const [appName, info] of appMap.entries()) {
+        if (!info.service) {
+          // Try to find a service that matches the app name
+          const matchingService = allServices.find(svc => {
+            const svcName = svc.toLowerCase();
+            const appLower = appName.toLowerCase();
+            return svcName.includes(appLower) || appLower.includes(svcName);
+          });
+          
+          if (matchingService) {
+            info.service = matchingService;
+          }
+        }
+      }
+      
     } catch (error) {
-      console.log('   ℹ️  Could not scan systemd services');
+      console.log('   ℹ️  Could not scan systemd services (this is okay)');
     }
     
     // Convert map to array
@@ -158,17 +204,9 @@ async function main() {
       console.log('\n⚠️  No systemd service auto-detected for this app');
       console.log('   Searching for possible services...\n');
       
-      // Try to find services that might match
-      const findServicesCommand = `${sshCommand} "systemctl list-units --type=service --all --no-pager --plain --no-legend | awk '{print \\$1}' | grep -v '@' | sort"`;
-      
-      try {
-        const { stdout: allServices } = await execPromise(findServicesCommand);
-        const serviceList = allServices.trim().split('\n')
-          .filter(s => s.endsWith('.service'))
-          .map(s => s.replace('.service', ''));
-        
+      if (allServices && allServices.length > 0) {
         // Filter to services that might be related
-        const likelyServices = serviceList.filter(s => 
+        const likelyServices = allServices.filter(s => 
           s.toLowerCase().includes(appVersion.toLowerCase()) ||
           appVersion.toLowerCase().includes(s.toLowerCase()) ||
           s.toLowerCase().includes('costtracker') ||
@@ -188,7 +226,7 @@ async function main() {
           console.log('');
         } else {
           // Show all user services if no matches
-          const userServices = serviceList.filter(s => 
+          const userServices = allServices.filter(s => 
             !s.startsWith('systemd-') && 
             !s.startsWith('dbus-') &&
             !s.startsWith('getty@') &&
@@ -206,8 +244,6 @@ async function main() {
         
         console.log('   💡 Tip: Check running services with: systemctl list-units --type=service --state=running');
         console.log('');
-      } catch (err) {
-        // Ignore if we can't list services
       }
       
       serviceName = await question('Enter the service name (or press Enter to skip service restart): ');
@@ -252,7 +288,7 @@ async function main() {
     console.log('📥 Step 1/5: Pulling latest code from git...');
     const pullCommand = `${sshCommand} "cd ${appPath} && git pull origin ${branch}"`;
     try {
-      const { stdout: pullOutput } = await execPromise(pullCommand);
+      const { stdout: pullOutput } = await execWithTimeout(pullCommand, 30000);
       console.log(pullOutput);
     } catch (error) {
       console.error('❌ Git pull failed:', error.message);
@@ -263,7 +299,7 @@ async function main() {
     console.log('📦 Step 2/5: Installing dependencies...');
     const installCommand = `${sshCommand} "cd ${appPath} && npm install --production"`;
     try {
-      const { stdout: installOutput } = await execPromise(installCommand);
+      const { stdout: installOutput } = await execWithTimeout(installCommand, 120000);
       console.log('✅ Dependencies installed');
     } catch (error) {
       console.error('❌ npm install failed:', error.message);
@@ -274,7 +310,7 @@ async function main() {
     console.log('🗄️  Step 3/5: Running database migrations...');
     const migrateCommand = `${sshCommand} "cd ${appPath} && npm run migrate 2>&1 || echo 'No migrations or migrate script not found'"`;
     try {
-      const { stdout: migrateOutput } = await execPromise(migrateCommand);
+      const { stdout: migrateOutput } = await execWithTimeout(migrateCommand, 60000);
       console.log(migrateOutput);
     } catch (error) {
       console.log('ℹ️  No migrations run (this is normal if no migrate script exists)');
@@ -285,7 +321,7 @@ async function main() {
       console.log('🔄 Step 4/5: Restarting application service...');
       const restartCommand = `${sshCommand} "sudo systemctl restart ${serviceName}"`;
       try {
-        await execPromise(restartCommand);
+        await execWithTimeout(restartCommand, 15000);
         console.log('✅ Service restarted');
       } catch (error) {
         console.error('❌ Service restart failed:', error.message);
@@ -296,7 +332,7 @@ async function main() {
       console.log('🔍 Step 5/5: Checking service status...');
       const statusCommand = `${sshCommand} "sudo systemctl status ${serviceName} --no-pager -l"`;
       try {
-        const { stdout: statusOutput } = await execPromise(statusCommand);
+        const { stdout: statusOutput } = await execWithTimeout(statusCommand, 10000);
         console.log(statusOutput);
       } catch (error) {
         // Status command may return non-zero even if running, so we'll show the output anyway
