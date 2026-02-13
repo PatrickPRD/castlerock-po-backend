@@ -57,6 +57,27 @@ Then follow the on-screen instructions to install services and start the applica
 
 See [AWS_EC2_RDS_DEPLOYMENT.md](AWS_EC2_RDS_DEPLOYMENT.md) for manual setup or more details.
 
+### Deploying Updates to EC2
+
+After your application is running on EC2, deploy the latest code changes:
+
+```bash
+# Run from your local machine
+npm run deploy
+
+# Or directly
+node deploy-to-ec2.js
+```
+
+The deployment script will:
+- Connect to your EC2 instance
+- Show you a list of deployed apps to choose from
+- Pull latest code from the git branch you specify
+- Install/update dependencies
+- Run database migrations
+- Restart the selected app's service
+- Display service status and logs
+
 ## 🛠 Available Scripts
 
 ```bash
@@ -64,6 +85,7 @@ npm run dev              # Start development server
 npm run start            # Start production server
 npm run setup            # Initialize database schema
 npm run setup-multi-app  # Interactive multi-app configuration wizard
+npm run deploy           # Deploy latest code to EC2 (interactive)
 npm run migrate          # Run database migrations
 npm run test-db          # Test database connection
 npm run reset-db         # Reset database (⚠️ destructive)

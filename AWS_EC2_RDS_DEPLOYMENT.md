@@ -4,7 +4,60 @@ This guide covers deploying the Castlerock PO Backend application on an existing
 
 **Quick Start:** Use `node setup-multi-app.js` for automated configuration (recommended)
 
+**Deploy Updates:** Use `node deploy-to-ec2.js` to deploy latest code changes to EC2
+
 **Manual Setup:** Follow the steps below if you prefer manual configuration
+
+## Quick Deployment of Updates
+
+If your application is already running on EC2 and you want to deploy the latest code changes:
+
+```bash
+# From your local machine in the git repository root
+npm run deploy
+
+# Or run the script directly
+node deploy-to-ec2.js
+```
+
+This automated script will:
+- ✅ Connect to EC2 and list available apps
+- ✅ Let you select which app to update
+- ✅ Pull latest code from git repository
+- ✅ Install/update npm dependencies
+- ✅ Run database migrations (if any)
+- ✅ Restart the application service
+- ✅ Verify the service is running
+
+You'll be prompted for:
+1. SSH command (e.g., `ssh -i your-key.pem ec2-user@your-ec2-ip`)
+2. Select from list of deployed apps (automatically detected)
+3. Git branch to pull (default: `main`)
+
+**Manual deployment** (if you prefer to run commands yourself):
+
+```bash
+# SSH into your EC2 instance
+ssh -i your-key.pem ec2-user@your-ec2-ip
+
+# Navigate to your app directory
+cd /apps/castlerock-po-v1
+
+# Pull latest code
+git pull origin main
+
+# Install dependencies
+npm install --production
+
+# Restart the service
+sudo systemctl restart castlerock-po-v1
+
+# Check status
+sudo systemctl status castlerock-po-v1
+
+# View recent logs
+sudo journalctl -u castlerock-po-v1 -n 50
+```
 
 ## Prerequisites
 

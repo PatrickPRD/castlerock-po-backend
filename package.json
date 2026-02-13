@@ -9,6 +9,7 @@
     "setup": "node database/setup.js",
     "preflight-check": "node preflight-check.js",
     "setup-multi-app": "node setup-multi-app.js",
+    "deploy": "node deploy-to-ec2.js",
     "migrate": "node database/migrate.js",
     "test-db": "node database/test-connection.js",
     "reset-db": "node database/reset-db.js",
