@@ -106,11 +106,6 @@ async function loadUsers() {
                 </a>
               </li>
               <li>
-                <a class="dropdown-item" href="#" onclick="sendInvite('${u.email}'); return false;">
-                  Reset Password
-                </a>
-              </li>
-              <li>
                 <a class="dropdown-item" href="#" onclick="editUser(${u.id}); return false;">
                   Edit
                 </a>
@@ -144,39 +139,35 @@ async function addUser() {
   const firstName = document.getElementById("firstName").value.trim();
   const lastName = document.getElementById("lastName").value.trim();
   const email = document.getElementById("userEmail").value.trim();
+  const password = document.getElementById("userPassword").value;
   const userRole = document.getElementById("userRole").value;
 
-  if (!email || !firstName || !lastName) {
+  if (!email || !firstName || !lastName || !password) {
     showToast("Please fill in all required fields", "error");
     return;
   }
 
   try {
-    // 1️⃣ Create user
+    // Create user with password
     await api("/admin/users", "POST", {
       email,
       role: userRole,
       first_name: firstName,
       last_name: lastName,
+      password: password,
     });
 
-    // 2️⃣ Send invite email
-    await fetch("/auth/request-reset", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
-
-    // 3️⃣ Clear inputs
+    // Clear inputs
     document.getElementById("firstName").value = "";
     document.getElementById("lastName").value = "";
     document.getElementById("userEmail").value = "";
+    document.getElementById("userPassword").value = "";
 
-    // 4️⃣ Refresh table
+    // Refresh table
     await loadUsers();
 
-    // 5️⃣ User feedback
-    showToast(`Invite sent to ${email}`, "success");
+    // User feedback
+    showToast(`User ${email} created successfully`, "success");
   } catch (err) {
     showToast(err.message || "Failed to create user", "error");
   }

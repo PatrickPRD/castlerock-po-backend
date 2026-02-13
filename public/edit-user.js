@@ -47,6 +47,11 @@ const payload = {
   active:     Number(el('active').value)
 };
 
+// Include password only if provided
+const password = el('password').value.trim();
+if (password) {
+  payload.password = password;
+}
 
   const res = await fetch(`/admin/users/${userId}`, {
     method: 'PUT',

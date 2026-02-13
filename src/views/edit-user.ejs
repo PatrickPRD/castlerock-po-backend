@@ -15,6 +15,27 @@
         <input id="email" placeholder="Email" type="email" required disabled>
       </div>
 
+      <div class="form-row">
+        <select id="role" required>
+          <option value="">Select role...</option>
+          <option value="super_admin">Super Admin</option>
+          <option value="admin">Admin</option>
+          <option value="staff">Staff</option>
+          <option value="viewer">Viewer</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <select id="active" required>
+          <option value="1">Active</option>
+          <option value="0">Disabled</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <input id="password" placeholder="New password (leave blank to keep current)" type="password">
+      </div>
+
       <div class="form-actions">
         <button class="btn btn-outline-secondary" type="button" onclick="cancel()">Cancel</button>
         <button class="btn btn-primary" type="submit">Save Changes</button>

@@ -30,18 +30,6 @@ async function login() {
 /* ============================
    Forgot Password
    ============================ */
-async function forgotPassword() {
-  const email = prompt('Enter your email address');
-  if (!email) return;
-
-  await fetch('/auth/request-reset', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email })
-  });
-
-  showToast(
-    'If the email exists, a password reset link has been sent.',
-    'success'
-  );
+function forgotPassword() {
+  window.location.href = 'mailto:webadmin@castlerockhomes.ie?subject=Password%20Reset%20Request&body=Hello,%0D%0A%0D%0APlease%20reset%20my%20password%20for%20the%20Purchase%20Order%20System.%0D%0A%0D%0AThank%20you.';
 }

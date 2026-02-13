@@ -5,6 +5,7 @@ const { authenticate } = require('../middleware/auth');
 const authorizeRoles = require('../middleware/authorizeRoles');
 const db = require('../db');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 const ExcelJS = require('exceljs');
 const multer = require('multer');
 const { sendPasswordSetupEmail } =
@@ -98,13 +99,47 @@ router.get(
   }
 );
 
+router.get(
+  '/users/:id',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      const userId = Number(req.params.id);
+      const [[user]] = await db.query(`
+        SELECT
+          id,
+          email,
+          first_name,
+          last_name,
+          role,
+          active
+        FROM users
+        WHERE id = ?
+      `, [userId]);
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      res.json(user);
+
+    } catch (err) {
+      console.error('LOAD USER ERROR:', err);
+      res.status(500).json({
+        error: 'Failed to load user'
+      });
+    }
+  }
+);
+
 
 router.post(
   '/users',
   authenticate,
   authorizeRoles('super_admin'),
   async (req, res) => {
-    const { email, role, first_name, last_name } = req.body;
+    const { email, role, first_name, last_name, password } = req.body;
 
     try {
       // Enforce single Super Admin
@@ -119,33 +154,31 @@ router.post(
         }
       }
 
-      // 🔐 Generate password setup token
-      const resetToken = crypto.randomBytes(32).toString('hex');
-      const resetExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      // Validate password is provided
+      if (!password) {
+        return res.status(400).json({
+          error: 'Password is required'
+        });
+      }
 
-      // ✅ Create user
+      // Hash the password
+      const passwordHash = await bcrypt.hash(password, 12);
+
+      // Create user
       const [result] = await db.query(
         `INSERT INTO users
-         (email, role, first_name, last_name, reset_token, reset_token_expires, active)
-         VALUES (?, ?, ?, ?, ?, ?, 1)`,
+         (email, role, first_name, last_name, password_hash, active)
+         VALUES (?, ?, ?, ?, ?, 1)`,
         [
           email,
           role,
           first_name,
           last_name,
-          resetToken,
-          resetExpires
+          passwordHash
         ]
       );
 
-      // 📧 Try to send email (non-fatal)
-      try {
-        await sendPasswordSetupEmail(email, resetToken);
-      } catch (emailErr) {
-        console.error('EMAIL FAILED (non-fatal):', emailErr.message);
-      }
-
-      // ✅ Respond ONCE
+      // Respond
       return res.json({
         success: true,
         userId: result.insertId
@@ -174,7 +207,7 @@ router.put(
   authorizeRoles('super_admin'),
   async (req, res) => {
 
-    const { email, role, first_name, last_name, active } = req.body;
+    const { email, role, first_name, last_name, active, password } = req.body;
     const userId = Number(req.params.id);
     const actingUserId = req.user.id;
 
@@ -272,15 +305,23 @@ if (target.role === 'super_admin' && role && role !== 'super_admin') {
     /* ======================================================
        UPDATE USER
        ====================================================== */
+    
+    // Hash password if provided
+    let passwordHash = null;
+    if (password) {
+      passwordHash = await bcrypt.hash(password, 12);
+    }
+
     await db.query(
       `
       UPDATE users
 SET
-  email      = COALESCE(?, email),
-  role       = COALESCE(?, role),
-  first_name = COALESCE(?, first_name),
-  last_name  = COALESCE(?, last_name),
-  active     = COALESCE(?, active)
+  email         = COALESCE(?, email),
+  role          = COALESCE(?, role),
+  first_name    = COALESCE(?, first_name),
+  last_name     = COALESCE(?, last_name),
+  active        = COALESCE(?, active),
+  password_hash = COALESCE(?, password_hash)
 WHERE id = ?
 
       `,
@@ -290,6 +331,7 @@ WHERE id = ?
   first_name,
   last_name,
   active,
+  passwordHash,
   userId
 ]
 
