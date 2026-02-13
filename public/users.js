@@ -15,10 +15,15 @@ const userTable = document.getElementById("userTable");
 const addUserModal = document.getElementById("addUserModal");
 const editUserModal = document.getElementById("editUserModal");
 const openAddUserBtn = document.getElementById("openAddUser");
+const emailFromAddBtn = document.getElementById("emailFromAdd");
+const emailFromEditBtn = document.getElementById("emailFromEdit");
+
+const userCache = new Map();
+let brandingCache = null;
 
 /* ============================
-   HELPERS
-   ============================ */
+  HELPERS
+  ============================ */
 async function api(url, method = "GET", body) {
   const res = await fetch(url, {
     method,
@@ -51,14 +56,12 @@ function toggleActions(btn) {
 
 function openModal(modal) {
   if (!modal) return;
-  modal.classList.remove("hidden");
-  document.body.classList.add("modal-open");
+  modal.style.display = "flex";
 }
 
 function closeModal(modal) {
   if (!modal) return;
-  modal.classList.add("hidden");
-  document.body.classList.remove("modal-open");
+  modal.style.display = "none";
 }
 
 function bindModalClosers() {
@@ -69,6 +72,7 @@ function bindModalClosers() {
     });
   });
 }
+
 
 function resetAddForm() {
   document.getElementById("addFirstName").value = "";
@@ -88,6 +92,82 @@ function resetEditForm() {
   document.getElementById("editPassword").value = "";
 }
 
+function updateEmailButtonsState() {
+  const addEmail = document.getElementById("addEmail");
+  const addPassword = document.getElementById("addPassword");
+  const editEmail = document.getElementById("editEmail");
+  const editPassword = document.getElementById("editPassword");
+
+  if (emailFromAddBtn) {
+    const hasPassword = !!(addPassword && addPassword.value.trim());
+    emailFromAddBtn.style.display = hasPassword ? "inline-flex" : "none";
+    emailFromAddBtn.disabled = !addEmail || !addEmail.value.trim();
+  }
+
+  if (emailFromEditBtn) {
+    const hasPassword = !!(editPassword && editPassword.value.trim());
+    emailFromEditBtn.style.display = hasPassword ? "inline-flex" : "none";
+    emailFromEditBtn.disabled = !editEmail || !editEmail.value.trim();
+  }
+}
+
+async function fetchBrandingSettings() {
+  try {
+    const res = await fetch("/settings/public", { cache: "no-store" });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    return null;
+  }
+}
+
+async function getHeaderBranding() {
+  if (brandingCache) return brandingCache;
+
+  const settings = await fetchBrandingSettings();
+  if (settings) {
+    const logoLabel = settings.header_logo_text || "Castlerock Homes";
+    const logoUrl = settings.logo_path || "";
+    brandingCache = {
+      headerColor: settings.header_color || "#b7342b",
+      logoUrl: settings.header_logo_mode === "image" ? logoUrl : "",
+      logoLabel: settings.header_logo_mode === "text" ? logoLabel : "Castlerock Homes"
+    };
+    return brandingCache;
+  }
+
+  const nav = document.getElementById("mainHeaderNav");
+  const logoImage = document.getElementById("headerBrandImage");
+  const logoText = document.getElementById("headerBrandText");
+  const rootStyles = getComputedStyle(document.documentElement);
+  const logoImageStyle = logoImage ? getComputedStyle(logoImage) : null;
+  const logoTextStyle = logoText ? getComputedStyle(logoText) : null;
+
+  const headerColor = (nav && getComputedStyle(nav).backgroundColor) || rootStyles.getPropertyValue("--md-primary").trim() || "#b7342b";
+  const logoUrl = (logoImage && logoImageStyle && logoImageStyle.display !== "none") ? logoImage.src : "";
+  const logoLabel = (logoText && logoTextStyle && logoTextStyle.display !== "none") ? logoText.textContent.trim() : "Castlerock Homes";
+
+  brandingCache = {
+    headerColor,
+    logoUrl,
+    logoLabel: logoLabel || "Castlerock Homes"
+  };
+
+  return brandingCache;
+}
+
+function buildEmailText({ name, email, password, loginUrl }) {
+  return [
+    `Hi ${name},`,
+    "",
+    "Here are your login details for the Castlerock Homes portal:",
+    "",
+    `Email: ${email}`,
+    `Password: ${password}`,
+    `Login: ${loginUrl}`
+  ].join("\n");
+}
+
 // Close on outside click
 document.addEventListener('click', e => {
   if (!e.target.closest('.actions-menu')) {
@@ -105,8 +185,10 @@ async function loadUsers() {
 
   const users = await api("/admin/users");
   userTable.innerHTML = "";
+  userCache.clear();
 
   users.forEach((u) => {
+    userCache.set(u.id, u);
     const userRole = u.role || "viewer";
     const isActive = Number(u.active) === 1;
     const isSystemUser = u.id === 99;
@@ -114,7 +196,6 @@ async function loadUsers() {
     userTable.innerHTML += `
       <tr ${isSystemUser ? 'style="opacity: 0.6;"' : ''}>
         <td>${u.first_name || ""} ${u.last_name || ""}</td>
-        <td>${u.email}</td>
 
         <td>
           <select onchange="updateUserRole(${u.id}, this.value)" ${isSystemUser ? 'disabled' : ''}>
@@ -230,10 +311,25 @@ async function openEditModal(id) {
     document.getElementById("editEmail").value = user.email || "";
     document.getElementById("editRole").value = user.role || "viewer";
     document.getElementById("editActive").value = Number(user.active) === 1 ? "1" : "0";
+    updateEmailButtonsState();
   } catch (err) {
     closeModal(editUserModal);
     showToast(err.message || "Failed to load user", "error");
   }
+}
+
+function sendLoginEmail({ name, email, password, loginUrl }) {
+  if (!email || !password) {
+    showToast("Set email and password in Add/Edit before emailing", "error");
+    return;
+  }
+
+  const url = loginUrl || `${window.location.origin}/login.html`;
+  getHeaderBranding().then((branding) => {
+    const subject = `Your ${branding.logoLabel} login details`;
+    const body = buildEmailText({ name, email, password, loginUrl: url });
+    window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  });
 }
 
 async function saveEditUser() {
@@ -327,6 +423,7 @@ loadUsers();
 if (openAddUserBtn) {
   openAddUserBtn.addEventListener("click", () => {
     resetAddForm();
+    updateEmailButtonsState();
     openModal(addUserModal);
   });
 }
@@ -345,6 +442,40 @@ if (editUserForm) {
     e.preventDefault();
     saveEditUser();
   });
+}
+
+if (emailFromAddBtn) {
+  emailFromAddBtn.addEventListener("click", () => {
+    const name = `${document.getElementById("addFirstName").value.trim()} ${document.getElementById("addLastName").value.trim()}`.trim();
+    const email = document.getElementById("addEmail").value.trim();
+    const password = document.getElementById("addPassword").value.trim();
+    sendLoginEmail({ name, email, password });
+  });
+}
+
+if (emailFromEditBtn) {
+  emailFromEditBtn.addEventListener("click", () => {
+    const name = `${document.getElementById("editFirstName").value.trim()} ${document.getElementById("editLastName").value.trim()}`.trim();
+    const email = document.getElementById("editEmail").value.trim();
+    const password = document.getElementById("editPassword").value.trim();
+    sendLoginEmail({ name, email, password });
+  });
+}
+
+if (document.getElementById("addEmail")) {
+  document.getElementById("addEmail").addEventListener("input", updateEmailButtonsState);
+}
+
+if (document.getElementById("addPassword")) {
+  document.getElementById("addPassword").addEventListener("input", updateEmailButtonsState);
+}
+
+if (document.getElementById("editEmail")) {
+  document.getElementById("editEmail").addEventListener("input", updateEmailButtonsState);
+}
+
+if (document.getElementById("editPassword")) {
+  document.getElementById("editPassword").addEventListener("input", updateEmailButtonsState);
 }
 
 bindModalClosers();

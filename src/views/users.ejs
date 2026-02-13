@@ -23,9 +23,8 @@
     </table>
   </div>
 
-  <div class="modal hidden" id="addUserModal" aria-hidden="true">
-    <div class="modal-backdrop" data-modal-close="addUserModal"></div>
-    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="addUserTitle">
+  <div class="modal" id="addUserModal" style="display:none;">
+    <div class="modal-content" style="width: 640px;">
       <div class="modal-header">
         <h3 id="addUserTitle">Add User</h3>
         <button class="modal-close" type="button" data-modal-close="addUserModal">x</button>
@@ -44,15 +43,15 @@
         </div>
         <div class="modal-actions">
           <button class="btn btn-outline-secondary" type="button" data-modal-close="addUserModal">Cancel</button>
+          <button class="btn btn-outline-secondary" type="button" id="emailFromAdd" disabled>Email Login Details</button>
           <button class="btn btn-primary" type="submit">Create User</button>
         </div>
       </form>
     </div>
   </div>
 
-  <div class="modal hidden" id="editUserModal" aria-hidden="true">
-    <div class="modal-backdrop" data-modal-close="editUserModal"></div>
-    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="editUserTitle">
+  <div class="modal" id="editUserModal" style="display:none;">
+    <div class="modal-content" style="width: 640px;">
       <div class="modal-header">
         <h3 id="editUserTitle">Edit User</h3>
         <button class="modal-close" type="button" data-modal-close="editUserModal">x</button>
@@ -77,6 +76,7 @@
         </div>
         <div class="modal-actions">
           <button class="btn btn-outline-secondary" type="button" data-modal-close="editUserModal">Cancel</button>
+          <button class="btn btn-outline-secondary" type="button" id="emailFromEdit" disabled>Email Login Details</button>
           <button class="btn btn-primary" type="submit">Save Changes</button>
         </div>
       </form>
