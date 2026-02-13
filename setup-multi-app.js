@@ -993,23 +993,40 @@ fi`;
       // Install Puppeteer system dependencies for PDF generation
       log.section('Installing Puppeteer System Dependencies');
       log.info('Installing system libraries required for PDF generation...');
-      const puppeteerDeps = [
-        'atk', 'at-spi2-atk', 'cups-libs', 'dbus-glib', 'dbus-libs',
-        'gdk-pixbuf2', 'glib2', 'glibc', 'gnutls', 'gtk3', 'libcrypt',
-        'libcurl', 'libdatrie', 'libdrm', 'libgbm', 'libgcc', 'libgcrypt',
-        'icu', 'libpango', 'libpng', 'libstdc++', 'libwayland-client',
-        'libwayland-server', 'libX11', 'libX11-xcb', 'libxcb', 'libxdamage',
-        'libxext', 'libxfixes', 'libxkbcommon', 'libxrandr', 'libxrender',
-        'libxshmfence', 'libxss', 'libxtst', 'mesa-libEGL', 'mesa-libgbm',
-        'nspr', 'nss', 'pango', 'zlib'
-      ].join(' ');
       
-      try {
-        runSshCommand(sshBase, `sudo yum install -y ${puppeteerDeps}`);
-        log.success('Puppeteer system dependencies installed.');
-      } catch (err) {
-        log.warn('Some Puppeteer dependencies may have failed to install.');
-        log.info('PDF generation may not work properly. Try running on EC2: sudo yum install -y ' + puppeteerDeps.split(' ').slice(0, 5).join(' ') + ' ...');
+      // Install in batches to handle partial failures gracefully
+      const depBatches = [
+        'atk at-spi2-atk cups-libs dbus-glib dbus-libs',
+        'gdk-pixbuf2 glib2 glibc gnutls gtk3',
+        'libcrypt libcurl libdatrie libdrm libgbm libgcc libgcrypt',
+        'icu libpango libpng libstdc++',
+        'libwayland-client libwayland-server libX11 libX11-xcb libxcb',
+        'libxdamage libxext libxfixes libxkbcommon libxrandr',
+        'libxrender libxshmfence libxss libxtst',
+        'mesa-libEGL mesa-libgbm nspr nss pango zlib'
+      ];
+      
+      let successCount = 0;
+      const batchCount = depBatches.length;
+      
+      for (const batch of depBatches) {
+        try {
+          runSshCommand(sshBase, `sudo yum install -y ${batch}`);
+          successCount++;
+        } catch (batchErr) {
+          // Log failed batch but continue with others
+          log.warn(`Failed to install batch: ${batch.split(' ').slice(0, 2).join(' ')}...`);
+        }
+      }
+      
+      if (successCount === batchCount) {
+        log.success('All Puppeteer system dependencies installed.');
+      } else if (successCount > 0) {
+        log.warn(`Installed ${successCount}/${batchCount} dependency batches.`);
+        log.info('Some dependencies may be missing, but PDF generation might still work.');
+      } else {
+        log.warn('Could not install Puppeteer dependencies.');
+        log.info('Try running manually on EC2: sudo yum install -y atk libgbm libX11 mesa-libEGL');
       }
     }
 
