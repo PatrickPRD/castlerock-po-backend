@@ -138,11 +138,8 @@ function buildLeaveYearOptions(years, selectedYear) {
 
 async function downloadWorkerPdf(workerId, workerName, button) {
   if (!workerId) return;
-  const originalText = button?.textContent || 'PDF';
-  if (button) {
-    button.disabled = true;
-    button.textContent = '...';
-  }
+  
+  showToast(`Generating PDF for ${workerName}...`, 'info');
 
   try {
     const yearParam = Number.isInteger(currentLeaveYear) ? `?year=${encodeURIComponent(currentLeaveYear)}` : '';
@@ -168,13 +165,10 @@ async function downloadWorkerPdf(workerId, workerName, button) {
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+    
+    showToast('PDF generated successfully', 'success');
   } catch (error) {
     showToast('Failed to generate worker PDF', 'error');
-  } finally {
-    if (button) {
-      button.disabled = false;
-      button.textContent = originalText;
-    }
   }
 }
 

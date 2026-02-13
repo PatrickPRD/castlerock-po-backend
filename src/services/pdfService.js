@@ -828,10 +828,6 @@ class PDFService {
               </div>
               <div class="row">
                 <div class="field">
-                  <div class="field-label">PPS Number</div>
-                  <div class="field-value">${this.escapeHtml(workerData.pps_number || 'N/A')}</div>
-                </div>
-                <div class="field">
                   <div class="field-label">Status</div>
                   <div class="field-value">${workerData.left_at ? 'Inactive' : 'Active'}</div>
                 </div>
@@ -859,16 +855,6 @@ class PDFService {
             </div>
 
             <div class="section">
-              <div class="section-title">Bank Details</div>
-              <div class="row">
-                <div class="field">
-                  <div class="field-label">Bank Details</div>
-                  <div class="field-value">${this.escapeHtml(workerData.bank_details || 'N/A')}</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="section">
               <div class="section-title">Employment</div>
               <div class="row">
                 <div class="field">
@@ -878,16 +864,6 @@ class PDFService {
                 <div class="field">
                   <div class="field-label">Date Ceased Employment</div>
                   <div class="field-value">${formatDateValue(workerData.left_at)}</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="section">
-              <div class="section-title">Compensation</div>
-              <div class="row">
-                <div class="field">
-                  <div class="field-label">Weekly Take Home</div>
-                  <div class="field-value">${formatMoney(workerData.weekly_take_home)}</div>
                 </div>
               </div>
             </div>

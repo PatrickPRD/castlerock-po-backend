@@ -142,6 +142,29 @@
   overflow-x: hidden;
 }
 
+.worker-pdf-btn.pdf-btn-loading {
+  background-color: #3b82f6 !important;
+  border-color: #3b82f6 !important;
+}
+
+.worker-pdf-btn .pdf-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: pdf-spin 0.6s linear infinite;
+  margin-right: 4px;
+  vertical-align: -2px;
+}
+
+@keyframes pdf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .leave-report-loading {
   display: none;
   align-items: center;

@@ -258,6 +258,7 @@ router.get(
  * GET /pdfs/worker/:workerId
  * Download a worker summary PDF
  * Accessible to: super_admin, admin
+ * Note: Financial data is removed from PDF for all users
  */
 router.get(
   '/worker/:workerId',

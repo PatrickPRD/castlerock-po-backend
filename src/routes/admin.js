@@ -631,7 +631,7 @@ router.delete(
 router.get(
   '/workers',
   authenticate,
-  authorizeRoles('super_admin', 'admin'),
+  authorizeRoles('super_admin'),
   async (req, res) => {
     const includeInactive = String(req.query.include_inactive) === '1';
     const whereClause = includeInactive ? '' : 'WHERE left_at IS NULL OR left_at >= CURDATE()';
@@ -677,7 +677,7 @@ router.get(
 router.post(
   '/workers',
   authenticate,
-  authorizeRoles('super_admin', 'admin'),
+  authorizeRoles('super_admin'),
   async (req, res) => {
     const {
       first_name,
@@ -812,7 +812,7 @@ router.post(
 router.put(
   '/workers/:id',
   authenticate,
-  authorizeRoles('super_admin', 'admin'),
+  authorizeRoles('super_admin'),
   async (req, res) => {
     const workerId = Number(req.params.id);
     const {
@@ -967,7 +967,7 @@ router.put(
 router.put(
   '/workers/:id/status',
   authenticate,
-  authorizeRoles('super_admin', 'admin'),
+  authorizeRoles('super_admin'),
   async (req, res) => {
     const workerId = Number(req.params.id);
     const active = Number(req.body.active) === 1 ? 1 : 0;
@@ -991,7 +991,7 @@ router.put(
 router.get(
   '/workers/template',
   authenticate,
-  authorizeRoles('super_admin', 'admin'),
+  authorizeRoles('super_admin'),
   async (_req, res) => {
     try {
       const [activeWorkers] = await db.query(
@@ -1114,7 +1114,7 @@ function normalizeHeader(value) {
 router.post(
   '/workers/bulk',
   authenticate,
-  authorizeRoles('super_admin', 'admin'),
+  authorizeRoles('super_admin'),
   upload.single('file'),
   async (req, res) => {
     if (!req.file) {
