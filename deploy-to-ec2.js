@@ -101,10 +101,11 @@ async function main() {
       const { stdout: serviceOutput } = await execWithTimeout(serviceListCommand, 10000);
       allServices = serviceOutput.trim().split('\n').filter(s => s.trim() !== '' && s.endsWith('.service')).map(s => s.replace('.service', ''));
       
-      console.log(`   ✓ Found ${allServices.length} total service${allServices.length === 1 ? '' : 's'}`);
+      console.log(`   ✓ Found ${allServices.length} total systemd service${allServices.length === 1 ? '' : 's'}`);
       
       // Strategy 1: Match by WorkingDirectory (most accurate but requires property to be set)
       const servicesToCheck = allServices.slice(0, 20);
+      let workingDirMatches = 0;
       
       for (const serviceName of servicesToCheck) {
         const service = serviceName + '.service';
@@ -119,11 +120,13 @@ async function main() {
             
             if (appMap.has(appName)) {
               appMap.get(appName).service = serviceName;
+              workingDirMatches++;
             } else {
               // Check if this path matches any directory we found
               for (const [existingName, info] of appMap.entries()) {
                 if (info.path === path || info.path.includes(appName)) {
                   info.service = serviceName;
+                  workingDirMatches++;
                   break;
                 }
               }
@@ -135,36 +138,96 @@ async function main() {
       }
       
       // Strategy 2: Name-based matching (if WorkingDirectory matching didn't find services)
+      let nameMatches = 0;
       for (const [appName, info] of appMap.entries()) {
         if (!info.service) {
           // Try to find a service that matches the app name
           const matchingService = allServices.find(svc => {
-            const svcName = svc.toLowerCase();
+            const svcLower = svc.toLowerCase();
             const appLower = appName.toLowerCase();
-            return svcName.includes(appLower) || appLower.includes(svcName);
+            
+            // Check various matching patterns
+            return svcLower === appLower ||                    // Exact match
+                   svcLower.includes(appLower) ||             // Service contains app name
+                   appLower.includes(svcLower) ||             // App name contains service
+                   appLower.replaceAll('_', '-').includes(svcLower) ||  // Replace underscores
+                   svcLower.includes(appLower.replaceAll('-', '_'));    // Or vice versa
           });
           
           if (matchingService) {
             info.service = matchingService;
+            nameMatches++;
           }
         }
       }
       
+      if (workingDirMatches > 0 || nameMatches > 0) {
+        console.log(`      ✓ Auto-detected ${workingDirMatches} by path, ${nameMatches} by name matching`);
+      }
+      
     } catch (error) {
-      console.log('   ℹ️  Could not scan systemd services (this is okay)');
+      console.log('   ℹ️  Could not scan systemd services');
+    }
+    
+    // 2c. Check for PM2 apps
+    console.log('   • Checking PM2 apps...');
+    let pm2Apps = [];
+    const pm2ListCommand = `${sshCommand} "pm2 list --no-autorestart 2>/dev/null || echo 'PM2_NOT_FOUND'"`;
+    
+    try {
+      const { stdout: pm2Output } = await execWithTimeout(pm2ListCommand, 10000);
+      
+      if (!pm2Output.includes('PM2_NOT_FOUND')) {
+        // Parse PM2 list output to extract app names
+        // PM2 output looks like:
+        // │ 0   │ costtracker  │ fork   │ 0          │ online │ 0s  │ 0 MB │
+        const lines = pm2Output.split('\n');
+        pm2Apps = lines
+          .filter(line => line.includes('online') || line.includes('stopped') || line.includes('errored'))
+          .map(line => {
+            const parts = line.split('│');
+            if (parts.length > 2) {
+              return parts[2].trim(); // App name is usually in column 2
+            }
+            return null;
+          })
+          .filter(app => app && app !== '' && !app.startsWith('App name'));
+        
+        if (pm2Apps.length > 0) {
+          console.log(`   ✓ Found ${pm2Apps.length} PM2 app${pm2Apps.length === 1 ? '' : 's'}: ${pm2Apps.join(', ')}`);
+          
+          // Try to match PM2 apps to our discovered apps
+          for (const [appName, info] of appMap.entries()) {
+            if (!info.service) {
+              const matchingPm2 = pm2Apps.find(pm2 => 
+                pm2.toLowerCase().includes(appName.toLowerCase()) ||
+                appName.toLowerCase().includes(pm2.toLowerCase())
+              );
+              if (matchingPm2) {
+                info.pm2App = matchingPm2;
+              }
+            }
+          }
+        }
+      } else {
+        console.log('   ℹ️  PM2 not found on EC2');
+      }
+    } catch (error) {
+      console.log('   ℹ️  Could not check PM2 apps');
     }
     
     // Convert map to array
     const apps = Array.from(appMap.entries()).map(([name, info]) => ({
       name,
       path: info.path,
-      service: info.service
+      service: info.service,
+      pm2App: info.pm2App
     }));
     
     if (apps.length === 0) {
       console.log('❌ No apps found on EC2.');
-      console.log('   • Checked directories: /apps, /home/*/apps, /opt/apps');
-      console.log('   • Checked systemd services matching: castlerock, costtracker, po-backend');
+      console.log('   • Checked directories: /apps, /home/*/apps');
+      console.log('   • No systemd services or PM2 apps detected');
       console.log('\n   Please run setup-multi-app.js first to deploy an application.\n');
       rl.close();
       return;
@@ -174,7 +237,13 @@ async function main() {
     apps.forEach((app, index) => {
       console.log(`   ${index + 1}. ${app.name}`);
       console.log(`      Path: ${app.path || 'unknown'}`);
-      console.log(`      Service: ${app.service || 'not detected'}`);
+      if (app.service) {
+        console.log(`      Manager: systemd (${app.service})`);
+      } else if (app.pm2App) {
+        console.log(`      Manager: PM2 (${app.pm2App})`);
+      } else {
+        console.log('      Manager: not detected');
+      }
       console.log('');
     });
     
@@ -192,64 +261,70 @@ async function main() {
     appVersion = selectedApp.name;
     appPath = selectedApp.path;
     
-    // Step 4: Confirm or set service name
+    // Step 4: Confirm or set service/PM2 app name
+    let appManagerType = null; // Track whether it's 'systemd' or 'pm2'
+    
     if (selectedApp.service) {
-      console.log(`\n✅ Using detected service: ${selectedApp.service}`);
+      console.log(`\n✅ Using detected systemd service: ${selectedApp.service}`);
       serviceName = selectedApp.service;
+      appManagerType = 'systemd';
       const changeService = await question('Use different service? (press Enter to keep, or type service name): ');
       if (changeService.trim()) {
         serviceName = changeService.trim();
       }
+    } else if (selectedApp.pm2App) {
+      console.log(`\n✅ Using detected PM2 app: ${selectedApp.pm2App}`);
+      serviceName = selectedApp.pm2App;
+      appManagerType = 'pm2';
+      const changePm2 = await question('Use different PM2 app? (press Enter to keep, or type app name): ');
+      if (changePm2.trim()) {
+        serviceName = changePm2.trim();
+      }
     } else {
-      console.log('\n⚠️  No systemd service auto-detected for this app');
-      console.log('   Searching for possible services...\n');
+      console.log('\n⚠️  No app manager auto-detected for this app');
+      console.log('   This could mean:');
+      console.log('   • App is managed by PM2 (not listed above)');
+      console.log('   • App uses a systemd service with different name');
+      console.log('   • App is daemonized or in background process');
+      console.log('   • App manager isn\'t installed on EC2\n');
+      
+      if (pm2Apps && pm2Apps.length > 0) {
+        console.log('   💡 Available PM2 apps:');
+        pm2Apps.forEach((pm2, idx) => {
+          console.log(`      ${idx + 1}. ${pm2}`);
+        });
+        console.log('');
+      }
       
       if (allServices && allServices.length > 0) {
         // Filter to services that might be related
         const likelyServices = allServices.filter(s => 
           s.toLowerCase().includes(appVersion.toLowerCase()) ||
           appVersion.toLowerCase().includes(s.toLowerCase()) ||
-          s.toLowerCase().includes('costtracker') ||
-          s.toLowerCase().includes('blossomhill') ||
-          s.toLowerCase().includes('castlerock') ||
-          s.toLowerCase().includes('crm') ||
-          s.toLowerCase().includes('backend') ||
           s.toLowerCase().includes('node') ||
           s.toLowerCase().includes('app')
         );
         
         if (likelyServices.length > 0) {
-          console.log('   Possible matching services:');
-          likelyServices.slice(0, 15).forEach((s, idx) => {
+          console.log('   💡 Possible systemd services:');
+          likelyServices.slice(0, 10).forEach((s, idx) => {
             console.log(`      ${idx + 1}. ${s}`);
           });
           console.log('');
-        } else {
-          // Show all user services if no matches
-          const userServices = allServices.filter(s => 
-            !s.startsWith('systemd-') && 
-            !s.startsWith('dbus-') &&
-            !s.startsWith('getty@') &&
-            !s.includes('system-')
-          );
-          
-          if (userServices.length > 0) {
-            console.log('   All available services (showing first 20):');
-            userServices.slice(0, 20).forEach((s, idx) => {
-              console.log(`      ${idx + 1}. ${s}`);
-            });
-            console.log('');
-          }
         }
-        
-        console.log('   💡 Tip: Check running services with: systemctl list-units --type=service --state=running');
-        console.log('');
       }
       
-      serviceName = await question('Enter the service name (or press Enter to skip service restart): ');
+      console.log('   🔍 Debug commands on EC2:');
+      console.log('      • PM2 apps: pm2 list');
+      console.log('      • Node processes: ps aux | grep node');
+      console.log('      • Systemd services: systemctl list-units --type=service --all | grep -i ' + appVersion.split('_')[0]);
+      console.log('');
+      
+      serviceName = await question('Enter the PM2 app name or systemd service name (or press Enter to skip): ');
       if (!serviceName || serviceName.trim() === '') {
-        console.log('⚠️  Warning: Deployment will continue without restarting a service.');
-        const continueWithout = await question('Continue without service restart? (yes/no): ');
+        console.log('\n⚠️  Deployment will continue without restarting the app manager.');
+        console.log('   💡 You\'ll need to manually restart the application after deployment.');
+        const continueWithout = await question('Continue without restart? (yes/no): ');
         if (continueWithout.toLowerCase() !== 'yes' && continueWithout.toLowerCase() !== 'y') {
           console.log('❌ Deployment cancelled.');
           rl.close();
@@ -318,19 +393,37 @@ async function main() {
 
     // Step 4: Restart the service (if service name provided)
     if (serviceName) {
-      console.log('🔄 Step 4/5: Restarting application service...');
-      const restartCommand = `${sshCommand} "sudo systemctl restart ${serviceName}"`;
+      console.log('🔄 Step 4/5: Restarting application...');
+      
+      let restartCommand;
+      if (appManagerType === 'pm2') {
+        restartCommand = `${sshCommand} "pm2 restart ${serviceName}"`;
+      } else {
+        restartCommand = `${sshCommand} "sudo systemctl restart ${serviceName}"`;
+      }
+      
       try {
         await execWithTimeout(restartCommand, 15000);
-        console.log('✅ Service restarted');
+        if (appManagerType === 'pm2') {
+          console.log('✅ PM2 app restarted');
+        } else {
+          console.log('✅ Systemd service restarted');
+        }
       } catch (error) {
-        console.error('❌ Service restart failed:', error.message);
+        console.error('❌ Restart failed:', error.message);
         throw error;
       }
 
       // Step 5: Check service status
-      console.log('🔍 Step 5/5: Checking service status...');
-      const statusCommand = `${sshCommand} "sudo systemctl status ${serviceName} --no-pager -l"`;
+      console.log('🔍 Step 5/5: Checking status...');
+      
+      let statusCommand;
+      if (appManagerType === 'pm2') {
+        statusCommand = `${sshCommand} "pm2 show ${serviceName}"`;
+      } else {
+        statusCommand = `${sshCommand} "sudo systemctl status ${serviceName} --no-pager -l"`;
+      }
+      
       try {
         const { stdout: statusOutput } = await execWithTimeout(statusCommand, 10000);
         console.log(statusOutput);
@@ -341,16 +434,23 @@ async function main() {
         }
       }
     } else {
-      console.log('⏭️  Step 4/5: Skipping service restart (no service configured)');
-      console.log('⏭️  Step 5/5: Skipping service status check');
+      console.log('⏭️  Step 4/5: Skipping restart (no service configured)');
+      console.log('⏭️  Step 5/5: Skipping status check');
       console.log('\n⚠️  Remember to manually restart your application!');
     }
 
     console.log('\n✅ Deployment completed successfully!\n');
     console.log('📊 Next steps:');
     if (serviceName) {
-      console.log(`   • View logs: ${sshCommand.split(' ').slice(0, -1).join(' ')} "sudo journalctl -u ${serviceName} -f"`);
-      console.log(`   • Check status: ${sshCommand.split(' ').slice(0, -1).join(' ')} "sudo systemctl status ${serviceName}"`);
+      const sshBase = sshCommand.split(' ').slice(0, -1).join(' ');
+      if (appManagerType === 'pm2') {
+        console.log(`   • View logs: ${sshBase} "pm2 logs ${serviceName}"`);
+        console.log(`   • Check status: ${sshBase} "pm2 show ${serviceName}"`);
+        console.log(`   • Additional info: ${sshBase} "pm2 list"`);
+      } else {
+        console.log(`   • View logs: ${sshBase} "sudo journalctl -u ${serviceName} -f"`);
+        console.log(`   • Check status: ${sshBase} "sudo systemctl status ${serviceName}"`);
+      }
     } else {
       console.log(`   • SSH to server: ${sshCommand}`);
       console.log(`   • Navigate to app: cd ${appPath}`);

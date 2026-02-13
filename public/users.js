@@ -12,6 +12,9 @@ if (!token || role !== "super_admin") {
    DOM
    ============================ */
 const userTable = document.getElementById("userTable");
+const addUserModal = document.getElementById("addUserModal");
+const editUserModal = document.getElementById("editUserModal");
+const openAddUserBtn = document.getElementById("openAddUser");
 
 /* ============================
    HELPERS
@@ -44,6 +47,45 @@ function toggleActions(btn) {
 
   const menu = btn.nextElementSibling;
   menu.classList.toggle('hidden');
+}
+
+function openModal(modal) {
+  if (!modal) return;
+  modal.classList.remove("hidden");
+  document.body.classList.add("modal-open");
+}
+
+function closeModal(modal) {
+  if (!modal) return;
+  modal.classList.add("hidden");
+  document.body.classList.remove("modal-open");
+}
+
+function bindModalClosers() {
+  document.querySelectorAll("[data-modal-close]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const modalId = btn.dataset.modalClose;
+      closeModal(document.getElementById(modalId));
+    });
+  });
+}
+
+function resetAddForm() {
+  document.getElementById("addFirstName").value = "";
+  document.getElementById("addLastName").value = "";
+  document.getElementById("addEmail").value = "";
+  document.getElementById("addPassword").value = "";
+  document.getElementById("addRole").value = "admin";
+}
+
+function resetEditForm() {
+  document.getElementById("editUserId").value = "";
+  document.getElementById("editFirstName").value = "";
+  document.getElementById("editLastName").value = "";
+  document.getElementById("editEmail").value = "";
+  document.getElementById("editRole").value = "viewer";
+  document.getElementById("editActive").value = "1";
+  document.getElementById("editPassword").value = "";
 }
 
 // Close on outside click
@@ -127,7 +169,7 @@ async function loadUsers() {
 }
 
 function editUser(id) {
-  window.location.href = `edit-user.html?id=${id}`;
+  openEditModal(id);
 }
 
 async function addUser() {
@@ -136,11 +178,11 @@ async function addUser() {
     return;
   }
 
-  const firstName = document.getElementById("firstName").value.trim();
-  const lastName = document.getElementById("lastName").value.trim();
-  const email = document.getElementById("userEmail").value.trim();
-  const password = document.getElementById("userPassword").value;
-  const userRole = document.getElementById("userRole").value;
+  const firstName = document.getElementById("addFirstName").value.trim();
+  const lastName = document.getElementById("addLastName").value.trim();
+  const email = document.getElementById("addEmail").value.trim();
+  const password = document.getElementById("addPassword").value;
+  const userRole = document.getElementById("addRole").value;
 
   if (!email || !firstName || !lastName || !password) {
     showToast("Please fill in all required fields", "error");
@@ -158,10 +200,8 @@ async function addUser() {
     });
 
     // Clear inputs
-    document.getElementById("firstName").value = "";
-    document.getElementById("lastName").value = "";
-    document.getElementById("userEmail").value = "";
-    document.getElementById("userPassword").value = "";
+    resetAddForm();
+    closeModal(addUserModal);
 
     // Refresh table
     await loadUsers();
@@ -170,6 +210,55 @@ async function addUser() {
     showToast(`User ${email} created successfully`, "success");
   } catch (err) {
     showToast(err.message || "Failed to create user", "error");
+  }
+}
+
+async function openEditModal(id) {
+  if (role !== "super_admin") {
+    showToast("Not authorized", "error");
+    return;
+  }
+
+  resetEditForm();
+  openModal(editUserModal);
+
+  try {
+    const user = await api(`/admin/users/${id}`);
+    document.getElementById("editUserId").value = id;
+    document.getElementById("editFirstName").value = user.first_name || "";
+    document.getElementById("editLastName").value = user.last_name || "";
+    document.getElementById("editEmail").value = user.email || "";
+    document.getElementById("editRole").value = user.role || "viewer";
+    document.getElementById("editActive").value = Number(user.active) === 1 ? "1" : "0";
+  } catch (err) {
+    closeModal(editUserModal);
+    showToast(err.message || "Failed to load user", "error");
+  }
+}
+
+async function saveEditUser() {
+  const id = document.getElementById("editUserId").value;
+  if (!id) return;
+
+  const payload = {
+    first_name: document.getElementById("editFirstName").value.trim(),
+    last_name: document.getElementById("editLastName").value.trim(),
+    role: document.getElementById("editRole").value,
+    active: Number(document.getElementById("editActive").value),
+  };
+
+  const password = document.getElementById("editPassword").value.trim();
+  if (password) {
+    payload.password = password;
+  }
+
+  try {
+    await api(`/admin/users/${id}`, "PUT", payload);
+    closeModal(editUserModal);
+    await loadUsers();
+    showToast("User updated", "success");
+  } catch (err) {
+    showToast(err.message || "Update failed", "error");
   }
 }
 
@@ -234,3 +323,28 @@ function back() {
    INIT
    ============================ */
 loadUsers();
+
+if (openAddUserBtn) {
+  openAddUserBtn.addEventListener("click", () => {
+    resetAddForm();
+    openModal(addUserModal);
+  });
+}
+
+const addUserForm = document.getElementById("addUserForm");
+if (addUserForm) {
+  addUserForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    addUser();
+  });
+}
+
+const editUserForm = document.getElementById("editUserForm");
+if (editUserForm) {
+  editUserForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    saveEditUser();
+  });
+}
+
+bindModalClosers();

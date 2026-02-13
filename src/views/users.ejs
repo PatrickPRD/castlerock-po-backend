@@ -4,19 +4,9 @@
 <main class="container">
 
   <div class="card" id="usersSection">
-    <h3>Users</h3>
-
-    <div class="form-row">
-      <input id="firstName" placeholder="First name">
-      <input id="lastName" placeholder="Last name">
-      <input id="userEmail" placeholder="Email">
-      <input id="userPassword" type="password" placeholder="Password">
-      <select id="userRole">
-        <option value="admin">Admin</option>
-        <option value="staff">Staff</option>
-        <option value="viewer">Viewer</option>
-      </select>
-      <button class="btn btn-primary" onclick="addUser()">Add User</button>
+    <div class="card-header">
+      <h3>Users</h3>
+      <button class="btn btn-primary" id="openAddUser">Add User</button>
     </div>
 
     <table class="po-table">
@@ -31,6 +21,66 @@
       </thead>
       <tbody id="userTable"></tbody>
     </table>
+  </div>
+
+  <div class="modal hidden" id="addUserModal" aria-hidden="true">
+    <div class="modal-backdrop" data-modal-close="addUserModal"></div>
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="addUserTitle">
+      <div class="modal-header">
+        <h3 id="addUserTitle">Add User</h3>
+        <button class="modal-close" type="button" data-modal-close="addUserModal">x</button>
+      </div>
+      <form id="addUserForm" class="modal-body">
+        <div class="form-grid">
+          <input id="addFirstName" placeholder="First name" required>
+          <input id="addLastName" placeholder="Last name" required>
+          <input id="addEmail" placeholder="Email" type="email" required>
+          <input id="addPassword" type="password" placeholder="Password" required>
+          <select id="addRole" required>
+            <option value="admin">Admin</option>
+            <option value="staff">Staff</option>
+            <option value="viewer">Viewer</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-outline-secondary" type="button" data-modal-close="addUserModal">Cancel</button>
+          <button class="btn btn-primary" type="submit">Create User</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="editUserModal" aria-hidden="true">
+    <div class="modal-backdrop" data-modal-close="editUserModal"></div>
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="editUserTitle">
+      <div class="modal-header">
+        <h3 id="editUserTitle">Edit User</h3>
+        <button class="modal-close" type="button" data-modal-close="editUserModal">x</button>
+      </div>
+      <form id="editUserForm" class="modal-body">
+        <input type="hidden" id="editUserId">
+        <div class="form-grid">
+          <input id="editFirstName" placeholder="First name" required>
+          <input id="editLastName" placeholder="Last name" required>
+          <input id="editEmail" placeholder="Email" type="email" disabled>
+          <select id="editRole" required>
+            <option value="super_admin">Super Admin</option>
+            <option value="admin">Admin</option>
+            <option value="staff">Staff</option>
+            <option value="viewer">Viewer</option>
+          </select>
+          <select id="editActive" required>
+            <option value="1">Active</option>
+            <option value="0">Disabled</option>
+          </select>
+          <input id="editPassword" type="password" placeholder="New password (leave blank to keep current)">
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-outline-secondary" type="button" data-modal-close="editUserModal">Cancel</button>
+          <button class="btn btn-primary" type="submit">Save Changes</button>
+        </div>
+      </form>
+    </div>
   </div>
 
 </main>
