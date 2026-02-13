@@ -380,7 +380,38 @@ async function main() {
       console.error('❌ npm install failed:', error.message);
       throw error;
     }
-
+    // Verify and install Puppeteer system dependencies
+    console.log('🔍 Checking Puppeteer system dependencies for PDF generation...');
+    const requiredPuppeteerDeps = [
+      'atk', 'at-spi2-atk', 'cups-libs', 'dbus-glib', 'gdk-pixbuf2', 'glib2',
+      'gtk3', 'libcurl', 'libgbm', 'libgcc', 'libpango', 'libpng', 'libstdc++',
+      'libX11', 'libxcb', 'libxdamage', 'libxext', 'libxfixes', 'libxkbcommon',
+      'libxrandr', 'libxrender', 'mesa-libEGL', 'nss'
+    ];
+    
+    try {
+      // Check if critical dependencies are installed
+      const checkDepsCommand = `${sshCommand} "rpm -q atk libgbm libX11 mesa-libEGL > /dev/null 2>&1 && echo 'OK' || echo 'MISSING'"`;
+      const { stdout: depsCheck } = await execWithTimeout(checkDepsCommand, 10000);
+      
+      if (depsCheck.trim() === 'MISSING') {
+        console.log('⚠️  Installing Puppeteer system dependencies...');
+        const allDeps = 'atk at-spi2-atk cups-libs dbus-glib dbus-libs gdk-pixbuf2 glib2 glibc gnutls gtk3 libcrypt libcurl libdatrie libdrm libgbm libgcc libgcrypt icu libpango libpng libstdc++ libwayland-client libwayland-server libX11 libX11-xcb libxcb libxdamage libxext libxfixes libxkbcommon libxrandr libxrender libxshmfence libxss libxtst mesa-libEGL mesa-libgbm nspr nss pango zlib';
+        const installDepsCommand = `${sshCommand} "sudo yum install -y ${allDeps}"`;
+        try {
+          await execWithTimeout(installDepsCommand, 180000);
+          console.log('✅ Puppeteer dependencies installed');
+        } catch (depsError) {
+          console.warn('⚠️  Some Puppeteer dependencies could not be installed');
+          console.log('   PDF generation may fail. You can install them manually on EC2 with:');
+          console.log(`   ${sshCommand.split(' ').slice(0, -1).join(' ')} "sudo yum install -y ${allDeps}"`);
+        }
+      } else {
+        console.log('✅ Puppeteer dependencies are installed');
+      }
+    } catch (error) {
+      console.log('ℹ️  Could not verify Puppeteer dependencies (continuing anyway)');
+    }
     // Step 3: Run database migrations (if any)
     console.log('🗄️  Step 3/5: Running database migrations...');
     const migrateCommand = `${sshCommand} "cd ${appPath} && npm run migrate 2>&1 || echo 'No migrations or migrate script not found'"`;

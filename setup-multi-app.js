@@ -989,6 +989,28 @@ fi`;
       log.info('Running npm install on EC2...');
       runSshCommand(sshBase, `cd ${appsDir} && npm install --production`);
       log.success('npm install completed.');
+
+      // Install Puppeteer system dependencies for PDF generation
+      log.section('Installing Puppeteer System Dependencies');
+      log.info('Installing system libraries required for PDF generation...');
+      const puppeteerDeps = [
+        'atk', 'at-spi2-atk', 'cups-libs', 'dbus-glib', 'dbus-libs',
+        'gdk-pixbuf2', 'glib2', 'glibc', 'gnutls', 'gtk3', 'libcrypt',
+        'libcurl', 'libdatrie', 'libdrm', 'libgbm', 'libgcc', 'libgcrypt',
+        'icu', 'libpango', 'libpng', 'libstdc++', 'libwayland-client',
+        'libwayland-server', 'libX11', 'libX11-xcb', 'libxcb', 'libxdamage',
+        'libxext', 'libxfixes', 'libxkbcommon', 'libxrandr', 'libxrender',
+        'libxshmfence', 'libxss', 'libxtst', 'mesa-libEGL', 'mesa-libgbm',
+        'nspr', 'nss', 'pango', 'zlib'
+      ].join(' ');
+      
+      try {
+        runSshCommand(sshBase, `sudo yum install -y ${puppeteerDeps}`);
+        log.success('Puppeteer system dependencies installed.');
+      } catch (err) {
+        log.warn('Some Puppeteer dependencies may have failed to install.');
+        log.info('PDF generation may not work properly. Try running on EC2: sudo yum install -y ' + puppeteerDeps.split(' ').slice(0, 5).join(' ') + ' ...');
+      }
     }
 
     // Step 12: Auto-install Nginx configuration
