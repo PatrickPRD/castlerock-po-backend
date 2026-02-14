@@ -28,6 +28,11 @@
   margin-bottom: 0.5rem;
 }
 
+.blank-worker-btn {
+  width: 100%;
+  margin-bottom: 0.75rem;
+}
+
 .search-input {
   width: 100%;
 }

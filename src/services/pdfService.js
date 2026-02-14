@@ -615,7 +615,25 @@ class PDFService {
     }
   }
 
-  static generateWorkerHTML(workerData, leaveSummary = {}, settings = {}) {
+  static async generateBlankWorkerPDF(leaveSummary, settings) {
+    try {
+      if (!puppeteer) {
+        throw new Error('Puppeteer is not installed. Please run: npm install puppeteer');
+      }
+
+      const html = this.generateWorkerHTML({}, leaveSummary, settings, {
+        blank: true,
+        docName: 'Blank Worker Form'
+      });
+      const pdf = await this.htmlToPDF(html);
+      return pdf;
+    } catch (error) {
+      console.error('Error generating blank worker PDF:', error);
+      throw new Error('Failed to generate PDF: ' + error.message);
+    }
+  }
+
+  static generateWorkerHTML(workerData, leaveSummary = {}, settings = {}, options = {}) {
     const branding = this.buildBranding(settings);
     const {
       headerColor,
@@ -629,8 +647,20 @@ class PDFService {
       currencySymbol
     } = branding;
 
+    const isBlank = options.blank === true;
     const workerName = `${workerData.first_name || ''} ${workerData.last_name || ''}`.trim()
       || 'Unnamed worker';
+    const docName = options.docName || (isBlank ? 'Blank Worker Form' : workerName);
+    const workerNameDisplay = isBlank ? '' : workerName;
+
+    const valueOrFallback = (value, fallback = 'N/A') => {
+      if (isBlank) return '';
+      if (value === null || value === undefined || value === '') return fallback;
+      return String(value);
+    };
+
+    const dateOrBlank = (value) => (isBlank ? '' : formatDateValue(value));
+    const leaveCell = (value) => (isBlank ? '' : Number(value || 0));
 
     const formatMoney = value => `${currencySymbol}${Number(value || 0).toFixed(2)}`;
     const formatDateValue = value => {
@@ -809,7 +839,7 @@ class PDFService {
             </div>
             <div class="doc-meta">
               <div class="doc-label">EMPLOYEE INFORMATION</div>
-              <div class="doc-name">${this.escapeHtml(workerName)}</div>
+              <div class="doc-name">${this.escapeHtml(docName)}</div>
             </div>
           </div>
 
@@ -819,17 +849,17 @@ class PDFService {
               <div class="row">
                 <div class="field">
                   <div class="field-label">Worker Name</div>
-                  <div class="field-value">${this.escapeHtml(workerName)}</div>
+                  <div class="field-value">${this.escapeHtml(workerNameDisplay)}</div>
                 </div>
                 <div class="field">
                   <div class="field-label">Employee ID</div>
-                  <div class="field-value">${this.escapeHtml(workerData.employee_id || 'N/A')}</div>
+                  <div class="field-value">${this.escapeHtml(valueOrFallback(workerData.employee_id))}</div>
                 </div>
               </div>
               <div class="row">
                 <div class="field">
                   <div class="field-label">Status</div>
-                  <div class="field-value">${workerData.left_at ? 'Inactive' : 'Active'}</div>
+                  <div class="field-value">${isBlank ? '' : (workerData.left_at ? 'Inactive' : 'Active')}</div>
                 </div>
               </div>
             </div>
@@ -839,17 +869,17 @@ class PDFService {
               <div class="row">
                 <div class="field">
                   <div class="field-label">Email Address</div>
-                  <div class="field-value">${this.escapeHtml(workerData.email || 'N/A')}</div>
+                  <div class="field-value">${this.escapeHtml(valueOrFallback(workerData.email))}</div>
                 </div>
                 <div class="field">
                   <div class="field-label">Mobile Number</div>
-                  <div class="field-value">${this.escapeHtml(workerData.mobile_number || 'N/A')}</div>
+                  <div class="field-value">${this.escapeHtml(valueOrFallback(workerData.mobile_number))}</div>
                 </div>
               </div>
               <div class="row full">
                 <div class="field">
                   <div class="field-label">Address</div>
-                  <div class="field-value">${this.escapeHtml(workerData.address || 'N/A')}</div>
+                  <div class="field-value">${this.escapeHtml(valueOrFallback(workerData.address))}</div>
                 </div>
               </div>
             </div>
@@ -859,11 +889,11 @@ class PDFService {
               <div class="row">
                 <div class="field">
                   <div class="field-label">Date of Employment</div>
-                  <div class="field-value">${formatDateValue(workerData.date_of_employment)}</div>
+                  <div class="field-value">${dateOrBlank(workerData.date_of_employment)}</div>
                 </div>
                 <div class="field">
                   <div class="field-label">Date Ceased Employment</div>
-                  <div class="field-value">${formatDateValue(workerData.left_at)}</div>
+                  <div class="field-value">${dateOrBlank(workerData.left_at)}</div>
                 </div>
               </div>
             </div>
@@ -873,16 +903,16 @@ class PDFService {
               <div class="row">
                 <div class="field">
                   <div class="field-label">Safe Pass Number</div>
-                  <div class="field-value">${this.escapeHtml(workerData.safe_pass_number || 'N/A')}</div>
+                  <div class="field-value">${this.escapeHtml(valueOrFallback(workerData.safe_pass_number))}</div>
                 </div>
                 <div class="field">
                   <div class="field-label">Safe Pass Expiry</div>
-                  <div class="field-value">${formatDateValue(workerData.safe_pass_expiry_date)}</div>
+                  <div class="field-value">${dateOrBlank(workerData.safe_pass_expiry_date)}</div>
                 </div>
               </div>
             </div>
 
-            ${workerData.notes ? `
+            ${!isBlank && workerData.notes ? `
               <div class="section">
                 <div class="section-title">Notes</div>
                 <div class="field-value" style="white-space: pre-wrap; font-size: 12px;">${this.escapeHtml(workerData.notes)}</div>
@@ -907,37 +937,37 @@ class PDFService {
                   <tbody>
                     <tr>
                       <td>Paid Sick</td>
-                      <td>${Number(leaveTotals.paid_sick || 0)}</td>
-                      <td>${Number(leaveAllowances.paid_sick || 0)}</td>
-                      <td>${Number(leaveRemaining.paid_sick || 0)}</td>
+                      <td>${leaveCell(leaveTotals.paid_sick)}</td>
+                      <td>${leaveCell(leaveAllowances.paid_sick)}</td>
+                      <td>${leaveCell(leaveRemaining.paid_sick)}</td>
                     </tr>
                     <tr>
                       <td>Annual Leave</td>
-                      <td>${Number(leaveTotals.annual_leave || 0)}</td>
-                      <td>${Number(leaveAllowances.annual_leave || 0)}</td>
-                      <td>${Number(leaveRemaining.annual_leave || 0)}</td>
+                      <td>${leaveCell(leaveTotals.annual_leave)}</td>
+                      <td>${leaveCell(leaveAllowances.annual_leave)}</td>
+                      <td>${leaveCell(leaveRemaining.annual_leave)}</td>
                     </tr>
                     <tr>
                       <td>Bank Holidays</td>
-                      <td>${Number(leaveTotals.bank_holiday || 0)}</td>
-                      <td>${Number(leaveAllowances.bank_holiday || 0)}</td>
-                      <td>${Number(leaveRemaining.bank_holiday || 0)}</td>
+                      <td>${leaveCell(leaveTotals.bank_holiday)}</td>
+                      <td>${leaveCell(leaveAllowances.bank_holiday)}</td>
+                      <td>${leaveCell(leaveRemaining.bank_holiday)}</td>
                     </tr>
                     <tr>
                       <td>Unpaid Sick</td>
-                      <td>${Number(leaveTotals.sick || 0)}</td>
+                      <td>${leaveCell(leaveTotals.sick)}</td>
                       <td>-</td>
                       <td>-</td>
                     </tr>
                     <tr>
                       <td>Unpaid Leave</td>
-                      <td>${Number(leaveTotals.unpaid_leave || 0)}</td>
+                      <td>${leaveCell(leaveTotals.unpaid_leave)}</td>
                       <td>-</td>
                       <td>-</td>
                     </tr>
                     <tr>
                       <td>Absent</td>
-                      <td>${Number(leaveTotals.absent || 0)}</td>
+                      <td>${leaveCell(leaveTotals.absent)}</td>
                       <td>-</td>
                       <td>-</td>
                     </tr>

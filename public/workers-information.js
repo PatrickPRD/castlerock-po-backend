@@ -12,6 +12,7 @@ const leaveYearSelect = document.getElementById('leaveYearSelect');
 const sortHeaders = document.querySelectorAll('th.sortable');
 const loadingIndicator = document.getElementById('leaveReportLoading');
 const tableWrapper = document.querySelector('.leave-report-table-wrapper');
+const blankWorkerPdfBtn = document.getElementById('blankWorkerPdfBtn');
 
 let allData = [];
 let sortColumn = 'name';
@@ -172,6 +173,38 @@ async function downloadWorkerPdf(workerId, workerName, button) {
   }
 }
 
+async function downloadBlankWorkerPdf() {
+  showToast('Generating blank worker PDF...', 'info');
+
+  try {
+    const yearParam = Number.isInteger(currentLeaveYear) ? `?year=${encodeURIComponent(currentLeaveYear)}` : '';
+    const res = await fetch(`/pdfs/worker-blank${yearParam}`, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+
+    if (!res.ok) {
+      showToast('Failed to generate blank worker PDF', 'error');
+      return;
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const yearSuffix = Number.isInteger(currentLeaveYear) ? `-${currentLeaveYear}` : '';
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Worker-Blank-Form${yearSuffix}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    showToast('Blank worker PDF generated', 'success');
+  } catch (error) {
+    showToast('Failed to generate blank worker PDF', 'error');
+  }
+}
+
 async function loadReport(selectedYear) {
   setLoading(true);
   try {
@@ -246,6 +279,12 @@ if (leaveYearSelect) {
         showToast('Failed to load workers information report', 'error');
       });
     }
+  });
+}
+
+if (blankWorkerPdfBtn) {
+  blankWorkerPdfBtn.addEventListener('click', () => {
+    downloadBlankWorkerPdf();
   });
 }
 

@@ -378,6 +378,71 @@ router.get(
 );
 
 /**
+ * GET /pdfs/worker-blank
+ * Download a blank worker form PDF
+ * Accessible to: super_admin, admin
+ */
+router.get(
+  '/worker-blank',
+  authenticate,
+  authorizeRoles('super_admin', 'admin'),
+  async (req, res) => {
+    try {
+      const settings = await SettingsService.getSettings();
+      const leaveYearStart = normalizeLeaveYearStart(settings.leave_year_start || '01-01');
+      const paidSickAllowance = Number(settings.sick_days_per_year || 0);
+      const annualLeaveAllowance = Number(settings.annual_leave_days_per_year || 0);
+      const bankHolidayAllowance = Number(settings.bank_holidays_per_year || 0);
+      const today = new Date();
+      const { startDate: currentStartDate } = getLeaveYearBounds(today, leaveYearStart);
+      const requestedYear = Number(req.query.year);
+      const hasRequestedYear = Number.isInteger(requestedYear) && requestedYear >= 2000 && requestedYear <= 2100;
+      const selectedStartYear = hasRequestedYear ? requestedYear : currentStartDate.getFullYear();
+      const startDate = getLeaveYearStartDate(selectedStartYear, leaveYearStart);
+      const endDate = getLeaveYearStartDate(selectedStartYear + 1, leaveYearStart);
+
+      const leaveSummary = {
+        start_date: formatDate(startDate),
+        end_date: formatDate(endDate),
+        leave_year_start: leaveYearStart,
+        allowances: {
+          paid_sick: paidSickAllowance,
+          annual_leave: annualLeaveAllowance,
+          bank_holiday: bankHolidayAllowance
+        },
+        totals: {
+          paid_sick: 0,
+          sick: 0,
+          annual_leave: 0,
+          unpaid_leave: 0,
+          bank_holiday: 0,
+          absent: 0
+        },
+        remaining: {
+          paid_sick: paidSickAllowance,
+          annual_leave: annualLeaveAllowance,
+          bank_holiday: bankHolidayAllowance
+        }
+      };
+
+      const pdf = await PDFService.generateBlankWorkerPDF(leaveSummary, settings);
+      const yearSuffix = hasRequestedYear ? `-${selectedStartYear}` : '';
+
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="Worker-Blank-Form${yearSuffix}.pdf"`,
+        'Content-Length': pdf.length
+      });
+
+      res.send(pdf);
+    } catch (error) {
+      console.error('Error generating blank worker PDF:', error);
+      res.status(500).json({ error: 'Failed to generate PDF: ' + error.message });
+    }
+  }
+);
+
+/**
  * GET /pdfs/gdpr
  * Download GDPR Privacy Notice as PDF
  * Accessible to: all authenticated users
