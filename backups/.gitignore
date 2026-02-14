@@ -1,0 +1,6 @@
+# Ignore all backup files
+*.sql
+*.json
+
+# But keep the folder
+!.gitignore

@@ -1,4 +1,8 @@
 const pool = require('../db');
+const fs = require('fs').promises;
+const path = require('path');
+
+const BACKUP_DIR = path.join(__dirname, '../../backups');
 
 const EXCLUDED_TABLES = new Set(['users', 'schema_migrations']);
 
@@ -472,5 +476,105 @@ module.exports = {
   createBackupSql,
   validateBackup,
   restoreBackup,
-  restoreBackupSql
+  restoreBackupSql,
+  listBackups,
+  getBackupFile,
+  deleteBackup,
+  saveBackup
 };
+
+/**
+ * List all backup files in the backups directory
+ */
+async function listBackups() {
+  try {
+    await fs.mkdir(BACKUP_DIR, { recursive: true });
+    const files = await fs.readdir(BACKUP_DIR);
+    
+    const backups = [];
+    for (const file of files) {
+      if (!file.endsWith('.sql')) continue;
+      
+      const filePath = path.join(BACKUP_DIR, file);
+      const stats = await fs.stat(filePath);
+      
+      backups.push({
+        filename: file,
+        size: stats.size,
+        created: stats.mtime,
+        type: 'sql'
+      });
+    }
+    
+    // Sort by creation date, newest first
+    backups.sort((a, b) => b.created - a.created);
+    
+    return backups;
+  } catch (err) {
+    console.error('Error listing backups:', err);
+    throw err;
+  }
+}
+
+/**
+ * Get a specific backup file content
+ */
+async function getBackupFile(filename) {
+  // Sanitize filename to prevent directory traversal
+  const safeName = path.basename(filename);
+  const filePath = path.join(BACKUP_DIR, safeName);
+  
+  // Check if file exists
+  try {
+    await fs.access(filePath);
+  } catch (err) {
+    throw new Error('Backup file not found');
+  }
+  
+  const content = await fs.readFile(filePath, 'utf-8');
+  return content;
+}
+
+/**
+ * Delete a backup file
+ */
+async function deleteBackup(filename) {
+  // Sanitize filename to prevent directory traversal
+  const safeName = path.basename(filename);
+  const filePath = path.join(BACKUP_DIR, safeName);
+  
+  // Check if file exists
+  try {
+    await fs.access(filePath);
+  } catch (err) {
+    throw new Error('Backup file not found');
+  }
+  
+  await fs.unlink(filePath);
+  return { success: true, message: `Backup ${safeName} deleted` };
+}
+
+/**
+ * Save a backup to disk
+ * @param {string} sqlContent - SQL backup content
+ * @returns {string} filename - The generated backup filename
+ */
+async function saveBackup(sqlContent) {
+  try {
+    await fs.mkdir(BACKUP_DIR, { recursive: true });
+    
+    const timestamp = new Date().toISOString()
+      .replace(/[:.]/g, '-')
+      .replace('T', '_')
+      .slice(0, 19);
+    const filename = `backup_${timestamp}.sql`;
+    const filePath = path.join(BACKUP_DIR, filename);
+    
+    await fs.writeFile(filePath, sqlContent, 'utf-8');
+    
+    return filename;
+  } catch (err) {
+    console.error('Error saving backup:', err);
+    throw err;
+  }
+}

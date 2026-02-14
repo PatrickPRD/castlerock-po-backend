@@ -1,22 +1,15 @@
 const token = localStorage.getItem('token');
 const role = localStorage.getItem('role');
 
-/* ============================
-   AUTH GUARD - SUPER ADMIN ONLY
-   ============================ */
+// Auth guard
 if (!token || role !== 'super_admin') {
   location.href = 'dashboard.html';
 }
 
-/* ============================
-   BACKUP DATA STORAGE
-   ============================ */
-let backupData = null;
-let backupMode = null; // 'json' | 'sql'
+let currentRestoreFilename = null;
+let uploadModal, restoreModal, resetModal;
 
-/* ============================
-   API HELPER
-   ============================ */
+// API helper
 async function api(url, method = 'GET', body) {
   const res = await fetch(url, {
     method,
@@ -35,339 +28,140 @@ async function api(url, method = 'GET', body) {
   return await res.json();
 }
 
-/* ============================
-   CREATE BACKUP
-   ============================ */
+// Load backups list
+async function loadBackups() {
+  const spinner = document.getElementById('loadingSpinner');
+  const tableBody = document.getElementById('backupsTableBody');
+  
+  try {
+    spinner.style.display = 'block';
+    const response = await api('/backups/list');
+    const backups = response.backups || [];
+    
+    if (backups.length === 0) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="4" class="text-center text-muted py-4">
+            No backups found. Create your first backup above.
+          </td>
+        </tr>
+      `;
+    } else {
+      tableBody.innerHTML = backups.map(backup => `
+        <tr>
+          <td><i class="bi bi-file-earmark-arrow-down me-2"></i><span class="font-monospace">${backup.filename}</span></td>
+          <td>${formatDate(backup.created)}</td>
+          <td>${formatFileSize(backup.size)}</td>
+          <td>
+            <div class="btn-group btn-group-sm" role="group">
+              <button class="btn btn-outline-primary" onclick="downloadBackup('${backup.filename}')" title="Download">
+                <i class="bi bi-download"></i>
+              </button>
+              <button class="btn btn-outline-success" onclick="openRestoreConfirmation('${backup.filename}')" title="Restore">
+                <i class="bi bi-arrow-clockwise"></i>
+              </button>
+              <button class="btn btn-outline-danger" onclick="deleteBackupConfirm('${backup.filename}')" title="Delete">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+  } catch (err) {
+    console.error('Load backups error:', err);
+    showToast('Failed to load backups: ' + err.message, 'error');
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="4" class="text-center text-danger py-4">
+          Error loading backups. Please refresh the page.
+        </td>
+      </tr>
+    `;
+  } finally {
+    spinner.style.display = 'none';
+  }
+}
+
+// Create backup
 async function createBackup() {
   try {
     showToast('Creating backup...', 'info');
-
     const response = await api('/backups/create', 'POST');
-
-    if (!response.sql) {
-      throw new Error('No backup data returned');
-    }
-
-    // Create a blob and download as SQL file
-    const blob = new Blob([response.sql], {
-      type: 'application/sql'
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    link.download = `backup-${timestamp}.sql`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    showToast('✅ Backup created and downloaded successfully', 'success');
+    showToast('✅ Backup created: ' + response.filename, 'success');
+    loadBackups();
   } catch (err) {
-    console.error('Backup error:', err);
+    console.error('Create backup error:', err);
     showToast('❌ Failed to create backup: ' + err.message, 'error');
   }
 }
 
-/* ============================
-   RESTORE MODAL
-   ============================ */
-function openRestoreModal() {
-  document.getElementById('restoreModal').classList.add('active');
-  resetRestoreForm();
-}
-
-function closeRestoreModal() {
-  document.getElementById('restoreModal').classList.remove('active');
-  resetRestoreForm();
-}
-
-function resetRestoreForm() {
-  const fileInput = document.getElementById('backupFile');
-  const preview = document.getElementById('backupPreview');
-  const errorDiv = document.getElementById('parseError');
-  const restoreBtn = document.getElementById('restoreBtn');
-  
-  if (fileInput) fileInput.value = '';
-  if (preview) preview.style.display = 'none';
-  if (errorDiv) errorDiv.style.display = 'none';
-  if (restoreBtn) restoreBtn.disabled = true;
-  
-  backupData = null;
-  backupMode = null;
-}
-
-/* ============================
-   VALIDATE BACKUP FILE
-   ============================ */
-async function validateBackupFile(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
+// Download backup
+async function downloadBackup(filename) {
   try {
-    const text = await file.text();
-    const isSqlFile = file.name.toLowerCase().endsWith('.sql');
-
-    if (isSqlFile) {
-      backupMode = 'sql';
-      backupData = text;
-
-      const lineCount = text.split('\n').length;
-      const sizeKb = (file.size / 1024).toFixed(1);
-      const details = `
-        <strong>Type:</strong> SQL script<br>
-        <strong>File:</strong> ${file.name}<br>
-        <strong>Size:</strong> ${sizeKb} KB<br>
-        <strong>Lines:</strong> ${lineCount}
-      `;
-      const detailsEl = document.getElementById('backupDetails');
-      const previewEl = document.getElementById('backupPreview');
-      const errorEl = document.getElementById('parseError');
-      const restoreBtn = document.getElementById('restoreBtn');
-      
-      if (detailsEl) detailsEl.innerHTML = details;
-      if (previewEl) previewEl.style.display = 'block';
-      if (errorEl) errorEl.style.display = 'none';
-      if (restoreBtn) restoreBtn.disabled = false;
-      return;
-    }
-
-    backupMode = 'json';
-    backupData = JSON.parse(text);
-
-    // Validate structure
-    if (!backupData.metadata || !backupData.tables) {
-      throw new Error('Invalid backup format: missing metadata or tables');
-    }
-
-    const { metadata, tables } = backupData;
-
-    // Show backup info
-    const details = `
-      <strong>Created:</strong> ${new Date(metadata.createdAt).toLocaleString()}<br>
-      <strong>Tables:</strong> ${Object.keys(tables).join(', ')}<br>
-      <strong>Records:</strong> ${Object.entries(tables)
-        .map(
-          ([table, records]) =>
-            `${table}: ${Array.isArray(records) ? records.length : 0}`
-        )
-        .join(', ')}
-    `;
-    const detailsEl = document.getElementById('backupDetails');
-    const previewEl = document.getElementById('backupPreview');
-    const errorEl = document.getElementById('parseError');
-    const restoreBtn = document.getElementById('restoreBtn');
+    const link = document.createElement('a');
+    link.href = `/backups/download/${encodeURIComponent(filename)}`;
+    link.download = filename;
+    link.style.display = 'none';
     
-    if (detailsEl) detailsEl.innerHTML = details;
-    if (previewEl) previewEl.style.display = 'block';
-    if (errorEl) errorEl.style.display = 'none';
-    if (restoreBtn) restoreBtn.disabled = false;
-  } catch (err) {
-    console.error('Backup validation error:', err);
-    const errorMsgEl = document.getElementById('parseErrorMsg');
-    const errorEl = document.getElementById('parseError');
-    const previewEl = document.getElementById('backupPreview');
-    const restoreBtn = document.getElementById('restoreBtn');
-    
-    if (errorMsgEl) errorMsgEl.textContent = err.message;
-    if (errorEl) errorEl.style.display = 'block';
-    if (previewEl) previewEl.style.display = 'none';
-    if (restoreBtn) restoreBtn.disabled = true;
-    backupData = null;
-  }
-}
-
-/* ============================
-   RESTORE BACKUP
-   ============================ */
-async function restoreBackup() {
-  if (!backupData) {
-    showToast('❌ No backup data loaded', 'error');
-    return;
-  }
-
-  try {
-    showToast('Validating backup...', 'info');
-
-    // For SQL backups, skip validation and go straight to confirmation
-    if (backupMode === 'sql') {
-      const confirmed = await confirm(
-        '⚠️ WARNING: SQL Backup\n\nThis will replace all application data with the backup data. User accounts will NOT be affected.\n\nThis action CANNOT be undone.\n\nContinue?'
-      );
-      if (!confirmed) return;
-      
-      return await executeRestore(false);
-    }
-
-    // For JSON backups, validate first
-    const validationResponse = await api('/backups/validate', 'POST', { 
-      backup: backupData 
+    // Add auth header via fetch, then trigger download
+    const response = await fetch(link.href, {
+      headers: { 'Authorization': 'Bearer ' + token }
     });
-
-    const report = validationResponse.report;
-
-    // Show validation report
-    showValidationReport(report, async () => {
-      // User confirmed, proceed with restore
-      return await executeRestore(false);
-    });
-
+    
+    if (!response.ok) {
+      throw new Error('Download failed');
+    }
+    
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    showToast('✅ Backup downloaded', 'success');
   } catch (err) {
-    console.error('Validation/Restore error:', err);
-    
-    // If validation failed, ask if user wants to force restore
-    if (err.message.includes('Validation') || err.message.includes('validation')) {
-      const forceRestore = await confirm(
-        '⚠️ Validation error: ' + err.message + '\n\nDo you want to force restore anyway? This may result in data inconsistencies.\n\nContinue?'
-      );
-      
-      if (forceRestore) {
-        return await executeRestore(true);
-      }
-    } else {
-      showToast('❌ Error: ' + err.message, 'error');
-    }
+    console.error('Download error:', err);
+    showToast('❌ Failed to download backup', 'error');
   }
 }
 
-/* ============================
-   SHOW VALIDATION REPORT
-   ============================ */
-function showValidationReport(report, onConfirm) {
-  let html = '<div style="max-height: 400px; overflow-y: auto; margin-bottom: 20px;">';
-  
-  html += '<h4>📊 Backup Validation Report</h4>';
-  html += `<p><strong>Backup Date:</strong> ${new Date(report.metadata.createdAt).toLocaleString()}</p>`;
-  html += `<p><strong>Total Records:</strong> ${report.totalRecords}</p>`;
-  
-  // Table breakdown
-  html += '<h5>Tables to be restored:</h5>';
-  html += '<ul>';
-  for (const [table, info] of Object.entries(report.tables)) {
-    const statusIcon = 
-      info.status === 'OK' ? '✅' : 
-      info.status === 'WARNING' ? '⚠️' : 
-      '❌';
-    html += `<li>${statusIcon} <strong>${table}:</strong> ${info.rowCount} records`;
-    
-    if (info.skippedColumns && info.skippedColumns.length > 0) {
-      html += ` <em>(skipping columns: ${info.skippedColumns.join(', ')})</em>`;
-    }
-    html += '</li>';
-  }
-  html += '</ul>';
-  
-  // Warnings
-  if (report.warnings && report.warnings.length > 0) {
-    html += '<h5>⚠️ Warnings:</h5>';
-    html += '<ul>';
-    report.warnings.forEach(w => html += `<li>${w}</li>`);
-    html += '</ul>';
-  }
-  
-  // Errors
-  if (report.errors && report.errors.length > 0) {
-    html += '<h5>❌ Errors:</h5>';
-    html += '<ul>';
-    report.errors.forEach(e => html += `<li>${e}</li>`);
-    html += '</ul>';
-    html += '<p style="color: #d32f2f;"><strong>⚠️ Note:</strong> Some data may not be restored due to schema mismatches.</p>';
-  }
-  
-  html += '</div>';
-  html += '<p style="margin-bottom: 20px;"><strong>This will replace all application data with the backup data. User accounts will NOT be affected.</strong></p>';
-  html += '<p style="margin-bottom: 20px; color: #d32f2f;"><strong>This action CANNOT be undone.</strong></p>';
-
-  // Create a custom confirmation modal
-  const modalHtml = `
-    <div id="validationReportModal" style="
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.7);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 10000;
-    ">
-      <div style="
-        background: white;
-        padding: 30px;
-        border-radius: 8px;
-        max-width: 600px;
-        width: 90%;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      ">
-        ${html}
-        <div style="display: flex; gap: 10px; justify-content: flex-end;">
-          <button onclick="closeValidationReport()" style="
-            padding: 10px 20px;
-            border: 1px solid #ccc;
-            background: #f5f5f5;
-            border-radius: 4px;
-            cursor: pointer;
-          ">Cancel</button>
-          <button onclick="confirmAndRestore()" style="
-            padding: 10px 20px;
-            background: #d32f2f;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-          ">Continue & Restore</button>
-        </div>
-      </div>
-    </div>
-  `;
-  
-  document.body.insertAdjacentHTML('beforeend', modalHtml);
-  
-  // Store the confirmation callback
-  window.restoreConfirmCallback = onConfirm;
+// Open restore confirmation
+function openRestoreConfirmation(filename) {
+  currentRestoreFilename = filename;
+  document.getElementById('restoreFilename').textContent = filename;
+  restoreModal.show();
 }
 
-function closeValidationReport() {
-  const modal = document.getElementById('validationReportModal');
-  if (modal) modal.remove();
-}
-
-async function confirmAndRestore() {
-  closeValidationReport();
-  if (window.restoreConfirmCallback) {
-    await window.restoreConfirmCallback();
-  }
-}
-
-/* ============================
-   EXECUTE RESTORE
-   ============================ */
-async function executeRestore(force = false) {
+// Confirm restore
+async function confirmRestore() {
+  if (!currentRestoreFilename) return;
+  
   try {
-    showToast('Restoring backup...', 'info');
-
-    const payload =
-      backupMode === 'sql'
-        ? { sql: backupData }
-        : { backup: backupData, force };
-
-    const response = await api('/backups/restore', 'POST', payload);
-
-    // Check if validation is required
-    if (response.requiresConfirmation && !force) {
-      showValidationReport(response.report, async () => {
-        return await executeRestore(true);
-      });
-      return;
+    showToast('Loading backup file...', 'info');
+    
+    // Download the backup content
+    const response = await fetch(`/backups/download/${encodeURIComponent(currentRestoreFilename)}`, {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to load backup file');
     }
-
-    closeRestoreModal();
-    showToast(
-      '✅ Backup restored successfully. Page will reload...',
-      'success'
-    );
-
+    
+    const sqlContent = await response.text();
+    
+    showToast('Restoring database...', 'info');
+    
+    // Restore the backup
+    const result = await api('/backups/restore', 'POST', { sql: sqlContent });
+    
+    restoreModal.hide();
+    showToast('✅ Backup restored successfully. Page will reload...', 'success');
+    
     setTimeout(() => {
       location.reload();
     }, 2000);
@@ -377,44 +171,98 @@ async function executeRestore(force = false) {
   }
 }
 
-/* ============================
-   RESET TO WIZARD
-   ============================ */
-function toggleDangerZone() {
-  const content = document.getElementById('dangerZoneContent');
-  const btn = document.getElementById('dangerZoneBtn');
+// Delete backup
+async function deleteBackupConfirm(filename) {
+  if (!confirm(`Delete backup "${filename}"?\n\nThis cannot be undone.`)) {
+    return;
+  }
   
-  if (content.classList.contains('active')) {
-    content.classList.remove('active');
-    btn.textContent = '🚨 Reset Whole Site';
-  } else {
-    content.classList.add('active');
-    btn.textContent = '✖ Hide Danger Zone';
+  try {
+    await fetch(`/backups/${encodeURIComponent(filename)}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      }
+    });
+    
+    showToast('✅ Backup deleted', 'success');
+    loadBackups();
+  } catch (err) {
+    console.error('Delete error:', err);
+    showToast('❌ Failed to delete backup', 'error');
   }
 }
 
+// Open upload modal
+function openUploadModal() {
+  document.getElementById('backupFileInput').value = '';
+  uploadModal.show();
+}
+
+// Upload backup
+async function uploadBackup() {
+  const fileInput = document.getElementById('backupFileInput');
+  const file = fileInput.files[0];
+  
+  if (!file) {
+    showToast('Please select a file', 'warning');
+    return;
+  }
+  
+  if (!file.name.endsWith('.sql')) {
+    showToast('Only .sql files are allowed', 'error');
+    return;
+  }
+  
+  try {
+    showToast('Uploading backup...', 'info');
+    
+    const formData = new FormData();
+    formData.append('backup', file);
+    
+    const response = await fetch('/backups/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token
+      },
+      body: formData
+    });
+    
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || 'Upload failed');
+    }
+    
+    const result = await response.json();
+    
+    uploadModal.hide();
+    showToast('✅ Backup uploaded: ' + result.filename, 'success');
+    loadBackups();
+  } catch (err) {
+    console.error('Upload error:', err);
+    showToast('❌ Failed to upload backup: ' + err.message, 'error');
+  }
+}
+
+// Open reset modal
 function openResetModal() {
-  document.getElementById('resetWizardModal').classList.add('active');
   document.getElementById('resetConfirmText').value = '';
   document.getElementById('confirmResetBtn').disabled = true;
+  resetModal.show();
 }
 
-function closeResetModal() {
-  document.getElementById('resetWizardModal').classList.remove('active');
-  document.getElementById('resetConfirmText').value = '';
-  document.getElementById('confirmResetBtn').disabled = true;
-}
-
+// Confirm reset
 async function confirmReset() {
   const confirmText = document.getElementById('resetConfirmText').value;
 
   if (confirmText !== 'RESET TO WIZARD') {
-    showToast('❌ Invalid confirmation text. Type exactly: RESET TO WIZARD', 'error');
+    showToast('❌ Invalid confirmation text', 'error');
     return;
   }
 
   try {
-    showToast('🔄 Resetting application to setup wizard...', 'info');
+    showToast('🔄 Resetting application...', 'info');
 
     const response = await api('/setup-wizard/reset', 'POST', {
       confirmText: confirmText
@@ -424,9 +272,8 @@ async function confirmReset() {
       throw new Error(response.error || 'Reset failed');
     }
 
-    showToast('✅ Reset successful. Redirecting to setup wizard...', 'success');
+    showToast('✅ Reset successful. Redirecting...', 'success');
     
-    // Clear auth and redirect after 2 seconds
     setTimeout(() => {
       localStorage.removeItem('token');
       localStorage.removeItem('role');
@@ -438,38 +285,39 @@ async function confirmReset() {
   }
 }
 
-/* ============================
-   NAVIGATION
-   ============================ */
-function back() {
-  location.href = 'dashboard.html';
-}
-
-// Close modal when clicking outside
-document.addEventListener('click', function (event) {
-  const restoreModal = document.getElementById('restoreModal');
-  const resetModal = document.getElementById('resetWizardModal');
-  
-  if (event.target === restoreModal) {
-    closeRestoreModal();
-  }
-  
-  if (event.target === resetModal) {
-    closeResetModal();
-  }
-});
-
-// Add file input listener for backup file validation
-const backupFileInput = document.getElementById('backupFile');
-if (backupFileInput) {
-  backupFileInput.addEventListener('change', validateBackupFile);
-}
-
-// Add reset confirmation text validation
-const resetConfirmInput = document.getElementById('resetConfirmText');
-const confirmResetBtn = document.getElementById('confirmResetBtn');
-if (resetConfirmInput && confirmResetBtn) {
-  resetConfirmInput.addEventListener('input', function(e) {
-    confirmResetBtn.disabled = e.target.value !== 'RESET TO WIZARD';
+// Format helpers
+function formatDate(dateString) {
+  const date = new Date(dateString);
+  return date.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
   });
 }
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+  // Initialize Bootstrap modals
+  uploadModal = new bootstrap.Modal(document.getElementById('uploadModal'));
+  restoreModal = new bootstrap.Modal(document.getElementById('restoreModal'));
+  resetModal = new bootstrap.Modal(document.getElementById('resetModal'));
+  
+  // Reset confirmation text validation
+  const resetConfirmInput = document.getElementById('resetConfirmText');
+  const confirmResetBtn = document.getElementById('confirmResetBtn');
+  
+  resetConfirmInput.addEventListener('input', (e) => {
+    confirmResetBtn.disabled = e.target.value !== 'RESET TO WIZARD';
+  });
+  
+  // Load initial backups
+  loadBackups();
+});
