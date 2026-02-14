@@ -557,11 +557,24 @@ async function deleteBackup(filename) {
 /**
  * Save a backup to disk
  * @param {string} sqlContent - SQL backup content
- * @returns {string} filename - The generated backup filename
+ * @returns {Object} result - Object with filename and deletedOldest flag
  */
 async function saveBackup(sqlContent) {
   try {
     await fs.mkdir(BACKUP_DIR, { recursive: true });
+    
+    // Check if we need to delete oldest backup (max 20 backups)
+    const MAX_BACKUPS = 20;
+    const existingBackups = await listBackups();
+    let deletedOldest = null;
+    
+    if (existingBackups.length >= MAX_BACKUPS) {
+      // Delete the oldest backup
+      const oldestBackup = existingBackups[existingBackups.length - 1];
+      await deleteBackup(oldestBackup.filename);
+      deletedOldest = oldestBackup.filename;
+      console.log(`🗑️ Deleted oldest backup to maintain limit: ${oldestBackup.filename}`);
+    }
     
     const timestamp = new Date().toISOString()
       .replace(/[:.]/g, '-')
@@ -572,7 +585,11 @@ async function saveBackup(sqlContent) {
     
     await fs.writeFile(filePath, sqlContent, 'utf-8');
     
-    return filename;
+    return { 
+      filename, 
+      deletedOldest,
+      isAtLimit: existingBackups.length >= MAX_BACKUPS
+    };
   } catch (err) {
     console.error('Error saving backup:', err);
     throw err;

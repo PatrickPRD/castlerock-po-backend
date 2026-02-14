@@ -50,6 +50,18 @@
             </tr>
           </tbody>
         </table>
+        
+        <!-- Pagination Controls -->
+        <div id="paginationControls" class="d-flex justify-content-between align-items-center mt-3" style="display: none !important;">
+          <div id="paginationInfo" class="text-muted">
+            Showing <span id="paginationStart">0</span> to <span id="paginationEnd">0</span> of <span id="paginationTotal">0</span> backups
+          </div>
+          <nav>
+            <ul class="pagination pagination-sm mb-0" id="paginationButtons">
+              <!-- Pagination buttons will be inserted here -->
+            </ul>
+          </nav>
+        </div>
       </div>
     </div>
   </div>
@@ -151,6 +163,33 @@
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-danger" id="confirmResetBtn" onclick="confirmReset()" disabled>
           <i class="bi bi-exclamation-octagon me-1"></i> Yes, Reset Everything
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Backup Limit Warning Modal -->
+<div class="modal fade" id="backupLimitModal" tabindex="-1" style="z-index: 1055;">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-dark">
+        <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Backup Limit Reached</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>
+          <strong>Maximum backups (20) reached!</strong>
+        </div>
+        <p class="mb-2">Creating a new backup will automatically delete the oldest backup:</p>
+        <p id="oldestBackupName" class="font-monospace bg-light p-2 rounded"></p>
+        <p class="mb-0"><strong>Do you want to continue?</strong></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-warning" onclick="proceedWithBackup()">
+          <i class="bi bi-download me-1"></i> Yes, Create Backup
         </button>
       </div>
     </div>

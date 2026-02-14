@@ -43,12 +43,18 @@ router.post(
       const sqlBackup = await createBackupSql();
       
       // Save backup to disk
-      const filename = await saveBackup(sqlBackup);
-      console.log(`✅ Backup saved as ${filename}`);
+      const result = await saveBackup(sqlBackup);
+      console.log(`✅ Backup saved as ${result.filename}`);
+      
+      if (result.deletedOldest) {
+        console.log(`🗑️ Deleted oldest backup: ${result.deletedOldest}`);
+      }
       
       res.json({ 
         success: true, 
-        filename,
+        filename: result.filename,
+        deletedOldest: result.deletedOldest,
+        isAtLimit: result.isAtLimit,
         message: 'Backup created and saved successfully'
       });
     } catch (err) {
@@ -226,11 +232,13 @@ router.post(
       }
       
       const sqlContent = req.file.buffer.toString('utf-8');
-      const filename = await saveBackup(sqlContent);
+      const result = await saveBackup(sqlContent);
       
       res.json({ 
         success: true, 
-        filename,
+        filename: result.filename,
+        deletedOldest: result.deletedOldest,
+        isAtLimit: result.isAtLimit,
         message: 'Backup uploaded successfully'
       });
     } catch (err) {

@@ -7,7 +7,11 @@ if (!token || role !== 'super_admin') {
 }
 
 let currentRestoreFilename = null;
-let uploadModal, restoreModal, resetModal;
+let uploadModal, restoreModal, resetModal, backupLimitModal;
+let allBackups = []; // Store all backups for pagination
+let currentPage = 1;
+const ITEMS_PER_PAGE = 10;
+const MAX_BACKUPS = 20;
 
 // API helper
 async function api(url, method = 'GET', body) {
@@ -36,9 +40,9 @@ async function loadBackups() {
   try {
     spinner.style.display = 'block';
     const response = await api('/backups/list');
-    const backups = response.backups || [];
+    allBackups = response.backups || [];
     
-    if (backups.length === 0) {
+    if (allBackups.length === 0) {
       tableBody.innerHTML = `
         <tr>
           <td colspan="4" class="text-center text-muted py-4">
@@ -46,27 +50,11 @@ async function loadBackups() {
           </td>
         </tr>
       `;
+      document.getElementById('paginationControls').style.display = 'none';
     } else {
-      tableBody.innerHTML = backups.map(backup => `
-        <tr>
-          <td><i class="bi bi-file-earmark-arrow-down me-2"></i><span class="font-monospace">${backup.filename}</span></td>
-          <td>${formatDate(backup.created)}</td>
-          <td>${formatFileSize(backup.size)}</td>
-          <td>
-            <div class="btn-group btn-group-sm" role="group">
-              <button class="btn btn-outline-primary" onclick="downloadBackup('${backup.filename}')" title="Download">
-                <i class="bi bi-download"></i>
-              </button>
-              <button class="btn btn-outline-success" onclick="openRestoreConfirmation('${backup.filename}')" title="Restore">
-                <i class="bi bi-arrow-clockwise"></i>
-              </button>
-              <button class="btn btn-outline-danger" onclick="deleteBackupConfirm('${backup.filename}')" title="Delete">
-                <i class="bi bi-trash"></i>
-              </button>
-            </div>
-          </td>
-        </tr>
-      `).join('');
+      renderPage(currentPage);
+      renderPagination();
+      document.getElementById('paginationControls').style.display = 'flex';
     }
   } catch (err) {
     console.error('Load backups error:', err);
@@ -83,12 +71,125 @@ async function loadBackups() {
   }
 }
 
+// Render a specific page of backups
+function renderPage(page) {
+  const tableBody = document.getElementById('backupsTableBody');
+  const startIndex = (page - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const pageBackups = allBackups.slice(startIndex, endIndex);
+  
+  tableBody.innerHTML = pageBackups.map(backup => `
+    <tr>
+      <td><i class="bi bi-file-earmark-arrow-down me-2"></i><span class="font-monospace">${backup.filename}</span></td>
+      <td>${formatDate(backup.created)}</td>
+      <td>${formatFileSize(backup.size)}</td>
+      <td>
+        <div class="btn-group btn-group-sm" role="group">
+          <button class="btn btn-outline-primary" onclick="downloadBackup('${backup.filename}')" title="Download">
+            <i class="bi bi-download"></i>
+          </button>
+          <button class="btn btn-outline-success" onclick="openRestoreConfirmation('${backup.filename}')" title="Restore">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+          <button class="btn btn-outline-danger" onclick="deleteBackupConfirm('${backup.filename}')" title="Delete">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+  
+  // Update pagination info
+  document.getElementById('paginationStart').textContent = allBackups.length > 0 ? startIndex + 1 : 0;
+  document.getElementById('paginationEnd').textContent = Math.min(endIndex, allBackups.length);
+  document.getElementById('paginationTotal').textContent = allBackups.length;
+}
+
+// Render pagination controls
+function renderPagination() {
+  const totalPages = Math.ceil(allBackups.length / ITEMS_PER_PAGE);
+  const paginationButtons = document.getElementById('paginationButtons');
+  
+  if (totalPages <= 1) {
+    paginationButtons.innerHTML = '';
+    return;
+  }
+  
+  let buttonsHtml = '';
+  
+  // Previous button
+  buttonsHtml += `
+    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+      <a class="page-link" href="#" onclick="goToPage(${currentPage - 1}); return false;">Previous</a>
+    </li>
+  `;
+  
+  // Page numbers
+  for (let i = 1; i <= totalPages; i++) {
+    if (
+      i === 1 || 
+      i === totalPages || 
+      (i >= currentPage - 1 && i <= currentPage + 1)
+    ) {
+      buttonsHtml += `
+        <li class="page-item ${i === currentPage ? 'active' : ''}">
+          <a class="page-link" href="#" onclick="goToPage(${i}); return false;">${i}</a>
+        </li>
+      `;
+    } else if (i === currentPage - 2 || i === currentPage + 2) {
+      buttonsHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+    }
+  }
+  
+  // Next button
+  buttonsHtml += `
+    <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+      <a class="page-link" href="#" onclick="goToPage(${currentPage + 1}); return false;">Next</a>
+    </li>
+  `;
+  
+  paginationButtons.innerHTML = buttonsHtml;
+}
+
+// Navigate to a specific page
+function goToPage(page) {
+  const totalPages = Math.ceil(allBackups.length / ITEMS_PER_PAGE);
+  if (page < 1 || page > totalPages) return;
+  
+  currentPage = page;
+  renderPage(currentPage);
+  renderPagination();
+}
+
 // Create backup
 async function createBackup() {
+  // Check if at limit
+  if (allBackups.length >= MAX_BACKUPS) {
+    const oldestBackup = allBackups[allBackups.length - 1];
+    document.getElementById('oldestBackupName').textContent = oldestBackup.filename;
+    backupLimitModal.show();
+    return;
+  }
+  
+  await proceedWithBackup();
+}
+
+// Proceed with backup creation (after warning if needed)
+async function proceedWithBackup() {
   try {
+    if (backupLimitModal) {
+      backupLimitModal.hide();
+    }
+    
     showToast('Creating backup...', 'info');
     const response = await api('/backups/create', 'POST');
-    showToast('✅ Backup created: ' + response.filename, 'success');
+    
+    if (response.deletedOldest) {
+      showToast(`✅ Backup created: ${response.filename}\n🗑️ Deleted oldest: ${response.deletedOldest}`, 'success');
+    } else {
+      showToast('✅ Backup created: ' + response.filename, 'success');
+    }
+    
     loadBackups();
   } catch (err) {
     console.error('Create backup error:', err);
@@ -215,6 +316,17 @@ async function uploadBackup() {
     return;
   }
   
+  // Check if at limit - show warning but allow upload
+  if (allBackups.length >= MAX_BACKUPS) {
+    const oldestBackup = allBackups[allBackups.length - 1];
+    const confirmed = confirm(
+      `Maximum backups (${MAX_BACKUPS}) reached!\n\n` +
+      `Uploading will delete the oldest backup:\n${oldestBackup.filename}\n\n` +
+      `Do you want to continue?`
+    );
+    if (!confirmed) return;
+  }
+  
   try {
     showToast('Uploading backup...', 'info');
     
@@ -237,7 +349,13 @@ async function uploadBackup() {
     const result = await response.json();
     
     uploadModal.hide();
-    showToast('✅ Backup uploaded: ' + result.filename, 'success');
+    
+    if (result.deletedOldest) {
+      showToast(`✅ Backup uploaded: ${result.filename}\n🗑️ Deleted oldest: ${result.deletedOldest}`, 'success');
+    } else {
+      showToast('✅ Backup uploaded: ' + result.filename, 'success');
+    }
+    
     loadBackups();
   } catch (err) {
     console.error('Upload error:', err);
@@ -309,6 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
   uploadModal = new bootstrap.Modal(document.getElementById('uploadModal'));
   restoreModal = new bootstrap.Modal(document.getElementById('restoreModal'));
   resetModal = new bootstrap.Modal(document.getElementById('resetModal'));
+  backupLimitModal = new bootstrap.Modal(document.getElementById('backupLimitModal'));
   
   // Reset confirmation text validation
   const resetConfirmInput = document.getElementById('resetConfirmText');
