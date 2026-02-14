@@ -4,6 +4,7 @@ const router = express.Router();
 const { authenticate } = require('../middleware/auth');
 const authorizeRoles = require('../middleware/authorizeRoles');
 const db = require('../db');
+const logAudit = require('../services/auditService');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const ExcelJS = require('exceljs');
@@ -531,11 +532,21 @@ router.post(
       });
     }
 
-    await db.query(
+    const [result] = await db.query(
       `INSERT INTO po_stages (name, active)
        VALUES (?, ?)`,
       [name.trim(), active ? 1 : 0]
     );
+
+    await logAudit({
+      table_name: 'po_stages',
+      record_id: result.insertId,
+      action: 'CREATE',
+      old_data: null,
+      new_data: { name: name.trim(), active: active ? 1 : 0 },
+      changed_by: req.user.id,
+      req
+    });
 
     res.json({ success: true });
   }
@@ -555,12 +566,31 @@ router.put(
       });
     }
 
+    const [[oldStage]] = await db.query(
+      'SELECT * FROM po_stages WHERE id = ?',
+      [stageId]
+    );
+
+    if (!oldStage) {
+      return res.status(404).json({ error: 'Stage not found' });
+    }
+
     await db.query(
       `UPDATE po_stages
        SET name = ?, active = ?
        WHERE id = ?`,
       [name.trim(), active ? 1 : 0, stageId]
     );
+
+    await logAudit({
+      table_name: 'po_stages',
+      record_id: stageId,
+      action: 'UPDATE',
+      old_data: oldStage,
+      new_data: { name: name.trim(), active: active ? 1 : 0 },
+      changed_by: req.user.id,
+      req
+    });
 
     res.json({ success: true });
   }
@@ -572,6 +602,15 @@ router.delete(
   authorizeRoles('super_admin'),
   async (req, res) => {
     const stageId = req.params.id;
+
+    const [[stage]] = await db.query(
+      'SELECT * FROM po_stages WHERE id = ?',
+      [stageId]
+    );
+
+    if (!stage) {
+      return res.status(404).json({ error: 'Stage not found' });
+    }
 
     const [rows] = await db.query(
       `SELECT COUNT(*) AS count
@@ -590,6 +629,16 @@ router.delete(
       `DELETE FROM po_stages WHERE id = ?`,
       [stageId]
     );
+
+    await logAudit({
+      table_name: 'po_stages',
+      record_id: stageId,
+      action: 'DELETE',
+      old_data: stage,
+      new_data: null,
+      changed_by: req.user.id,
+      req
+    });
 
     res.json({ success: true });
   }
