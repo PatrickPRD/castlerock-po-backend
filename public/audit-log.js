@@ -254,7 +254,7 @@ function renderJsonTable(obj) {
       ${Object.entries(obj).map(([key, value]) => `
         <tr>
           <td class="change-key">${formatFieldName(key)}</td>
-          <td class="change-value">${formatValue(value)}</td>
+          <td class="change-value">${formatValue(value, key)}</td>
         </tr>
       `).join('')}
     </table>
@@ -286,8 +286,8 @@ function renderChangesComparison(oldValues, newValues) {
           return `
             <tr class="${changed ? 'changed-row' : ''}">
               <td class="change-key">${formatFieldName(key)}</td>
-              <td class="change-old-value">${formatValue(oldVal)}</td>
-              <td class="change-new-value">${formatValue(newVal)}</td>
+              <td class="change-old-value">${formatValue(oldVal, key)}</td>
+              <td class="change-new-value">${formatValue(newVal, key)}</td>
             </tr>
           `;
         }).join('')}
@@ -309,7 +309,7 @@ function formatCurrency(value) {
   return '€' + value.toLocaleString('en-IE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function formatValue(value) {
+function formatValue(value, fieldName = '') {
   if (value === null || value === undefined) {
     return '<span class="text-muted">null</span>';
   }
@@ -320,6 +320,12 @@ function formatValue(value) {
   
   if (typeof value === 'object') {
     return `<code>${JSON.stringify(value, null, 2)}</code>`;
+  }
+  
+  // Format VAT rates as percentages
+  if (typeof value === 'number' && fieldName.toLowerCase().includes('vat_rate')) {
+    const percentage = (value * 100).toFixed(2);
+    return `${percentage}%`;
   }
   
   // Format currency values

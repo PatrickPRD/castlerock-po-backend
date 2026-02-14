@@ -182,7 +182,7 @@ class PDFService {
     } = branding;
     const formatMoney = value => `${currencySymbol}${Number(value || 0).toFixed(2)}`;
 
-    const vatAmount = (po_net_amount * (po_vat_rate / 100)).toFixed(2);
+    const vatAmount = (po_net_amount * po_vat_rate).toFixed(2);
     const poDate = new Date(po_date).toLocaleDateString('en-IE', {
       year: 'numeric',
       month: 'long',
@@ -257,7 +257,7 @@ class PDFService {
                 <td style="padding: 6px; font-size: 11px;">${this.escapeHtml(inv.invoice_number)}</td>
                 <td style="padding: 6px; font-size: 11px;">${inv.invoice_date}</td>
                 <td style="padding: 6px; text-align: right; font-size: 11px;">${formatMoney(inv.net_amount)}</td>
-                <td style="padding: 6px; text-align: right; font-size: 11px;">${parseFloat(inv.vat_rate || 0)}%</td>
+                <td style="padding: 6px; text-align: right; font-size: 11px;">${(parseFloat(inv.vat_rate || 0) * 100).toFixed(2)}%</td>
                 <td style="padding: 6px; text-align: right; font-size: 11px;">${formatMoney(inv.vat_amount)}</td>
                 <td style="padding: 6px; text-align: right; font-size: 11px; font-weight: 500;">${formatMoney(inv.total_amount)}</td>
               </tr>
@@ -569,7 +569,7 @@ class PDFService {
                   <div class="totals-value">${formatMoney(po_net_amount)}</div>
                 </div>
                 <div class="totals-row">
-                  <div class="totals-label">VAT (${po_vat_rate || 0}%):</div>
+                  <div class="totals-label">VAT (${(po_vat_rate * 100).toFixed(2)}%):</div>
                   <div class="totals-value">${formatMoney(vatAmount)}</div>
                 </div>
                 <div class="totals-row">
