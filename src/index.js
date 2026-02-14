@@ -5,6 +5,7 @@ const path = require('path');
 const pool = require('./db');
 const { ensureLeaveDefaults } = require('./services/leaveService');
 const { checkSetupRequired } = require('./middleware/setupCheck');
+const dynamicTitle = require('./middleware/dynamicTitle');
 
 const app = express();
 
@@ -20,42 +21,45 @@ app.use(express.static(path.join(__dirname, '../public')));
 // ✅ Check if setup is required before accessing protected pages
 app.use(checkSetupRequired);
 
+// Add dynamic title support (Company Name | CostTracker | Page Title)
+app.use(dynamicTitle);
+
 // Root route → login page
 app.get('/', (req, res) => {
-  res.render('login');
+  res.render('login', { pageTitle: 'Login' });
 });
 
 // Setup Wizard route
-app.get('/setup-wizard.html', (req, res) => res.render('setup-wizard'));
+app.get('/setup-wizard.html', (req, res) => res.render('setup-wizard', { pageTitle: 'Setup Wizard' }));
 
 // Page routes using EJS templates
-app.get('/login.html', (req, res) => res.render('login'));
-app.get('/reset-password.html', (req, res) => res.render('reset-password'));
-app.get('/dashboard.html', (req, res) => res.render('dashboard'));
-app.get('/suppliers.html', (req, res) => res.render('suppliers'));
-app.get('/create-po.html', (req, res) => res.render('create-po'));
-app.get('/edit-po.html', (req, res) => res.render('edit-po'));
-app.get('/invoice-entry.html', (req, res) => res.render('invoice-entry'));
-app.get('/edit-supplier.html', (req, res) => res.render('edit-supplier'));
-app.get('/edit-user.html', (req, res) => res.render('edit-user'));
-app.get('/users.html', (req, res) => res.render('users'));
-app.get('/workers.html', (req, res) => res.render('workers'));
-app.get('/timesheets.html', (req, res) => res.render('timesheets'));
-app.get('/locations.html', (req, res) => res.render('locations'));
-app.get('/sites.html', (req, res) => res.render('sites'));
-app.get('/stages.html', (req, res) => res.render('stages'));
-app.get('/location-spread.html', (req, res) => res.render('location-spread'));
-app.get('/backup-management.html', (req, res) => res.render('backup-management'));
-app.get('/application-settings.html', (req, res) => res.render('application-settings'));
+app.get('/login.html', (req, res) => res.render('login', { pageTitle: 'Login' }));
+app.get('/reset-password.html', (req, res) => res.render('reset-password', { pageTitle: 'Reset Password' }));
+app.get('/dashboard.html', (req, res) => res.render('dashboard', { pageTitle: 'Purchase Orders' }));
+app.get('/suppliers.html', (req, res) => res.render('suppliers', { pageTitle: 'Suppliers' }));
+app.get('/create-po.html', (req, res) => res.render('create-po', { pageTitle: 'Create Purchase Order' }));
+app.get('/edit-po.html', (req, res) => res.render('edit-po', { pageTitle: 'Edit Purchase Order' }));
+app.get('/invoice-entry.html', (req, res) => res.render('invoice-entry', { pageTitle: 'Invoice Entry' }));
+app.get('/edit-supplier.html', (req, res) => res.render('edit-supplier', { pageTitle: 'Edit Supplier' }));
+app.get('/edit-user.html', (req, res) => res.render('edit-user', { pageTitle: 'Edit User' }));
+app.get('/users.html', (req, res) => res.render('users', { pageTitle: 'Users' }));
+app.get('/workers.html', (req, res) => res.render('workers', { pageTitle: 'Workers' }));
+app.get('/timesheets.html', (req, res) => res.render('timesheets', { pageTitle: 'Timesheets' }));
+app.get('/locations.html', (req, res) => res.render('locations', { pageTitle: 'Locations' }));
+app.get('/sites.html', (req, res) => res.render('sites', { pageTitle: 'Sites' }));
+app.get('/stages.html', (req, res) => res.render('stages', { pageTitle: 'Stages' }));
+app.get('/location-spread.html', (req, res) => res.render('location-spread', { pageTitle: 'Location Spread' }));
+app.get('/backup-management.html', (req, res) => res.render('backup-management', { pageTitle: 'Backup Management' }));
+app.get('/application-settings.html', (req, res) => res.render('application-settings', { pageTitle: 'Application Settings' }));
 app.get('/header-branding.html', (req, res) => res.redirect('/application-settings.html'));
-app.get('/location-report.html', (req, res) => res.render('location-report'));
-app.get('/supplier-report.html', (req, res) => res.render('supplier-report'));
-app.get('/invoice-report.html', (req, res) => res.render('invoice-report'));
-app.get('/workers-information.html', (req, res) => res.render('workers-information'));
+app.get('/location-report.html', (req, res) => res.render('location-report', { pageTitle: 'Location Report' }));
+app.get('/supplier-report.html', (req, res) => res.render('supplier-report', { pageTitle: 'Supplier Report' }));
+app.get('/invoice-report.html', (req, res) => res.render('invoice-report', { pageTitle: 'Invoice Report' }));
+app.get('/workers-information.html', (req, res) => res.render('workers-information', { pageTitle: 'Workers Information' }));
 app.get('/leave-report.html', (req, res) => res.redirect('/workers-information.html'));
-app.get('/labour-costs.html', (req, res) => res.render('labour-costs'));
-app.get('/gdpr.html', (req, res) => res.render('gdpr'));
-app.get('/audit-log.html', (req, res) => res.render('audit-log'));
+app.get('/labour-costs.html', (req, res) => res.render('labour-costs', { pageTitle: 'Labour Costs' }));
+app.get('/gdpr.html', (req, res) => res.render('gdpr', { pageTitle: 'GDPR Privacy Notice' }));
+app.get('/audit-log.html', (req, res) => res.render('audit-log', { pageTitle: 'Audit Log' }));
 
 // Health check with database connectivity test
 app.get('/health', async (req, res) => {

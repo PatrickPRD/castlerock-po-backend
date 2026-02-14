@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title><%= title %></title>
+  <title><%= (companyName || 'Castlerock Homes') %> | CostTracker<% if (typeof pageTitle !== 'undefined') { %> | <%= pageTitle %><% } %></title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="icon" href="https://castlerock-po-assets-eu.s3.eu-north-1.amazonaws.com/POTrackerAssets/favicon.ico">
