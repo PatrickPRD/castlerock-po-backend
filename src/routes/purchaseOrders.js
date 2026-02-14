@@ -308,6 +308,36 @@ router.post(
         }
 
         await conn.commit();
+        
+        // Fetch context for audit log
+        const [[context]] = await conn.query(
+          `SELECT s.name as supplier_name, si.name as site_name, l.name as location_name
+           FROM suppliers s, sites si, locations l
+           WHERE s.id = ? AND si.id = ? AND l.id = ?`,
+          [supplierId, siteId, locationId]
+        );
+        
+        // Audit log
+        await logAudit({
+          table_name: 'purchase_orders',
+          record_id: result.insertId,
+          action: 'CREATE',
+          old_data: null,
+          new_data: {
+            po_number: poNumber,
+            supplier: context.supplier_name,
+            site: context.site_name,
+            location: context.location_name,
+            po_date: poDate,
+            net_amount: net,
+            vat_rate: vatDecimal,
+            total_amount: total,
+            line_items_count: normalizedLineItems.length
+          },
+          changed_by: req.user.id,
+          req
+        });
+        
         res.json({ success: true, poNumber });
       } catch (error) {
         await conn.rollback();
@@ -355,6 +385,12 @@ router.put(
     const conn = await db.getConnection();
     try {
       await conn.beginTransaction();
+
+      // Fetch old values for audit log
+      const [[oldPO]] = await conn.query(
+        'SELECT * FROM purchase_orders WHERE id = ?',
+        [id]
+      );
 
       await conn.query(`
         UPDATE purchase_orders
@@ -408,6 +444,53 @@ router.put(
       }
 
       await conn.commit();
+      
+      // Fetch context for audit log
+      const [[oldContext]] = await conn.query(
+        `SELECT s.name as supplier_name, si.name as site_name, l.name as location_name, ps.name as stage_name
+         FROM suppliers s, sites si, locations l, po_stages ps
+         WHERE s.id = ? AND si.id = ? AND l.id = ? AND ps.id = ?`,
+        [oldPO.supplier_id, oldPO.site_id, oldPO.location_id, oldPO.stage_id]
+      );
+      
+      const [[newContext]] = await conn.query(
+        `SELECT s.name as supplier_name, si.name as site_name, l.name as location_name, ps.name as stage_name
+         FROM suppliers s, sites si, locations l, po_stages ps
+         WHERE s.id = ? AND si.id = ? AND l.id = ? AND ps.id = ?`,
+        [supplierId, siteId, locationId, stageId]
+      );
+      
+      // Audit log
+      await logAudit({
+        table_name: 'purchase_orders',
+        record_id: id,
+        action: 'UPDATE',
+        old_data: {
+          po_number: oldPO.po_number,
+          supplier: oldContext.supplier_name,
+          site: oldContext.site_name,
+          location: oldContext.location_name,
+          stage: oldContext.stage_name,
+          po_date: oldPO.po_date,
+          net_amount: oldPO.net_amount,
+          vat_rate: oldPO.vat_rate,
+          total_amount: oldPO.total_amount
+        },
+        new_data: {
+          po_number: oldPO.po_number,
+          supplier: newContext.supplier_name,
+          site: newContext.site_name,
+          location: newContext.location_name,
+          stage: newContext.stage_name,
+          po_date: poDate,
+          net_amount: net,
+          vat_rate: vatDecimal,
+          total_amount: total
+        },
+        changed_by: req.user.id,
+        req
+      });
+      
       res.json({ success: true });
     } catch (error) {
       await conn.rollback();
@@ -458,6 +541,37 @@ router.delete(
         error: 'PO already cancelled or not found'
       });
     }
+
+    // Fetch PO details for audit log
+    const [[poDetails]] = await db.query(
+      `SELECT po.po_number, s.name as supplier_name, si.name as site_name
+       FROM purchase_orders po
+       JOIN suppliers s ON s.id = po.supplier_id
+       JOIN sites si ON si.id = po.site_id
+       WHERE po.id = ?`,
+      [id]
+    );
+    
+    // Audit log
+    await logAudit({
+      table_name: 'purchase_orders',
+      record_id: id,
+      action: 'CANCEL',
+      old_data: { 
+        po_number: poDetails.po_number,
+        supplier: poDetails.supplier_name,
+        site: poDetails.site_name,
+        status: 'Issued' 
+      },
+      new_data: { 
+        po_number: poDetails.po_number,
+        supplier: poDetails.supplier_name,
+        site: poDetails.site_name,
+        status: 'Cancelled' 
+      },
+      changed_by: req.user.id,
+      req
+    });
 
     res.json({ success: true });
   }

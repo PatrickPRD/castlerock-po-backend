@@ -1,0 +1,83 @@
+<%- include('partials/head', { title: 'Audit Log | Castlerock Homes', styles: ['admin.css', 'audit-log.css'] }) %>
+<%- include('partials/header', { pageTitle: 'Audit Log' }) %>
+
+<main class="container">
+
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-3">
+      <h3 class="mb-0"><i class="bi bi-journal-text me-2"></i>Audit Log</h3>
+      <div class="d-flex gap-2 flex-wrap">
+        <select id="filterTable" class="form-select form-select-sm" style="width: auto;">
+          <option value="">All Tables</option>
+          <option value="purchase_orders">Purchase Orders</option>
+          <option value="invoices">Invoices</option>
+          <option value="suppliers">Suppliers</option>
+          <option value="users">Users</option>
+          <option value="workers">Workers</option>
+          <option value="timesheets">Timesheets</option>
+        </select>
+        
+        <select id="filterAction" class="form-select form-select-sm" style="width: auto;">
+          <option value="">All Actions</option>
+          <option value="CREATE">Create</option>
+          <option value="UPDATE">Update</option>
+          <option value="DELETE">Delete</option>
+          <option value="CANCEL">Cancel</option>
+          <option value="LOGIN">Login</option>
+        </select>
+        
+        <button class="btn btn-outline-secondary btn-sm" id="refreshBtn" title="Refresh">
+          <i class="bi bi-arrow-clockwise"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 audit-table">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>User</th>
+            <th>Action</th>
+            <th>Table</th>
+            <th class="text-center">Record ID</th>
+            <th class="text-center">Changes</th>
+          </tr>
+        </thead>
+        <tbody id="auditTableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-3">
+      <div class="text-muted small" id="paginationInfo">Loading...</div>
+      <div class="d-flex gap-2 align-items-center">
+        <button class="btn btn-outline-secondary btn-sm" id="prevPageBtn" disabled>
+          <i class="bi bi-chevron-left"></i> Previous
+        </button>
+        <span class="fw-medium" id="pageIndicator">Page 1</span>
+        <button class="btn btn-outline-secondary btn-sm" id="nextPageBtn" disabled>
+          Next <i class="bi bi-chevron-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Changes Detail Modal -->
+  <div class="modal" id="changesModal" style="display:none;">
+    <div class="modal-content" style="max-width: 900px;">
+      <div class="modal-header">
+        <h3>Change Details</h3>
+        <button class="modal-close" type="button" data-modal-close="changesModal">×</button>
+      </div>
+      <div class="modal-body" id="changesModalBody">
+        <!-- Changes will be rendered here -->
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" type="button" data-modal-close="changesModal">Close</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<%- include('partials/footer', { scripts: ['audit-log.js'], includeNavScript: true }) %>

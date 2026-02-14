@@ -10,38 +10,135 @@ const db = require('../db');
    ====================================================== */
 
 /**
- * Get audit log for a specific entity
- * entityType: 'purchase_order' | 'invoice'
- * entityId: numeric ID
+ * Get all audit logs with filtering and pagination
+ * Query params:
+ * - page: page number (default 1)
+ * - limit: items per page (default 50)
+ * - table: filter by table name
+ * - action: filter by action type
+ * - user_id: filter by user
  */
 router.get(
-  '/:entityType/:entityId',
+  '/',
   authenticate,
   authorizeRoles('super_admin'),
   async (req, res) => {
-    const { entityType, entityId } = req.params;
+    try {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 50;
+      const offset = (page - 1) * limit;
+      
+      let whereConditions = [];
+      let queryParams = [];
+      
+      if (req.query.table) {
+        whereConditions.push('a.table_name = ?');
+        queryParams.push(req.query.table);
+      }
+      
+      if (req.query.action) {
+        whereConditions.push('a.action = ?');
+        queryParams.push(req.query.action);
+      }
+      
+      if (req.query.user_id) {
+        whereConditions.push('a.user_id = ?');
+        queryParams.push(req.query.user_id);
+      }
+      
+      const whereClause = whereConditions.length > 0 
+        ? 'WHERE ' + whereConditions.join(' AND ')
+        : '';
+      
+      // Get total count
+      const [[{ total }]] = await db.query(
+        `SELECT COUNT(*) as total FROM audit_log a ${whereClause}`,
+        queryParams
+      );
+      
+      // Get paginated results
+      const [rows] = await db.query(
+        `
+        SELECT
+          a.id,
+          a.user_id,
+          a.action,
+          a.table_name,
+          a.record_id,
+          a.old_values,
+          a.new_values,
+          a.ip_address,
+          a.user_agent,
+          a.created_at,
+          COALESCE(u.email, 'System') AS performed_by,
+          CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS performed_by_name
+        FROM audit_log a
+        LEFT JOIN users u ON a.user_id = u.id
+        ${whereClause}
+        ORDER BY a.created_at DESC
+        LIMIT ? OFFSET ?
+        `,
+        [...queryParams, limit, offset]
+      );
 
-    const [rows] = await db.query(
-      `
-      SELECT
-        a.id,
-        a.entity_type,
-        a.entity_id,
-        a.action,
-        a.old_value,
-        a.new_value,
-        a.created_at,
-        u.email AS performed_by
-      FROM audit_log a
-      JOIN users u ON a.user_id = u.id
-      WHERE a.entity_type = ?
-        AND a.entity_id = ?
-      ORDER BY a.created_at DESC
-      `,
-      [entityType, entityId]
-    );
+      res.json({
+        data: rows,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching audit logs:', error);
+      res.status(500).json({ error: 'Failed to fetch audit logs' });
+    }
+  }
+);
 
-    res.json(rows);
+/**
+ * Get audit log for a specific record
+ * tableName: table name (e.g., 'purchase_orders', 'invoices')
+ * recordId: numeric ID
+ */
+router.get(
+  '/:tableName/:recordId',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      const { tableName, recordId } = req.params;
+
+      const [rows] = await db.query(
+        `
+        SELECT
+          a.id,
+          a.user_id,
+          a.action,
+          a.table_name,
+          a.record_id,
+          a.old_values,
+          a.new_values,
+          a.ip_address,
+          a.user_agent,
+          a.created_at,
+          COALESCE(u.email, 'System') AS performed_by,
+          CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS performed_by_name
+        FROM audit_log a
+        LEFT JOIN users u ON a.user_id = u.id
+        WHERE a.table_name = ?
+          AND a.record_id = ?
+        ORDER BY a.created_at DESC
+        `,
+        [tableName, recordId]
+      );
+
+      res.json(rows);
+    } catch (error) {
+      console.error('Error fetching record audit logs:', error);
+      res.status(500).json({ error: 'Failed to fetch audit logs' });
+    }
   }
 );
 

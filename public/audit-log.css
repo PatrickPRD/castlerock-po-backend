@@ -1,0 +1,170 @@
+/* ============================
+   AUDIT LOG PAGE STYLES
+   ============================ */
+
+/* Timestamp styling */
+.audit-table td:first-child {
+  color: #6c757d;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+/* Record ID styling */
+.audit-table .record-id-cell {
+  font-family: 'Courier New', monospace;
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+/* Action badges - customize Bootstrap badges */
+.audit-table .badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.35rem 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ============================
+   CHANGES DETAIL STYLES
+   ============================ */
+
+.changes-detail {
+  padding: 0.5rem 0;
+}
+
+/* Audit metadata section */
+.audit-metadata {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 6px;
+  border-left: 4px solid #0d6efd;
+}
+
+.audit-metadata strong {
+  color: #495057;
+  display: inline-block;
+  min-width: 100px;
+}
+
+.audit-metadata .row > div {
+  padding: 0.25rem 0;
+}
+
+.changes-detail h4 {
+  margin: 1.5rem 0 1rem 0;
+  color: #495057;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.changes-detail h4:first-child {
+  margin-top: 0;
+}
+
+/* Changes comparison table */
+.changes-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.changes-table thead th {
+  background: #f8f9fa;
+  padding: 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 2px solid #dee2e6;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #495057;
+}
+
+.changes-table tbody tr {
+  border-bottom: 1px solid #dee2e6;
+}
+
+.changes-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.changes-table tbody tr.changed-row {
+  background: #fff3cd;
+}
+
+.change-key {
+  padding: 0.75rem;
+  font-weight: 600;
+  color: #495057;
+  width: 30%;
+  vertical-align: top;
+}
+
+.change-value {
+  padding: 0.75rem;
+  color: #212529;
+  word-break: break-word;
+}
+
+.change-old-value {
+  padding: 0.75rem;
+  color: #dc3545;
+  text-decoration: line-through;
+  opacity: 0.8;
+  word-break: break-word;
+  background: #fff5f5;
+}
+
+.change-new-value {
+  padding: 0.75rem;
+  color: #198754;
+  font-weight: 500;
+  word-break: break-word;
+  background: #f0fdf4;
+}
+
+.changes-table code {
+  background: #f8f9fa;
+  padding: 0.25rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.85rem;
+  display: block;
+  white-space: pre-wrap;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid #dee2e6;
+}
+
+/* ============================
+   RESPONSIVE ADJUSTMENTS
+   ============================ */
+
+@media (max-width: 768px) {
+  .audit-table {
+    font-size: 0.85rem;
+  }
+  
+  .audit-table th,
+  .audit-table td {
+    padding: 0.5rem !important;
+  }
+  
+  .audit-table td:first-child {
+    font-size: 0.8rem;
+  }
+  
+  .change-key {
+    width: 40%;
+  }
+  
+  .changes-table {
+    font-size: 0.85rem;
+  }
+  
+  .changes-table thead th,
+  .changes-table tbody td {
+    padding: 0.5rem;
+  }
+}

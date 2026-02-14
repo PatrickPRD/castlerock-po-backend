@@ -4,6 +4,7 @@ const pool = require('../db');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { authenticate } = require('../middleware/auth');
+const logAudit = require('../services/auditService');
 
 async function hasActiveColumn() {
   const [rows] = await pool.query(
@@ -167,6 +168,23 @@ router.post('/login', async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: '8h' }
     );
+
+    // Audit log (non-blocking)
+    logAudit({
+      table_name: 'users',
+      record_id: user.id,
+      action: 'LOGIN',
+      old_data: null,
+      new_data: { 
+        email: user.email, 
+        role: user.role,
+        first_name: user.first_name
+      },
+      changed_by: user.id,
+      req
+    }).catch(err => {
+      console.error('Login audit log failed:', err);
+    });
 
     res.json({
       token,

@@ -107,7 +107,8 @@ router.post(
         action: 'INSERT',
         old_data: null,
         new_data: { name, contact_person, email, phone, address },
-        changed_by: req.user.id
+        changed_by: req.user.id,
+        req
       });
 
       res.json({ success: true });
@@ -174,7 +175,8 @@ router.put(
       action: 'UPDATE',
       old_data: oldSupplier,
       new_data: { name, contact_person, email, phone, address },
-      changed_by: req.user.id
+      changed_by: req.user.id,
+      req
     });
 
     res.json({ success: true });
@@ -221,7 +223,8 @@ router.delete(
       action: 'DELETE',
       old_data: supplier,
       new_data: null,
-      changed_by: req.user.id
+      changed_by: req.user.id,
+      req
     });
 
     res.json({ success: true });
@@ -278,8 +281,9 @@ router.post(
       record_id: sourceId,
       action: 'MERGE',
       old_data: source,
-      new_data: { merged_into: targetId },
-      changed_by: req.user.id
+      new_data: { merged_into: targetId, target_name: target.name },
+      changed_by: req.user.id,
+      req
     });
 
     res.json({ success: true });
