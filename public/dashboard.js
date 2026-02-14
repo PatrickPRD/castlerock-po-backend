@@ -594,7 +594,6 @@ function renderPO(po) {
 
   const detailsRow = document.createElement("tr");
   detailsRow.className = "details-row";
-  detailsRow.style.display = "none";
 
   detailsRow.innerHTML = `
     <td colspan="6">
@@ -660,17 +659,14 @@ function renderPO(po) {
     // Close previously open PO
     if (openDetailsRow && openDetailsRow !== detailsRow) {
       openDetailsRow.classList.remove("open");
-      openDetailsRow.style.display = "none";
       openDetailsRow.previousSibling?.classList.remove("open", "active");
     }
 
     if (isOpen) {
       detailsRow.classList.remove("open");
-      detailsRow.style.display = "none";
       mainRow.classList.remove("open", "active");
       openDetailsRow = null;
     } else {
-      detailsRow.style.display = "table-row";
       detailsRow.classList.add("open");
       mainRow.classList.add("open", "active");
       openDetailsRow = detailsRow;

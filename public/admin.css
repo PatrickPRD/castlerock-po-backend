@@ -123,6 +123,38 @@
     margin-top: 0.5rem;
   }
 }
+@media (max-width: 768px) {
+  .po-table .details-row {
+    display: none;
+  }
+
+  .po-table .details-row.open {
+    display: block;
+  }
+
+  .po-table .details-row td {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .po-table .details-row td > .details-wrapper {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+/* Desktop default: hide details rows until opened */
+.po-table .details-row {
+  display: none;
+}
+
+@media (min-width: 769px) {
+  .po-table .details-row.open {
+    display: table-row;
+  }
+}
 /* =====================================================
    ADMIN – BASE
    ===================================================== */
