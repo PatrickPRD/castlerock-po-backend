@@ -198,7 +198,7 @@ async function loadUsers() {
         <td>${u.first_name || ""} ${u.last_name || ""}</td>
 
         <td>
-          <select onchange="updateUserRole(${u.id}, this.value)" ${isSystemUser ? 'disabled' : ''}>
+          <select onchange="updateUserRole(${u.id}, this.value, this)" data-current-role="${userRole}" ${isSystemUser ? 'disabled' : ''}>
             <option value="super_admin" ${
               userRole === "super_admin" ? "selected" : ""
             }>Super Admin</option>
@@ -270,6 +270,13 @@ async function addUser() {
     return;
   }
 
+  if (userRole === "super_admin") {
+    const confirmed = await confirmDialog(
+      "Create Super Admin? This grants full access to users, backups, and system settings."
+    );
+    if (!confirmed) return;
+  }
+
   try {
     // Create user with password
     await api("/admin/users", "POST", {
@@ -310,6 +317,7 @@ async function openEditModal(id) {
     document.getElementById("editLastName").value = user.last_name || "";
     document.getElementById("editEmail").value = user.email || "";
     document.getElementById("editRole").value = user.role || "viewer";
+    document.getElementById("editRole").dataset.currentRole = user.role || "viewer";
     document.getElementById("editActive").value = Number(user.active) === 1 ? "1" : "0";
     updateEmailButtonsState();
   } catch (err) {
@@ -336,10 +344,20 @@ async function saveEditUser() {
   const id = document.getElementById("editUserId").value;
   if (!id) return;
 
+  const editRoleEl = document.getElementById("editRole");
+  const previousRole = editRoleEl?.dataset.currentRole;
+  const nextRole = editRoleEl?.value;
+  if (nextRole === "super_admin" && previousRole !== "super_admin") {
+    const confirmed = await confirmDialog(
+      "Promote to Super Admin? This grants full access to users, backups, and system settings."
+    );
+    if (!confirmed) return;
+  }
+
   const payload = {
     first_name: document.getElementById("editFirstName").value.trim(),
     last_name: document.getElementById("editLastName").value.trim(),
-    role: document.getElementById("editRole").value,
+    role: nextRole,
     active: Number(document.getElementById("editActive").value),
   };
 
@@ -368,12 +386,33 @@ async function toggleUser(id, active) {
   }
 }
 
-async function updateUserRole(id, role) {
+async function updateUserRole(id, role, selectEl) {
+  const previousRole = selectEl?.dataset.currentRole;
+  const isPromotion = role === "super_admin" && previousRole !== "super_admin";
+
+  if (isPromotion) {
+    const confirmed = await confirmDialog(
+      "Promote to Super Admin? This grants full access to users, backups, and system settings."
+    );
+    if (!confirmed) {
+      if (selectEl && previousRole) {
+        selectEl.value = previousRole;
+      }
+      return;
+    }
+  }
+
   try {
     await api(`/admin/users/${id}`, "PUT", { role });
+    if (selectEl) {
+      selectEl.dataset.currentRole = role;
+    }
     loadUsers();
   } catch (err) {
     showToast(err.message, "error");
+    if (selectEl && previousRole) {
+      selectEl.value = previousRole;
+    }
     loadUsers(); // 🔄 snap UI back to server truth
   }
 }

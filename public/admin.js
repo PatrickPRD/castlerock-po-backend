@@ -97,7 +97,7 @@ async function loadUsers() {
         <td>${u.email}</td>
 
         <td>
-          <select onchange="updateUserRole(${u.id}, this.value)" ${isSystemUser ? 'disabled' : ''}>
+          <select onchange="updateUserRole(${u.id}, this.value, this)" data-current-role="${userRole}" ${isSystemUser ? 'disabled' : ''}>
             <option value="super_admin" ${
               userRole === "super_admin" ? "selected" : ""
             }>Super Admin</option>
@@ -170,6 +170,13 @@ async function addUser() {
     return;
   }
 
+  if (userRole === "super_admin") {
+    const confirmed = await confirmDialog(
+      "Create Super Admin? This grants full access to users, backups, and system settings."
+    );
+    if (!confirmed) return;
+  }
+
   try {
     // 1️⃣ Create user
     await api("/admin/users", "POST", {
@@ -211,12 +218,33 @@ async function toggleUser(id, active) {
   }
 }
 
-async function updateUserRole(id, role) {
+async function updateUserRole(id, role, selectEl) {
+  const previousRole = selectEl?.dataset.currentRole;
+  const isPromotion = role === "super_admin" && previousRole !== "super_admin";
+
+  if (isPromotion) {
+    const confirmed = await confirmDialog(
+      "Promote to Super Admin? This grants full access to users, backups, and system settings."
+    );
+    if (!confirmed) {
+      if (selectEl && previousRole) {
+        selectEl.value = previousRole;
+      }
+      return;
+    }
+  }
+
   try {
     await api(`/admin/users/${id}`, "PUT", { role });
+    if (selectEl) {
+      selectEl.dataset.currentRole = role;
+    }
     loadUsers();
   } catch (err) {
     showToast(err.message, "error");
+    if (selectEl && previousRole) {
+      selectEl.value = previousRole;
+    }
     loadUsers(); // 🔄 snap UI back to server truth
   }
 }

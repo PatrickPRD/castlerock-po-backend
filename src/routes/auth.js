@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../db');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const { authenticate } = require('../middleware/auth');
 
 async function hasActiveColumn() {
   const [rows] = await pool.query(
@@ -118,6 +119,7 @@ router.post('/login', async (req, res) => {
           SELECT
             id,
             email,
+            first_name,
             password_hash,
             role,
             active
@@ -128,6 +130,7 @@ router.post('/login', async (req, res) => {
           SELECT
             id,
             email,
+            first_name,
             password_hash,
             role
           FROM users
@@ -167,12 +170,40 @@ router.post('/login', async (req, res) => {
 
     res.json({
       token,
-      role: user.role
+      role: user.role,
+      first_name: user.first_name
     });
 
   } catch (err) {
     console.error('LOGIN ERROR:', err);
     res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+router.get('/me', authenticate, async (req, res) => {
+  try {
+    const [[user]] = await pool.query(
+      `
+      SELECT id, email, first_name, role
+      FROM users
+      WHERE id = ?
+      `,
+      [req.user.id]
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      id: user.id,
+      email: user.email,
+      first_name: user.first_name,
+      role: user.role
+    });
+  } catch (err) {
+    console.error('AUTH ME ERROR:', err);
+    res.status(500).json({ error: 'Failed to load user' });
   }
 });
 

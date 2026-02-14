@@ -10,6 +10,7 @@ const userId = params.get('id');
 if (!userId) location.href = 'users.html';
 
 const el = id => document.getElementById(id);
+let initialRole = null;
 
 /* =========================
    Load user
@@ -31,6 +32,7 @@ async function loadUser() {
   el('email').value     = u.email;
   el('role').value      = u.role;
   el('active').value    = u.active ? '1' : '0';
+  initialRole = u.role;
 }
 
 /* =========================
@@ -39,11 +41,19 @@ async function loadUser() {
 el('userForm').addEventListener('submit', async e => {
   e.preventDefault();
 
+  const nextRole = el('role').value;
+  if (nextRole === 'super_admin' && initialRole !== 'super_admin') {
+    const confirmed = await confirmDialog(
+      'Promote to Super Admin? This grants full access to users, backups, and system settings.'
+    );
+    if (!confirmed) return;
+  }
+
 const payload = {
   email:      el('email').value.trim(),
   first_name: el('firstName').value.trim(),
   last_name:  el('lastName').value.trim(),
-  role:       el('role').value,
+  role:       nextRole,
   active:     Number(el('active').value)
 };
 

@@ -142,18 +142,6 @@ router.post(
     const { email, role, first_name, last_name, password } = req.body;
 
     try {
-      // Enforce single Super Admin
-      if (role === 'super_admin') {
-        const [existing] = await db.query(
-          "SELECT id FROM users WHERE role = 'super_admin' LIMIT 1"
-        );
-        if (existing.length > 0) {
-          return res.status(400).json({
-            error: 'A Super Admin already exists'
-          });
-        }
-      }
-
       // Validate password is provided
       if (!password) {
         return res.status(400).json({
@@ -265,23 +253,6 @@ if (email) {
       }
     }
 
-    /* ======================================================
-       ❌ RULE 3: Only one Super Admin total
-       ====================================================== */
-    if (role === 'super_admin') {
-      const [[existing]] = await db.query(
-        `SELECT COUNT(*) AS total
-         FROM users
-         WHERE role = 'super_admin' AND id <> ?`,
-        [userId]
-      );
-
-      if (existing.total > 0) {
-        return res.status(400).json({
-          error: 'A Super Admin already exists'
-        });
-      }
-    }
 /* ======================================================
    ❌ RULE 4: Cannot demote the only Super Admin
    ====================================================== */

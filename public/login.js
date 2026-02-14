@@ -23,6 +23,11 @@ async function login() {
   // Store auth info
   localStorage.setItem('token', data.token);
   localStorage.setItem('role', data.role);
+  if (data.first_name) {
+    localStorage.setItem('firstName', data.first_name);
+  } else {
+    localStorage.removeItem('firstName');
+  }
 
   window.location.href = 'dashboard.html';
 }

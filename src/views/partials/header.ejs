@@ -84,6 +84,7 @@
           <li class="nav-item dropdown ms-3">
             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
               <i class="bi bi-person-circle"></i>
+              <span id="userFirstName" class="ms-2"></span>
             </a>
             <ul class="dropdown-menu dropdown-menu-end">
               <li><a class="dropdown-item" href="gdpr.html">
@@ -122,6 +123,34 @@
       // Hide on timesheets page
       if (timesheetsNavItem) timesheetsNavItem.style.display = 'none';
     }
+  })();
+
+  (function() {
+    const nameEl = document.getElementById('userFirstName');
+    if (!nameEl) return;
+
+    const name = localStorage.getItem('firstName');
+    if (name) {
+      nameEl.textContent = name;
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    fetch('/auth/me', {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const firstName = data?.first_name || '';
+        if (!firstName) return;
+        localStorage.setItem('firstName', firstName);
+        nameEl.textContent = firstName;
+      })
+      .catch(() => {});
   })();
 
   function applyHeaderBrandingSettings(settings) {
