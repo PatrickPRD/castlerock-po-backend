@@ -61,7 +61,7 @@ async function loadStages() {
       stageTable.appendChild(row);
     });
   } catch (error) {
-    alert("Error loading stages: " + error.message);
+    showToast("Error loading stages: " + error.message, "error");
   }
 }
 
@@ -94,7 +94,7 @@ async function editStage(id) {
     const stage = stages.find(s => s.id === id);
     
     if (!stage) {
-      alert("Stage not found");
+      showToast("Stage not found", "error");
       return;
     }
 
@@ -105,7 +105,7 @@ async function editStage(id) {
     document.getElementById("stageActive").value = stage.active ? "1" : "0";
     document.getElementById("stageModal").style.display = "flex";
   } catch (error) {
-    alert("Error loading stage: " + error.message);
+    showToast("Error loading stage: " + error.message, "error");
   }
 }
 
@@ -120,7 +120,7 @@ document.getElementById("stageForm").addEventListener("submit", async (e) => {
   const active = document.getElementById("stageActive").value;
 
   if (!name) {
-    alert("Stage name is required");
+    showToast("Stage name is required", "error");
     return;
   }
 
@@ -135,9 +135,9 @@ document.getElementById("stageForm").addEventListener("submit", async (e) => {
 
     closeStageModal();
     await loadStages();
-    alert(id ? "Stage updated successfully" : "Stage created successfully");
+    showToast(id ? "Stage updated successfully" : "Stage created successfully", "success");
   } catch (error) {
-    alert("Error saving stage: " + error.message);
+    showToast("Error saving stage: " + error.message, "error");
   }
 });
 
@@ -146,20 +146,20 @@ document.getElementById("stageForm").addEventListener("submit", async (e) => {
    ============================ */
 async function deleteStage(id, poCount) {
   if (poCount > 0) {
-    alert(`Cannot delete this stage. It has ${poCount} associated Purchase Order(s).\n\nPlease use the Merge Stages feature to move POs to another stage first.`);
+    showToast(`Cannot delete this stage. It has ${poCount} associated Purchase Order(s). Please use the Merge Stages feature to move POs to another stage first.`, "error");
     return;
   }
 
-  if (!confirm("Are you sure you want to delete this stage?")) {
+  if (!(await confirmDialog("Are you sure you want to delete this stage?"))) {
     return;
   }
 
   try {
     await api(`/admin/stages/${id}`, "DELETE");
     await loadStages();
-    alert("Stage deleted successfully");
+    showToast("Stage deleted successfully", "success");
   } catch (error) {
-    alert("Error deleting stage: " + error.message);
+    showToast("Error deleting stage: " + error.message, "error");
   }
 }
 
@@ -202,7 +202,7 @@ async function loadStagesForMerge() {
     // Add event listener to keep stage dropdown
     keepSelect.onchange = updateMergeStageOptions;
   } catch (error) {
-    alert("Error loading stages: " + error.message);
+    showToast("Error loading stages: " + error.message, "error");
   }
 }
 
@@ -236,19 +236,19 @@ async function mergeStages() {
   const mergeId = document.getElementById("mergeMergeStage").value;
 
   if (!keepId || !mergeId) {
-    alert("Please select both stages");
+    showToast("Please select both stages", "error");
     return;
   }
 
   if (keepId === mergeId) {
-    alert("Please select two different stages");
+    showToast("Please select two different stages", "error");
     return;
   }
 
   const keepStage = document.getElementById("mergeKeepStage").options[document.getElementById("mergeKeepStage").selectedIndex].text;
   const mergeStage = document.getElementById("mergeMergeStage").options[document.getElementById("mergeMergeStage").selectedIndex].text;
 
-  if (!confirm(`Are you sure you want to merge:\n\n"${mergeStage}"\n\ninto\n\n"${keepStage}"?\n\nAll POs will be moved and the merged stage will be deleted.`)) {
+  if (!(await confirmDialog(`Are you sure you want to merge "${mergeStage}" into "${keepStage}"? All POs will be moved and the merged stage will be deleted.`))) {
     return;
   }
 
@@ -260,9 +260,9 @@ async function mergeStages() {
 
     closeMergeStageModal();
     await loadStages();
-    alert("Stages merged successfully!");
+    showToast("Stages merged successfully!", "success");
   } catch (error) {
-    alert("Error merging stages: " + error.message);
+    showToast("Error merging stages: " + error.message, "error");
   }
 }
 
