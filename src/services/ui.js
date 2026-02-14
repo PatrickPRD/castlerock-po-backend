@@ -50,7 +50,7 @@ function ensureUI() {
 .ui-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 9998;
+  z-index: 99998;
   pointer-events: none;      
   transition: background 0.15s ease;
 }
@@ -88,7 +88,7 @@ function ensureUI() {
     color: #111827;
     border-radius: 10px;
     box-shadow: 0 10px 25px rgba(0,0,0,0.25);
-    z-index: 9999;
+    z-index: 99999;
     text-align: center;
     font-weight: 500;
   }
@@ -113,7 +113,7 @@ function ensureUI() {
     background: #e5e7eb;
     border-radius: 10px;
     box-shadow: 0 10px 25px rgba(0,0,0,0.25);
-    z-index: 9999;
+    z-index: 99999;
     text-align: center;
   }
 

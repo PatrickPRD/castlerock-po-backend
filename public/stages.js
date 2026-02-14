@@ -240,7 +240,7 @@ async function mergeStages() {
     return;
   }
 
-  if (keepId === mergeId) {
+  if (parseInt(keepId) === parseInt(mergeId)) {
     showToast("Please select two different stages", "error");
     return;
   }
@@ -253,15 +253,16 @@ async function mergeStages() {
   }
 
   try {
-    await api("/admin/merge-stages", "POST", {
-      keep_stage_id: keepId,
-      merge_stage_id: mergeId,
+    const response = await api("/admin/merge-stages", "POST", {
+      keep_stage_id: parseInt(keepId),
+      merge_stage_id: parseInt(mergeId),
     });
 
     closeMergeStageModal();
     await loadStages();
     showToast("Stages merged successfully!", "success");
   } catch (error) {
+    console.error('Merge stages error:', error);
     showToast("Error merging stages: " + error.message, "error");
   }
 }

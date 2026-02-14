@@ -218,6 +218,11 @@ window.viewChanges = async function(auditId) {
     } else if (log.action === 'DELETE' || log.action === 'CANCEL') {
       changesHtml += '<h4>Previous Values:</h4>';
       changesHtml += renderJsonTable(oldValues);
+    } else if (log.action === 'MERGE') {
+      changesHtml += '<h4>Merged Record:</h4>';
+      changesHtml += renderJsonTable(oldValues);
+      changesHtml += '<h4>Merged Into:</h4>';
+      changesHtml += renderJsonTable(newValues);
     } else if (log.action === 'LOGIN') {
       changesHtml += '<h4>Login Details:</h4>';
       changesHtml += renderJsonTable(newValues);
@@ -357,6 +362,7 @@ function getActionBadge(action) {
     'CREATE': '<span class="badge bg-success">CREATE</span>',
     'UPDATE': '<span class="badge bg-primary">UPDATE</span>',
     'DELETE': '<span class="badge bg-danger">DELETE</span>',
+    'MERGE': '<span class="badge bg-warning text-dark">MERGE</span>',
     'CANCEL': '<span class="badge bg-warning">CANCEL</span>',
     'LOGIN': '<span class="badge bg-info">LOGIN</span>'
   };

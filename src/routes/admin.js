@@ -1386,6 +1386,21 @@ router.post(
         });
       }
 
+      // Fetch stage details before merge
+      const [[keepStage]] = await db.query(
+        'SELECT * FROM po_stages WHERE id = ?',
+        [keep_stage_id]
+      );
+
+      const [[mergeStage]] = await db.query(
+        'SELECT * FROM po_stages WHERE id = ?',
+        [merge_stage_id]
+      );
+
+      if (!keepStage || !mergeStage) {
+        return res.status(404).json({ error: 'Stage not found' });
+      }
+
       connection = await db.getConnection();
       await connection.beginTransaction();
 
@@ -1405,10 +1420,25 @@ router.post(
 
       await connection.commit();
 
+      // Audit log
+      await logAudit({
+        table_name: 'po_stages',
+        record_id: merge_stage_id,
+        action: 'MERGE',
+        old_data: mergeStage,
+        new_data: { merged_into: keep_stage_id, target_name: keepStage.name },
+        changed_by: req.user.id,
+        req
+      });
+
       res.json({ success: true });
     } catch (error) {
       if (connection) await connection.rollback();
-      throw error;
+      console.error('Error merging stages:', error);
+      res.status(500).json({ 
+        error: 'Failed to merge stages',
+        details: error.message 
+      });
     } finally {
       if (connection) connection.release();
     }
@@ -1616,6 +1646,17 @@ router.post(
         await connection.commit();
 
         console.log(`✅ Successfully merged location ${merge_location_id} into ${keep_location_id}`);
+
+        // Audit log
+        await logAudit({
+          table_name: 'locations',
+          record_id: merge_location_id,
+          action: 'MERGE',
+          old_data: mergeLoc[0],
+          new_data: { merged_into: keep_location_id, target_name: keepLoc[0].name },
+          changed_by: req.user.id,
+          req
+        });
 
         res.json({
           success: true,

@@ -22,7 +22,15 @@ async function logAudit({
 }) {
   try {
     // Extract IP and user agent from request if available
-    const ip_address = req ? (req.ip || req.connection?.remoteAddress || null) : null;
+    // Handle both direct connections and proxied requests
+    let ip_address = null;
+    if (req) {
+      // req.ip properly handles X-Forwarded-For when trust proxy is enabled
+      ip_address = req.ip || 
+                   req.headers['x-forwarded-for']?.split(',')[0].trim() ||
+                   req.connection.remoteAddress || 
+                   null;
+    }
     const user_agent = req ? (req.get('user-agent') || null) : null;
     
     await pool.query(
