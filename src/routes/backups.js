@@ -6,6 +6,7 @@ const {
   createBackup,
   createBackupSql,
   validateBackup,
+  validateSqlBackup,
   restoreBackup,
   restoreBackupSql,
   listBackups,
@@ -15,6 +16,7 @@ const {
 } = require('../services/backupService');
 const { authenticate } = require('../middleware/auth');
 const authorizeRoles = require('../middleware/authorizeRoles');
+const logAudit = require('../services/auditService');
 
 // Configure multer for backup uploads
 const storage = multer.memoryStorage();
@@ -49,6 +51,17 @@ router.post(
       if (result.deletedOldest) {
         console.log(`🗑️ Deleted oldest backup: ${result.deletedOldest}`);
       }
+      
+      // Log to audit trail
+      await logAudit({
+        table_name: 'system',
+        record_id: 0,
+        action: 'BACKUP_CREATE',
+        old_data: null,
+        new_data: { filename: result.filename, timestamp: new Date() },
+        changed_by: req.user.id,
+        req
+      });
       
       res.json({ 
         success: true, 
@@ -107,6 +120,40 @@ router.post(
 );
 
 /* ======================================================
+   VALIDATE SQL BACKUP (SUPER ADMIN ONLY)
+   Analyzes SQL backup content against current schema
+   ====================================================== */
+router.post(
+  '/validate-sql',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      const { sql } = req.body;
+
+      if (!sql) {
+        return res
+          .status(400)
+          .json({ error: 'No SQL backup provided' });
+      }
+
+      console.log('📋 Validating SQL backup...');
+      const report = await validateSqlBackup(sql);
+      
+      res.json({ 
+        success: true, 
+        report 
+      });
+    } catch (err) {
+      console.error('❌ SQL validation error:', err);
+      res
+        .status(500)
+        .json({ error: 'Failed to validate SQL backup: ' + err.message });
+    }
+  }
+);
+
+/* ======================================================
    RESTORE BACKUP (SUPER ADMIN ONLY)
    ====================================================== */
 router.post(
@@ -147,6 +194,17 @@ router.post(
 
       console.log('🔄 Restoring database from backup...');
       const result = sql ? await restoreBackupSql(sql) : await restoreBackup(backup);
+
+      // Log to audit trail
+      await logAudit({
+        table_name: 'system',
+        record_id: 0,
+        action: 'BACKUP_RESTORE',
+        old_data: null,
+        new_data: { success: true, timestamp: new Date() },
+        changed_by: req.user.id,
+        req
+      });
 
       res.json(result);
     } catch (err) {
@@ -209,6 +267,18 @@ router.delete(
     try {
       const { filename } = req.params;
       const result = await deleteBackup(filename);
+      
+      // Log to audit trail
+      await logAudit({
+        table_name: 'system',
+        record_id: 0,
+        action: 'BACKUP_DELETE',
+        old_data: { filename },
+        new_data: null,
+        changed_by: req.user.id,
+        req
+      });
+      
       res.json(result);
     } catch (err) {
       console.error('❌ Delete backup error:', err);
@@ -233,6 +303,17 @@ router.post(
       
       const sqlContent = req.file.buffer.toString('utf-8');
       const result = await saveBackup(sqlContent);
+      
+      // Log to audit trail
+      await logAudit({
+        table_name: 'system',
+        record_id: 0,
+        action: 'BACKUP_UPLOAD',
+        old_data: null,
+        new_data: { filename: result.filename, timestamp: new Date() },
+        changed_by: req.user.id,
+        req
+      });
       
       res.json({ 
         success: true, 

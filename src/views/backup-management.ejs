@@ -96,6 +96,85 @@
   </div>
 </div>
 
+<!-- Restore Preview Modal -->
+<div class="modal fade" id="restorePreviewModal" tabindex="-1" style="z-index: 1055;">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-info text-white">
+        <h5 class="modal-title"><i class="bi bi-binoculars me-2"></i>Restore Preview</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="validationSpinner" class="text-center py-5" style="display: none;">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <p class="mt-2">Analyzing backup contents...</p>
+        </div>
+        
+        <div id="validationContent" style="display: none;">
+          <p class="mb-2"><strong>Backup File:</strong></p>
+          <p id="previewFilename" class="font-monospace bg-light p-2 rounded mb-3"></p>
+          
+          <div id="validationWarnings" style="display: none;">
+            <div class="alert alert-warning">
+              <i class="bi bi-exclamation-triangle-fill me-2"></i>
+              <strong>Warnings:</strong>
+              <ul id="warningsList" class="mb-0 mt-2"></ul>
+            </div>
+          </div>
+          
+          <div id="validationErrors" style="display: none;">
+            <div class="alert alert-danger">
+              <i class="bi bi-exclamation-octagon-fill me-2"></i>
+              <strong>Errors:</strong>
+              <ul id="errorsList" class="mb-0 mt-2"></ul>
+            </div>
+          </div>
+          
+          <div id="tablesSummary">
+            <p class="mb-2"><strong>Tables to Restore:</strong></p>
+            <div id="tablesList" class="table-responsive">
+              <table class="table table-sm table-bordered">
+                <thead class="table-light">
+                  <tr>
+                    <th>Table Name</th>
+                    <th class="text-end">Records</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="tablesBody">
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          <div id="sqlFileInfo" style="display: none;" class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>SQL Backup:</strong> This is a direct SQL export. Full validation is not available, but all tables will be reset to the backup state.
+          </div>
+          
+          <div class="alert alert-danger mt-3">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <strong>WARNING:</strong> This will delete all existing data and replace it with the backup data.
+            <ul class="mb-0 mt-2">
+              <li>All current POs, invoices, and data will be lost</li>
+              <li>User accounts will NOT be affected</li>
+              <li>This action CANNOT be undone</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmPreviewBtn" onclick="proceedWithRestore()">
+          <i class="bi bi-arrow-clockwise me-1"></i> Yes, Restore This Backup
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Restore Confirmation Modal -->
 <div class="modal fade" id="restoreModal" tabindex="-1" style="z-index: 1055;">
   <div class="modal-dialog">

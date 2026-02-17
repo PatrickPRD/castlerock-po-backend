@@ -7,7 +7,8 @@ if (!token || role !== 'super_admin') {
 }
 
 let currentRestoreFilename = null;
-let uploadModal, restoreModal, resetModal, backupLimitModal;
+let currentRestoreSqlContent = null;
+let uploadModal, restoreModal, restorePreviewModal, resetModal, backupLimitModal;
 let allBackups = []; // Store all backups for pagination
 let currentPage = 1;
 const ITEMS_PER_PAGE = 10;
@@ -230,22 +231,21 @@ async function downloadBackup(filename) {
   }
 }
 
-// Open restore confirmation
-function openRestoreConfirmation(filename) {
+// Open restore with validation preview
+async function openRestoreConfirmation(filename) {
   currentRestoreFilename = filename;
-  document.getElementById('restoreFilename').textContent = filename;
-  restoreModal.show();
-}
-
-// Confirm restore
-async function confirmRestore() {
-  if (!currentRestoreFilename) return;
+  currentRestoreSqlContent = null;
   
   try {
+    // Show spinner
+    document.getElementById('validationSpinner').style.display = 'block';
+    document.getElementById('validationContent').style.display = 'none';
+    restorePreviewModal.show();
+    
     showToast('Loading backup file...', 'info');
     
     // Download the backup content
-    const response = await fetch(`/backups/download/${encodeURIComponent(currentRestoreFilename)}`, {
+    const response = await fetch(`/backups/download/${encodeURIComponent(filename)}`, {
       headers: { 'Authorization': 'Bearer ' + token }
     });
     
@@ -254,13 +254,210 @@ async function confirmRestore() {
     }
     
     const sqlContent = await response.text();
+    currentRestoreSqlContent = sqlContent;
     
+    // Try to validate the backup
+    showToast('Analyzing backup...', 'info');
+    await validateAndPreviewBackup(sqlContent);
+    
+    // Show content and hide spinner
+    document.getElementById('validationSpinner').style.display = 'none';
+    document.getElementById('validationContent').style.display = 'block';
+    document.getElementById('previewFilename').textContent = filename;
+    
+  } catch (err) {
+    console.error('Load backup for preview error:', err);
+    document.getElementById('validationSpinner').style.display = 'none';
+    document.getElementById('validationContent').style.display = 'block';
+    document.getElementById('previewFilename').textContent = currentRestoreFilename;
+    
+    // Show SQL file info and hide detailed info
+    document.getElementById('sqlFileInfo').style.display = 'block';
+    document.getElementById('tablesSummary').style.display = 'none';
+    document.getElementById('validationWarnings').style.display = 'none';
+    document.getElementById('validationErrors').style.display = 'none';
+    
+    showToast('Note: Backup analyzed as SQL dump', 'info');
+  }
+}
+
+// Validate and preview backup
+async function validateAndPreviewBackup(sqlContent) {
+  try {
+    // For backward compatibility, try to validate as JSON backup format
+    try {
+      const backupData = JSON.parse(sqlContent);
+      
+      if (backupData.metadata && backupData.tables) {
+        // This is a JSON backup with structured data
+        const report = await api('/backups/validate', 'POST', { backup: backupData });
+        
+        if (report && report.report) {
+          displayValidationReport(report.report);
+          return;
+        }
+      }
+    } catch (parseErr) {
+      // Not JSON, treat as SQL dump
+    }
+    
+    // It's a SQL dump - validate using SQL validation endpoint
+    try {
+      const report = await api('/backups/validate-sql', 'POST', { sql: sqlContent });
+      
+      if (report && report.report) {
+        displaySqlValidationReport(report.report);
+        return;
+      }
+    } catch (sqlValidationErr) {
+      console.warn('SQL validation error:', sqlValidationErr);
+      displaySqlBackupPreview();
+    }
+    
+  } catch (err) {
+    console.error('Validation error:', err);
+    displaySqlBackupPreview();
+  }
+}
+
+// Display validation report for JSON backups
+function displayValidationReport(report) {
+  // Hide SQL info
+  document.getElementById('sqlFileInfo').style.display = 'none';
+  document.getElementById('tablesSummary').style.display = 'block';
+  
+  // Clear ALL data completely
+  document.getElementById('tablesBody').innerHTML = '';
+  document.getElementById('warningsList').innerHTML = '';
+  document.getElementById('errorsList').innerHTML = '';
+  document.getElementById('validationWarnings').style.display = 'none';
+  document.getElementById('validationErrors').style.display = 'none';
+  
+  // Show warnings if any
+  const warningsDiv = document.getElementById('validationWarnings');
+  if (report.warnings && report.warnings.length > 0) {
+    warningsDiv.style.display = 'block';
+    document.getElementById('warningsList').innerHTML = report.warnings
+      .map(w => `<li>${escapeHtml(w)}</li>`)
+      .join('');
+  }
+  
+  // Show errors if any
+  const errorsDiv = document.getElementById('validationErrors');
+  if (report.errors && report.errors.length > 0) {
+    errorsDiv.style.display = 'block';
+    document.getElementById('errorsList').innerHTML = report.errors
+      .map(e => `<li>${escapeHtml(e)}</li>`)
+      .join('');
+  }
+  
+  // Display tables
+  if (report.tables && Object.keys(report.tables).length > 0) {
+    const tablesHtml = Object.entries(report.tables)
+      .map(([tableName, tableInfo]) => {
+        const rowCount = tableInfo.rowCount || 0;
+        let statusBadge = 'bg-success';
+        let statusText = 'Ready';
+        
+        if (tableInfo.status === 'EMPTY') {
+          statusBadge = 'bg-secondary';
+          statusText = 'Empty';
+        }
+        
+        return `
+          <tr>
+            <td><code>${escapeHtml(tableName)}</code></td>
+            <td class="text-end"><strong>${rowCount.toLocaleString()}</strong></td>
+            <td><span class="badge ${statusBadge}">${statusText}</span></td>
+          </tr>
+        `;
+      })
+      .join('');
+    
+    document.getElementById('tablesBody').innerHTML = tablesHtml;
+  }
+}
+
+// Display validation report for SQL backups
+function displaySqlValidationReport(report) {
+  // Hide generic SQL info and show detailed info
+  document.getElementById('sqlFileInfo').style.display = 'none';
+  document.getElementById('tablesSummary').style.display = 'block';
+  
+  // Clear ALL previous data completely
+  document.getElementById('tablesBody').innerHTML = '';
+  document.getElementById('warningsList').innerHTML = '';
+  document.getElementById('errorsList').innerHTML = '';
+  document.getElementById('validationWarnings').style.display = 'none';
+  document.getElementById('validationErrors').style.display = 'none';
+  
+  // Show warnings if any
+  const warningsDiv = document.getElementById('validationWarnings');
+  if (report.warnings && report.warnings.length > 0) {
+    warningsDiv.style.display = 'block';
+    document.getElementById('warningsList').innerHTML = report.warnings
+      .map(w => `<li>${escapeHtml(w)}</li>`)
+      .join('');
+  }
+  
+  // Show errors if any
+  const errorsDiv = document.getElementById('validationErrors');
+  if (report.errors && report.errors.length > 0) {
+    errorsDiv.style.display = 'block';
+    document.getElementById('errorsList').innerHTML = report.errors
+      .map(e => `<li>${escapeHtml(e)}</li>`)
+      .join('');
+  }
+  
+  // Display tables found in SQL backup
+  if (report.tables && Object.keys(report.tables).length > 0) {
+    const tablesHtml = Object.entries(report.tables)
+      .map(([tableName, tableInfo]) => {
+        const rowCount = tableInfo.rowCount || 0;
+        
+        return `
+          <tr>
+            <td><code>${escapeHtml(tableName)}</code></td>
+            <td class="text-end"><strong>${rowCount.toLocaleString()}</strong></td>
+            <td><span class="badge bg-success">Ready to Restore</span></td>
+          </tr>
+        `;
+      })
+      .join('');
+    
+    document.getElementById('tablesBody').innerHTML = tablesHtml;
+  }
+}
+
+// Display preview for SQL backups
+function displaySqlBackupPreview() {
+  document.getElementById('sqlFileInfo').style.display = 'block';
+  document.getElementById('tablesSummary').style.display = 'none';
+  document.getElementById('validationWarnings').style.display = 'none';
+  document.getElementById('validationErrors').style.display = 'none';
+}
+
+// HTML escape utility
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Proceed with restore (after preview)
+async function proceedWithRestore() {
+  if (!currentRestoreSqlContent) {
+    showToast('❌ No backup content loaded', 'error');
+    return;
+  }
+  
+  try {
+    restorePreviewModal.hide();
     showToast('Restoring database...', 'info');
     
     // Restore the backup
-    const result = await api('/backups/restore', 'POST', { sql: sqlContent });
+    const result = await api('/backups/restore', 'POST', { sql: currentRestoreSqlContent, force: true });
     
-    restoreModal.hide();
     showToast('✅ Backup restored successfully. Page will reload...', 'success');
     
     setTimeout(() => {
@@ -272,6 +469,12 @@ async function confirmRestore() {
   }
 }
 
+// Confirm restore (kept for backward compatibility)
+async function confirmRestore() {
+  // This is now called after preview, but we keep it for compatibility
+  // The actual restore is done in proceedWithRestore()
+}
+
 // Delete backup
 async function deleteBackupConfirm(filename) {
   if (!confirm(`Delete backup "${filename}"?\n\nThis cannot be undone.`)) {
@@ -279,7 +482,7 @@ async function deleteBackupConfirm(filename) {
   }
   
   try {
-    await fetch(`/backups/${encodeURIComponent(filename)}`, {
+    const response = await fetch(`/backups/${encodeURIComponent(filename)}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -287,11 +490,16 @@ async function deleteBackupConfirm(filename) {
       }
     });
     
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || 'Delete failed');
+    }
+    
     showToast('✅ Backup deleted', 'success');
     loadBackups();
   } catch (err) {
     console.error('Delete error:', err);
-    showToast('❌ Failed to delete backup', 'error');
+    showToast('❌ Failed to delete backup: ' + err.message, 'error');
   }
 }
 
@@ -426,6 +634,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize Bootstrap modals
   uploadModal = new bootstrap.Modal(document.getElementById('uploadModal'));
   restoreModal = new bootstrap.Modal(document.getElementById('restoreModal'));
+  restorePreviewModal = new bootstrap.Modal(document.getElementById('restorePreviewModal'));
   resetModal = new bootstrap.Modal(document.getElementById('resetModal'));
   backupLimitModal = new bootstrap.Modal(document.getElementById('backupLimitModal'));
   
