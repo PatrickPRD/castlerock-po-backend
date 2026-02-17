@@ -115,28 +115,6 @@ async function setupDatabase() {
     `);
     console.log('✅ Site letters table created');
 
-    // Check if super admin exists
-    const [[existingAdmin]] = await pool.query(
-      "SELECT id FROM users WHERE role = 'super_admin' LIMIT 1"
-    );
-
-    if (existingAdmin) {
-      console.log('ℹ️  Super admin already exists');
-    } else {
-      // Create super admin - Password: Admin@123
-      const passwordHash = await bcrypt.hash('Admin@123', 12);
-      
-      await pool.query(
-        `INSERT INTO users (email, password_hash, first_name, last_name, role, active)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        ['admin@castlerock.com', passwordHash, 'Super', 'Admin', 'super_admin', 1]
-      );
-      console.log('✅ Super admin created');
-      console.log('   📧 Email: admin@castlerock.com');
-      console.log('   🔑 Password: Admin@123');
-      console.log('   ⚠️  Please change password after first login!\n');
-    }
-
     // Create other essential tables
     await pool.query(`
       CREATE TABLE IF NOT EXISTS suppliers (
