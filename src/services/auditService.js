@@ -20,6 +20,8 @@ async function logAudit({
   changed_by,
   req
 }) {
+  console.log('🔍 logAudit called with:', { table_name, record_id, action, changed_by });
+  
   try {
     // Extract IP and user agent from request if available
     // Handle both direct connections and proxied requests
@@ -32,6 +34,8 @@ async function logAudit({
                    null;
     }
     const user_agent = req ? (req.get('user-agent') || null) : null;
+    
+    console.log('🔍 Inserting into audit_log:', { changed_by, action, table_name, record_id, ip_address });
     
     await pool.query(
       `
@@ -53,6 +57,7 @@ async function logAudit({
     console.log(`✓ Audit log: ${action} on ${table_name}#${record_id} by user ${changed_by}`);
   } catch (error) {
     console.error('❌ Audit log failed:', error.message);
+    console.error('❌ Audit error:', error);
     console.error('Audit data:', { table_name, record_id, action, changed_by });
     // Don't throw - we don't want audit failures to break the application
   }

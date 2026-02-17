@@ -167,6 +167,19 @@ router.post(
         ]
       );
 
+      // Audit log (non-blocking)
+      logAudit({
+        table_name: 'users',
+        record_id: result.insertId,
+        action: 'CREATE',
+        old_data: null,
+        new_data: { email, role, first_name, last_name },
+        changed_by: req.user.id,
+        req
+      }).catch(err => {
+        console.error('User create audit log failed:', err);
+      });
+
       // Respond
       return res.json({
         success: true,
@@ -309,6 +322,25 @@ WHERE id = ?
 
     );
 
+    // Audit log (non-blocking)
+    logAudit({
+      table_name: 'users',
+      record_id: userId,
+      action: 'UPDATE',
+      old_data: { 
+        email: target.email, 
+        role: target.role, 
+        first_name: target.first_name, 
+        last_name: target.last_name,
+        active: target.active 
+      },
+      new_data: { email, role, first_name, last_name, active },
+      changed_by: req.user.id,
+      req
+    }).catch(err => {
+      console.error('User update audit log failed:', err);
+    });
+
     res.json({ success: true });
   }
 );
@@ -359,6 +391,19 @@ router.delete(
 
       // ✅ Delete user
       await db.query('DELETE FROM users WHERE id = ?', [userId]);
+
+      // Audit log (non-blocking)
+      logAudit({
+        table_name: 'users',
+        record_id: userId,
+        action: 'DELETE',
+        old_data: users[0],
+        new_data: null,
+        changed_by: req.user.id,
+        req
+      }).catch(err => {
+        console.error('User delete audit log failed:', err);
+      });
 
       return res.json({ success: true });
 
@@ -423,6 +468,16 @@ router.post(
         );
       }
 
+      logAudit({
+        table_name: 'sites',
+        record_id: siteId,
+        action: 'CREATE',
+        old_data: null,
+        new_data: { name: name.trim(), site_letter: site_code.toUpperCase(), address },
+        changed_by: req.user.id,
+        req
+      }).catch(err => console.error('Site create audit log failed:', err));
+
       res.json({ success: true });
 
     } catch (err) {
@@ -454,12 +509,29 @@ router.put(
       return res.status(400).json({ error: 'Site name is required' });
     }
 
+    const [[oldSite]] = await db.query(
+      'SELECT * FROM sites WHERE id = ?',
+      [siteId]
+    );
+
     await db.query(
       `UPDATE sites
        SET name = ?, address = ?
        WHERE id = ?`,
       [name.trim(), address || null, siteId]
     );
+
+    if (oldSite) {
+      logAudit({
+        table_name: 'sites',
+        record_id: siteId,
+        action: 'UPDATE',
+        old_data: { name: oldSite.name, address: oldSite.address },
+        new_data: { name: name.trim(), address },
+        changed_by: req.user.id,
+        req
+      }).catch(err => console.error('Site update audit log failed:', err));
+    }
 
     res.json({ success: true });
   }
@@ -489,10 +561,27 @@ router.delete(
       });
     }
 
+    const [[site]] = await db.query(
+      'SELECT * FROM sites WHERE id = ?',
+      [siteId]
+    );
+
     await db.query(
       `DELETE FROM sites WHERE id = ?`,
       [siteId]
     );
+
+    if (site) {
+      logAudit({
+        table_name: 'sites',
+        record_id: siteId,
+        action: 'DELETE',
+        old_data: site,
+        new_data: null,
+        changed_by: req.user.id,
+        req
+      }).catch(err => console.error('Site delete audit log failed:', err));
+    }
 
     res.json({ success: true });
   }
@@ -795,7 +884,7 @@ router.post(
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const isActive = !normalizedLeftAt || new Date(`${normalizedLeftAt}T00:00:00`) >= today;
-      await db.query(
+      const [result] = await db.query(
         `INSERT INTO workers
          (first_name, last_name, nickname, email, mobile_number, address, bank_details, pps_number, weekly_take_home, weekly_cost, safe_pass_number, safe_pass_expiry_date, date_of_employment, left_at, employee_id, login_no, notes, active)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -820,6 +909,16 @@ router.post(
           isActive ? 1 : 0
         ]
       );
+
+      logAudit({
+        table_name: 'workers',
+        record_id: result.insertId,
+        action: 'CREATE',
+        old_data: null,
+        new_data: { first_name: normalizedFirst, last_name: normalizedLast, employee_id, login_no: normalizedLoginNo, active: isActive },
+        changed_by: req.user.id,
+        req
+      }).catch(err => console.error('Worker create audit log failed:', err));
 
       res.json({ success: true });
     } catch (err) {
@@ -928,6 +1027,11 @@ router.put(
     }
 
     try {
+      const [[oldWorker]] = await db.query(
+        'SELECT * FROM workers WHERE id = ?',
+        [workerId]
+      );
+
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const isActive = !normalizedLeftAt || new Date(`${normalizedLeftAt}T00:00:00`) >= today;
@@ -976,6 +1080,18 @@ router.put(
         ]
       );
 
+      if (oldWorker) {
+        logAudit({
+          table_name: 'workers',
+          record_id: workerId,
+          action: 'UPDATE',
+          old_data: { first_name: oldWorker.first_name, last_name: oldWorker.last_name, employee_id: oldWorker.employee_id, login_no: oldWorker.login_no, active: oldWorker.active },
+          new_data: { first_name: normalizedFirst, last_name: normalizedLast, employee_id, login_no: normalizedLoginNo, active: isActive },
+          changed_by: req.user.id,
+          req
+        }).catch(err => console.error('Worker update audit log failed:', err));
+      }
+
       res.json({ success: true });
     } catch (err) {
       console.error('UPDATE WORKER ERROR:', err);
@@ -993,12 +1109,29 @@ router.put(
     const active = Number(req.body.active) === 1 ? 1 : 0;
 
     try {
+      const [[oldWorker]] = await db.query(
+        'SELECT * FROM workers WHERE id = ?',
+        [workerId]
+      );
+
       await db.query(
         `UPDATE workers
          SET active = ?, left_at = ?
          WHERE id = ?`,
         [active, active ? null : new Date(), workerId]
       );
+
+      if (oldWorker) {
+        logAudit({
+          table_name: 'workers',
+          record_id: workerId,
+          action: 'UPDATE',
+          old_data: { active: oldWorker.active, left_at: oldWorker.left_at },
+          new_data: { active, left_at: active ? null : new Date() },
+          changed_by: req.user.id,
+          req
+        }).catch(err => console.error('Worker status update audit log failed:', err));
+      }
 
       res.json({ success: true });
     } catch (err) {
@@ -1477,11 +1610,21 @@ router.post(
       });
     }
 
-    await db.query(
+    const [result] = await db.query(
       `INSERT INTO locations (name, type, site_id)
        VALUES (?, ?, ?)`,
       [name.trim(), type || null, site_id]
     );
+
+    logAudit({
+      table_name: 'locations',
+      record_id: result.insertId,
+      action: 'CREATE',
+      old_data: null,
+      new_data: { name: name.trim(), type, site_id },
+      changed_by: req.user.id,
+      req
+    }).catch(err => console.error('Location create audit log failed:', err));
 
     res.json({ success: true });
   }
@@ -1506,6 +1649,11 @@ router.put(
       });
     }
 
+    const [[oldLocation]] = await db.query(
+      'SELECT * FROM locations WHERE id = ?',
+      [locationId]
+    );
+
     await db.query(
       `UPDATE locations
        SET name = ?, type = ?, site_id = ?
@@ -1517,6 +1665,18 @@ router.put(
         locationId
       ]
     );
+
+    if (oldLocation) {
+      logAudit({
+        table_name: 'locations',
+        record_id: locationId,
+        action: 'UPDATE',
+        old_data: { name: oldLocation.name, type: oldLocation.type, site_id: oldLocation.site_id },
+        new_data: { name: name.trim(), type, site_id },
+        changed_by: req.user.id,
+        req
+      }).catch(err => console.error('Location update audit log failed:', err));
+    }
 
     res.json({ success: true });
   }
@@ -1544,10 +1704,27 @@ router.delete(
       });
     }
 
+    const [[location]] = await db.query(
+      'SELECT * FROM locations WHERE id = ?',
+      [locationId]
+    );
+
     await db.query(
       `DELETE FROM locations WHERE id = ?`,
       [locationId]
     );
+
+    if (location) {
+      logAudit({
+        table_name: 'locations',
+        record_id: locationId,
+        action: 'DELETE',
+        old_data: location,
+        new_data: null,
+        changed_by: req.user.id,
+        req
+      }).catch(err => console.error('Location delete audit log failed:', err));
+    }
 
     res.json({ success: true });
   }

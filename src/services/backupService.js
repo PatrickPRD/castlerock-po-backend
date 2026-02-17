@@ -4,7 +4,7 @@ const path = require('path');
 
 const BACKUP_DIR = path.join(__dirname, '../../backups');
 
-const EXCLUDED_TABLES = new Set(['users', 'schema_migrations']);
+const EXCLUDED_TABLES = new Set(['users', 'schema_migrations', 'audit_log']);
 
 const BACKUP_TABLES = [
   'site_settings',

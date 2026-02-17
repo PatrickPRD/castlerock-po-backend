@@ -98,19 +98,25 @@ async function loadAuditLogs() {
     if (currentFilters.action) {
       params.append('action', currentFilters.action);
     }
-    
+
+    console.log('📋 Fetching audit logs from:', `/audit?${params.toString()}`);
     const response = await api(`/audit?${params.toString()}`);
+    console.log('📋 API Response:', response);
+    
     const { data, pagination } = response;
+    console.log('📋 Data from response:', data);
+    console.log('📋 Pagination:', pagination);
     
     renderAuditTable(data);
     updatePagination(pagination);
   } catch (err) {
-    console.error('Failed to load audit logs:', err);
+    console.error('❌ Failed to load audit logs:', err);
+    console.error('❌ Error message:', err.message);
     auditTableBody.innerHTML = `
       <tr>
         <td colspan="6" class="text-center py-5 text-danger">
           <i class="bi bi-exclamation-triangle fs-1 d-block mb-2"></i>
-          Failed to load audit logs
+          Failed to load audit logs: ${err.message}
         </td>
       </tr>
     `;

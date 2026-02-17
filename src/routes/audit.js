@@ -80,9 +80,35 @@ router.get(
         `,
         [...queryParams, limit, offset]
       );
+      
+      // Parse JSON fields in audit log entries with error handling
+      const parsedRows = rows.map(row => {
+        let oldValues = null;
+        let newValues = null;
+        
+        try {
+          oldValues = row.old_values ? JSON.parse(row.old_values) : null;
+        } catch (e) {
+          console.error('Failed to parse old_values for audit entry', row.id, ':', e.message);
+          oldValues = row.old_values; // Return raw string if parsing fails
+        }
+        
+        try {
+          newValues = row.new_values ? JSON.parse(row.new_values) : null;
+        } catch (e) {
+          console.error('Failed to parse new_values for audit entry', row.id, ':', e.message);
+          newValues = row.new_values; // Return raw string if parsing fails
+        }
+        
+        return {
+          ...row,
+          old_values: oldValues,
+          new_values: newValues
+        };
+      });
 
       res.json({
-        data: rows,
+        data: parsedRows,
         pagination: {
           page,
           limit,

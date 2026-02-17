@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const { authenticate, authorizeRoles } = require('../middleware/auth');
+const logAudit = require('../services/auditService');
 
 /* ======================================================
    GET invoices for PO
@@ -53,7 +54,7 @@ router.post(
     const vat = +(net * ratePercent / 100).toFixed(2);
     const total = +(net + vat).toFixed(2);
 
-    await pool.query(
+    const [result] = await pool.query(
       `
       INSERT INTO invoices
       (
@@ -80,6 +81,18 @@ router.post(
       ]
     );
 
+    logAudit({
+      table_name: 'invoices',
+      record_id: result.insertId,
+      action: 'CREATE',
+      old_data: null,
+      new_data: { purchaseOrderId, invoiceNumber, invoiceDate, netAmount, vatRate, vat, total },
+      changed_by: req.user.id,
+      req
+    }).catch(err => {
+      console.error('Invoice create audit log failed:', err);
+    });
+
     res.json({ success: true });
   }
 );
@@ -100,6 +113,12 @@ router.put(
     const rateDecimal = ratePercent / 100; // Convert percentage to decimal (13.5 -> 0.135)
     const vat = +(net * ratePercent / 100).toFixed(2);
     const total = +(net + vat).toFixed(2);
+
+    // Fetch old invoice for audit log
+    const [[oldInvoice]] = await pool.query(
+      'SELECT * FROM invoices WHERE id = ?',
+      [req.params.id]
+    );
 
     await pool.query(
       `
@@ -124,6 +143,27 @@ router.put(
       ]
     );
 
+    if (oldInvoice) {
+      logAudit({
+        table_name: 'invoices',
+        record_id: req.params.id,
+        action: 'UPDATE',
+        old_data: {
+          invoice_number: oldInvoice.invoice_number,
+          invoice_date: oldInvoice.invoice_date,
+          net_amount: oldInvoice.net_amount,
+          vat_rate: oldInvoice.vat_rate,
+          vat_amount: oldInvoice.vat_amount,
+          total_amount: oldInvoice.total_amount
+        },
+        new_data: { invoiceNumber, invoiceDate, netAmount: net, vatRate: rateDecimal, vatAmount: vat, totalAmount: total },
+        changed_by: req.user.id,
+        req
+      }).catch(err => {
+        console.error('Invoice update audit log failed:', err);
+      });
+    }
+
     res.json({ success: true });
   }
 );
@@ -137,10 +177,30 @@ router.delete(
   authorizeRoles('super_admin','admin', 'staff'),
   async (req, res) => {
 
+    // Fetch invoice before deletion for audit log
+    const [[invoice]] = await pool.query(
+      'SELECT * FROM invoices WHERE id = ?',
+      [req.params.id]
+    );
+
     await pool.query(
       'DELETE FROM invoices WHERE id = ?',
       [req.params.id]
     );
+
+    if (invoice) {
+      logAudit({
+        table_name: 'invoices',
+        record_id: req.params.id,
+        action: 'DELETE',
+        old_data: invoice,
+        new_data: null,
+        changed_by: req.user.id,
+        req
+      }).catch(err => {
+        console.error('Invoice delete audit log failed:', err);
+      });
+    }
 
     res.json({ success: true });
   }

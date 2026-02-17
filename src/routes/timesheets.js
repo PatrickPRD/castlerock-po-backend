@@ -5,6 +5,7 @@ const { authenticate } = require('../middleware/auth');
 const authorizeRoles = require('../middleware/authorizeRoles');
 const db = require('../db');
 const SettingsService = require('../services/settingsService');
+const logAudit = require('../services/auditService');
 
 const LEAVE_TYPES = new Set([
   'paid_sick',
@@ -308,6 +309,17 @@ router.post(
       }
 
       await conn.commit();
+
+      logAudit({
+        table_name: 'timesheets',
+        record_id: timesheetId,
+        action: normalizedEntries.length > 0 ? 'UPDATE' : 'CREATE',
+        old_data: null,
+        new_data: { week_start, entries_count: normalizedEntries.length },
+        changed_by: req.user.id,
+        req
+      }).catch(err => console.error('Timesheet save audit log failed:', err));
+
       res.json({ success: true });
     } catch (err) {
       await conn.rollback();

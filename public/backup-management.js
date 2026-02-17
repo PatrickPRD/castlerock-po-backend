@@ -456,15 +456,18 @@ async function proceedWithRestore() {
     showToast('Restoring database...', 'info');
     
     // Restore the backup
+    console.log('📤 Sending restore request...');
     const result = await api('/backups/restore', 'POST', { sql: currentRestoreSqlContent, force: true });
+    console.log('✅ Restore response received:', result);
     
-    showToast('✅ Backup restored successfully. Page will reload...', 'success');
+    showToast('✅ Backup restored successfully! Please refresh the page manually (F5) to see changes.', 'success');
     
-    setTimeout(() => {
-      location.reload();
-    }, 2000);
+    // Don't auto-reload - let user check console and refresh manually
+    console.log('✅ RESTORE COMPLETE - Check server console for audit log messages');
+    console.log('✅ Refresh the page (F5) when ready');
   } catch (err) {
     console.error('Restore error:', err);
+    console.error('Error details:', err.message);
     showToast('❌ Failed to restore backup: ' + err.message, 'error');
   }
 }

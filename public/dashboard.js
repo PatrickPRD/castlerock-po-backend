@@ -653,7 +653,7 @@ function renderPO(po) {
   let loaded = false;
   let lineItemsLoaded = false;
 
-  mainRow.onclick = async () => {
+  mainRow.onclick = () => {
     const isOpen = detailsRow.classList.contains("open");
 
     // Close previously open PO
@@ -671,35 +671,36 @@ function renderPO(po) {
       mainRow.classList.add("open", "active");
       openDetailsRow = detailsRow;
 
-      // Lazy load line items for this PO
-      if (!lineItemsLoaded) {
-        try {
-          const res = await fetch(`/purchase-orders/${po.id}`, { headers: { Authorization: "Bearer " + token } });
-          if (res.ok) {
-            const data = await res.json();
-            const descDiv = document.getElementById(`po-desc-${po.id}`);
-            if (Array.isArray(data.line_items) && data.line_items.length > 0) {
-              // Show line items as comma-separated values in the description wrapper
-              const lineItemsText = data.line_items.map(item => item.description).filter(Boolean).join(', ');
-              descDiv.innerHTML = lineItemsText || '<span style="color: #999;">No line items</span>';
-            } else {
-              descDiv.innerHTML = data.description || '<span style="color: #999;">No description</span>';
-            }
-          }
-        } catch (e) {
-          // fallback
-          const descDiv = document.getElementById(`po-desc-${po.id}`);
-          if (descDiv) descDiv.innerHTML = '<span style="color: #999;">Failed to load details</span>';
-        }
-        lineItemsLoaded = true;
-      }
-
-      if (!loaded) {
-        loadInvoices(po.id, document.getElementById(`inv-${po.id}`));
-        loaded = true;
-      }
-
+      // Defer heavy async operations to prevent blocking the main thread
       requestAnimationFrame(() => {
+        // Lazy load line items for this PO
+        if (!lineItemsLoaded) {
+          lineItemsLoaded = true;
+          fetch(`/purchase-orders/${po.id}`, { headers: { Authorization: "Bearer " + token } })
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+              if (!data) return;
+              const descDiv = document.getElementById(`po-desc-${po.id}`);
+              if (!descDiv) return;
+              
+              if (Array.isArray(data.line_items) && data.line_items.length > 0) {
+                const lineItemsText = data.line_items.map(item => item.description).filter(Boolean).join(', ');
+                descDiv.innerHTML = lineItemsText || '<span style="color: #999;">No line items</span>';
+              } else {
+                descDiv.innerHTML = data.description || '<span style="color: #999;">No description</span>';
+              }
+            })
+            .catch(() => {
+              const descDiv = document.getElementById(`po-desc-${po.id}`);
+              if (descDiv) descDiv.innerHTML = '<span style="color: #999;">Failed to load details</span>';
+            });
+        }
+
+        if (!loaded) {
+          loaded = true;
+          loadInvoices(po.id, document.getElementById(`inv-${po.id}`));
+        }
+
         scrollExpandedRowIntoView(detailsRow);
       });
     }

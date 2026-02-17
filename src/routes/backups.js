@@ -52,16 +52,21 @@ router.post(
         console.log(`🗑️ Deleted oldest backup: ${result.deletedOldest}`);
       }
       
-      // Log to audit trail
-      await logAudit({
-        table_name: 'system',
-        record_id: 0,
-        action: 'BACKUP_CREATE',
-        old_data: null,
-        new_data: { filename: result.filename, timestamp: new Date() },
-        changed_by: req.user.id,
-        req
-      });
+      // Log to audit trail (don't block the response)
+      try {
+        await logAudit({
+          table_name: 'system',
+          record_id: 0,
+          action: 'BACKUP_CREATE',
+          old_data: null,
+          new_data: { filename: result.filename, timestamp: new Date() },
+          changed_by: req.user.id,
+          req
+        });
+        console.log('✅ Audit log: BACKUP_CREATE recorded');
+      } catch (auditErr) {
+        console.error('⚠️ Audit logging failed (non-fatal):', auditErr.message);
+      }
       
       res.json({ 
         success: true, 
@@ -192,23 +197,66 @@ router.post(
         }
       }
 
-      console.log('🔄 Restoring database from backup...');
+      console.log('='.repeat(80));
+      console.log('🔄 RESTORE OPERATION STARTED');
+      console.log('='.repeat(80));
+      console.log('📝 User ID for audit:', req.user?.id);
+      console.log('📝 Authenticated user:', req.user);
+      console.log('📝 Backup type:', sql ? 'SQL' : 'JSON');
+      
       const result = sql ? await restoreBackupSql(sql) : await restoreBackup(backup);
+      
+      console.log('='.repeat(80));
+      console.log('✅ RESTORE COMPLETED SUCCESSFULLY');
+      console.log('✅ Result:', result);
+      console.log('='.repeat(80));
 
-      // Log to audit trail
-      await logAudit({
-        table_name: 'system',
-        record_id: 0,
-        action: 'BACKUP_RESTORE',
-        old_data: null,
-        new_data: { success: true, timestamp: new Date() },
-        changed_by: req.user.id,
-        req
-      });
+      // Log to audit trail (don't let failures here prevent success response)
+      try {
+        console.log('📋 Attempting to log audit entry for BACKUP_RESTORE...');
+        const auditData = {
+          table_name: 'system',
+          record_id: 0,
+          action: 'BACKUP_RESTORE',
+          old_data: null,
+          new_data: { success: true, timestamp: new Date() },
+          changed_by: req.user.id,
+          req
+        };
+        console.log('📋 Audit data:', auditData);
+        
+        await logAudit(auditData);
+        console.log('✅ Audit log: BACKUP_RESTORE recorded');
+      } catch (auditErr) {
+        console.error('⚠️ Audit logging failed (non-fatal):', auditErr.message);
+        console.error('⚠️ Audit error stack:', auditErr.stack);
+      }
 
-      res.json(result);
+      const response = {
+        success: true, 
+        message: 'Backup restored successfully',
+        ...result 
+      };
+      console.log('📤 Sending restore response:', response);
+      res.json(response);
     } catch (err) {
       console.error('❌ Restore error:', err);
+      
+      // Try to log the error to audit trail
+      try {
+        await logAudit({
+          table_name: 'system',
+          record_id: 0,
+          action: 'BACKUP_RESTORE',
+          old_data: null,
+          new_data: { success: false, error: err.message, timestamp: new Date() },
+          changed_by: req.user.id,
+          req
+        });
+      } catch (auditErr) {
+        console.error('⚠️ Audit logging failed:', auditErr.message);
+      }
+      
       res
         .status(500)
         .json({ error: 'Failed to restore backup: ' + err.message });
@@ -268,16 +316,21 @@ router.delete(
       const { filename } = req.params;
       const result = await deleteBackup(filename);
       
-      // Log to audit trail
-      await logAudit({
-        table_name: 'system',
-        record_id: 0,
-        action: 'BACKUP_DELETE',
-        old_data: { filename },
-        new_data: null,
-        changed_by: req.user.id,
-        req
-      });
+      // Log to audit trail (don't block the response)
+      try {
+        await logAudit({
+          table_name: 'system',
+          record_id: 0,
+          action: 'BACKUP_DELETE',
+          old_data: { filename },
+          new_data: null,
+          changed_by: req.user.id,
+          req
+        });
+        console.log('✅ Audit log: BACKUP_DELETE recorded');
+      } catch (auditErr) {
+        console.error('⚠️ Audit logging failed (non-fatal):', auditErr.message);
+      }
       
       res.json(result);
     } catch (err) {
@@ -304,16 +357,21 @@ router.post(
       const sqlContent = req.file.buffer.toString('utf-8');
       const result = await saveBackup(sqlContent);
       
-      // Log to audit trail
-      await logAudit({
-        table_name: 'system',
-        record_id: 0,
-        action: 'BACKUP_UPLOAD',
-        old_data: null,
-        new_data: { filename: result.filename, timestamp: new Date() },
-        changed_by: req.user.id,
-        req
-      });
+      // Log to audit trail (don't block the response)
+      try {
+        await logAudit({
+          table_name: 'system',
+          record_id: 0,
+          action: 'BACKUP_UPLOAD',
+          old_data: null,
+          new_data: { filename: result.filename, timestamp: new Date() },
+          changed_by: req.user.id,
+          req
+        });
+        console.log('✅ Audit log: BACKUP_UPLOAD recorded');
+      } catch (auditErr) {
+        console.error('⚠️ Audit logging failed (non-fatal):', auditErr.message);
+      }
       
       res.json({ 
         success: true, 
