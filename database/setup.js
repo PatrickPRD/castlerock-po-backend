@@ -475,8 +475,7 @@ async function setupDatabase() {
     console.log('\n🎉 Database setup complete!\n');
 
   } catch (error) {
-    console.error('❌ Database setup failed:', error);
-    process.exit(1);
+    throw error;
   } finally {
     if (pool) {
       await pool.end();
@@ -487,4 +486,11 @@ async function setupDatabase() {
   }
 }
 
-setupDatabase();
+if (require.main === module) {
+  setupDatabase().catch(error => {
+    console.error('❌ Database setup failed:', error);
+    process.exit(1);
+  });
+}
+
+module.exports = { setupDatabase };

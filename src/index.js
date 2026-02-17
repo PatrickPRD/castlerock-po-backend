@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const pool = require('./db');
+const { setupDatabase } = require('../database/setup');
 const { ensureLeaveDefaults } = require('./services/leaveService');
 const { checkSetupRequired } = require('./middleware/setupCheck');
 const dynamicTitle = require('./middleware/dynamicTitle');
@@ -143,16 +144,42 @@ app.use('/timesheets', timesheetRoutes);
 const exportRoutes = require('./routes/exports');
 app.use('/exports', exportRoutes);
 
+async function ensureSchemaReady() {
+  await pool.ready;
+
+  try {
+    await pool.query('SELECT 1 FROM site_settings LIMIT 1');
+  } catch (error) {
+    const message = String(error?.message || '');
+    if (error?.code === 'ER_NO_SUCH_TABLE' || message.includes("doesn't exist")) {
+      console.warn('⚠️  Missing schema tables; running database setup...');
+      await setupDatabase();
+      return;
+    }
+
+    throw error;
+  }
+}
+
 // Start server
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
 
-app.listen(PORT, HOST, () => {
-  console.log(`🚀 Server running on ${HOST}:${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🗄️  Database: ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
+async function startServer() {
+  await ensureSchemaReady();
 
-  ensureLeaveDefaults().catch(error => {
-    console.error('Failed to ensure leave defaults:', error);
+  app.listen(PORT, HOST, () => {
+    console.log(`🚀 Server running on ${HOST}:${PORT}`);
+    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🗄️  Database: ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
+
+    ensureLeaveDefaults().catch(error => {
+      console.error('Failed to ensure leave defaults:', error);
+    });
   });
+}
+
+startServer().catch(error => {
+  console.error('❌ Server startup failed:', error.message || error);
+  process.exit(1);
 });
