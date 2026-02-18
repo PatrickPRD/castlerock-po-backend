@@ -11,7 +11,7 @@ function buildInviteEmail({ firstName, resetUrl, branding = {}, appBaseUrl = '' 
     const logoSrc = branding.logo_path.startsWith('http') 
       ? branding.logo_path 
       : `${appBaseUrl}${branding.logo_path}`;
-    logoUrl = `<img src="${logoSrc}" alt="${companyName}" style="max-height:40px;margin-bottom:12px;">`;
+    logoUrl = `<img src="${logoSrc}" alt="${companyName}" style="max-height:40px;margin-bottom:12px;display:block;" width="auto" height="40">`;
   }
   
   const buttonColor = branding.accent_color || headerColor;
@@ -104,7 +104,7 @@ function buildPasswordResetEmail({ firstName, resetUrl, branding = {}, appBaseUr
     const logoSrc = branding.logo_path.startsWith('http') 
       ? branding.logo_path 
       : `${appBaseUrl}${branding.logo_path}`;
-    logoUrl = `<img src="${logoSrc}" alt="${companyName}" style="max-height:40px;margin-bottom:12px;">`;
+    logoUrl = `<img src="${logoSrc}" alt="${companyName}" style="max-height:40px;margin-bottom:12px;display:block;" width="auto" height="40">`;
   }
   
   const buttonColor = branding.accent_color || headerColor;
@@ -215,8 +215,13 @@ async function sendPasswordSetupEmail(user, token) {
     appBaseUrl
   });
 
-  console.log('📧 Sending welcome email to:', user.email, 'with logo URL:', 
-    branding.logo_path ? `${appBaseUrl}${branding.logo_path}` : 'NO LOGO');
+  const logoFullUrl = branding.logo_path ? 
+    (branding.logo_path.startsWith('http') ? branding.logo_path : `${appBaseUrl}${branding.logo_path}`) : 
+    'NO LOGO';
+  
+  console.log('📧 Sending welcome email to:', user.email);
+  console.log('📧 Logo URL:', logoFullUrl);
+  console.log('📧 HTML preview (first 500 chars):', html.substring(0, 500));
 
   await sendEmail({
     to: user.email,
@@ -253,8 +258,13 @@ async function sendPasswordResetEmail(user, token) {
     appBaseUrl
   });
 
-  console.log('📧 Sending password reset email to:', user.email, 'with logo URL:', 
-    branding.logo_path ? `${appBaseUrl}${branding.logo_path}` : 'NO LOGO');
+  const logoFullUrl = branding.logo_path ? 
+    (branding.logo_path.startsWith('http') ? branding.logo_path : `${appBaseUrl}${branding.logo_path}`) : 
+    'NO LOGO';
+  
+  console.log('📧 Sending password reset email to:', user.email);
+  console.log('📧 Logo URL:', logoFullUrl);
+  console.log('📧 HTML preview (first 500 chars):', html.substring(0, 500));
 
   await sendEmail({
     to: user.email,
