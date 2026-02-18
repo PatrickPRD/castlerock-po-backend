@@ -915,7 +915,17 @@ router.post(
         record_id: result.insertId,
         action: 'CREATE',
         old_data: null,
-        new_data: { first_name: normalizedFirst, last_name: normalizedLast, employee_id, login_no: normalizedLoginNo, active: isActive },
+        new_data: { 
+          first_name: normalizedFirst, 
+          last_name: normalizedLast,
+          email: normalizedEmail,
+          employee_id,
+          login_no: normalizedLoginNo,
+          weekly_take_home: weekly_take_home ?? null,
+          weekly_cost: weekly_cost ?? null,
+          date_of_employment: normalizedDate,
+          active: isActive
+        },
         changed_by: req.user.id,
         req
       }).catch(err => console.error('Worker create audit log failed:', err));
@@ -1085,8 +1095,28 @@ router.put(
           table_name: 'workers',
           record_id: workerId,
           action: 'UPDATE',
-          old_data: { first_name: oldWorker.first_name, last_name: oldWorker.last_name, employee_id: oldWorker.employee_id, login_no: oldWorker.login_no, active: oldWorker.active },
-          new_data: { first_name: normalizedFirst, last_name: normalizedLast, employee_id, login_no: normalizedLoginNo, active: isActive },
+          old_data: { 
+            first_name: oldWorker.first_name,
+            last_name: oldWorker.last_name,
+            email: oldWorker.email,
+            employee_id: oldWorker.employee_id,
+            login_no: oldWorker.login_no,
+            weekly_take_home: oldWorker.weekly_take_home,
+            weekly_cost: oldWorker.weekly_cost,
+            date_of_employment: oldWorker.date_of_employment,
+            active: oldWorker.active
+          },
+          new_data: { 
+            first_name: normalizedFirst,
+            last_name: normalizedLast,
+            email: normalizedEmail,
+            employee_id,
+            login_no: normalizedLoginNo,
+            weekly_take_home: weekly_take_home ?? null,
+            weekly_cost: weekly_cost ?? null,
+            date_of_employment: normalizedDate,
+            active: isActive
+          },
           changed_by: req.user.id,
           req
         }).catch(err => console.error('Worker update audit log failed:', err));
