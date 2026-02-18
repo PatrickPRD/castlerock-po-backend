@@ -9,7 +9,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const ExcelJS = require('exceljs');
 const multer = require('multer');
-const { sendPasswordSetupEmail } =
+const { sendPasswordSetupEmail, sendPasswordResetEmail } =
   require('../services/userEmailService');
 
 const upload = multer({
@@ -462,7 +462,7 @@ router.post(
 
       // Send password reset email (non-blocking)
       try {
-        await sendPasswordSetupEmail(user, token);
+        await sendPasswordResetEmail(user, token);
       } catch (emailErr) {
         console.error('Failed to send password reset email:', emailErr);
       }

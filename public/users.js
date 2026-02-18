@@ -285,6 +285,7 @@ async function resetPassword(id, email) {
   try {
     await api(`/admin/users/${id}/reset-password`, "POST");
     showToast(`Password reset email sent to ${email}`, "success");
+    closeModal(editUserModal);
   } catch (err) {
     showToast(err.message || "Failed to send password reset email", "error");
   }
