@@ -536,9 +536,9 @@ function applyFilters() {
       return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
     })
     .forEach((po) => {
-    totalNet += num(po.net_amount);
-    totalGross += num(po.total_amount);
-    renderPO(po);
+      totalNet += num(po.net_amount);
+      totalGross += num(po.total_amount);
+      renderPO(po);
     });
 
   poCountEl.textContent = filtered.length;
