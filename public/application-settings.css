@@ -25,3 +25,38 @@
   font-weight: 600;
   font-size: 1rem;
 }
+#toggleAdvancedIcons {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+#toggleAdvancedIcons:hover {
+  background-color: #e9ecef;
+}
+
+#toggleIconArrow {
+  font-size: 12px;
+  transition: transform 0.3s ease;
+}
+
+#advancedIconsSection {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 1000px;
+  }
+}

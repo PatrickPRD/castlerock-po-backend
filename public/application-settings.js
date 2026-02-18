@@ -698,4 +698,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     showToast(err.message || 'Failed to load financial settings', 'error');
   }
 });
+
+// Toggle advanced icons section
+const toggleAdvancedIconsBtn = document.getElementById('toggleAdvancedIcons');
+const advancedIconsSection = document.getElementById('advancedIconsSection');
+const toggleIconText = document.getElementById('toggleIconText');
+const toggleIconArrow = document.getElementById('toggleIconArrow');
+
+if (toggleAdvancedIconsBtn && advancedIconsSection) {
+  toggleAdvancedIconsBtn.addEventListener('click', () => {
+    const isHidden = advancedIconsSection.style.display === 'none';
+    advancedIconsSection.style.display = isHidden ? 'block' : 'none';
+    toggleIconText.textContent = isHidden ? 'Hide Advanced Icons' : 'Show Advanced Icons';
+    toggleIconArrow.textContent = isHidden ? '▲' : '▼';
+  });
+}
+
 })();
