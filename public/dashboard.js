@@ -1,9 +1,10 @@
 
 
+// Ensure user is authenticated before loading page
+ensureAuthenticated();
+
 const token = localStorage.getItem("token");
 const role = localStorage.getItem("role");
-
-if (!token) location.href = "login.html";
 
 const poTable = document.getElementById("poTable");
 
@@ -33,11 +34,13 @@ let vatRatesCache = null;
 async function ensureVatRates() {
   if (vatRatesCache) return vatRatesCache;
   try {
-    const res = await fetch('/settings/financial', {
-      headers: { Authorization: 'Bearer ' + token }
-    });
-    const data = await res.json();
-    vatRatesCache = Array.isArray(data.vat_rates) ? data.vat_rates.map(Number) : [];
+    const res = await authenticatedFetch('/settings/financial');
+    if (res.ok) {
+      const data = await res.json();
+      vatRatesCache = Array.isArray(data.vat_rates) ? data.vat_rates.map(Number) : [];
+    } else {
+      vatRatesCache = [];
+    }
   } catch (_) {
     vatRatesCache = [];
   }
@@ -187,10 +190,11 @@ function initLineItemsManager({
       return;
     }
 
-    fetch(`/purchase-orders/line-items/search?q=${encodeURIComponent(query)}`, {
-      headers: { Authorization: 'Bearer ' + token }
-    })
-      .then(res => res.json())
+    authenticatedFetch(`/purchase-orders/line-items/search?q=${encodeURIComponent(query)}`)
+      .then(res => {
+        if (res.ok) return res.json();
+        throw new Error('Failed to fetch suggestions');
+      })
       .then(items => {
         suggestions.innerHTML = '';
         items.forEach(item => {
@@ -385,13 +389,25 @@ function formatVat(rate) {
    Load Purchase Orders
    ============================ */
 async function loadPOs() {
-  const res = await fetch("/purchase-orders", {
-    headers: { Authorization: "Bearer " + token },
-  });
+  try {
+    const res = await authenticatedFetch("/purchase-orders");
 
-  allPOs = await res.json();
-  populateFilters();
-  applyFilters();
+    if (!res.ok) {
+      const error = await res.json();
+      showToast(error.error || "Failed to load purchase orders", "error");
+      return;
+    }
+
+    allPOs = await res.json();
+    populateFilters();
+    applyFilters();
+  } catch (error) {
+    console.error("Error loading purchase orders:", error);
+    // authenticatedFetch will handle 401 errors by redirecting to login
+    if (error.message !== "Authentication token expired") {
+      showToast("Failed to load purchase orders", "error");
+    }
+  }
 }
 
 /* ============================
@@ -774,9 +790,7 @@ async function editPO(id) {
   
   // Load PO data
   try {
-    const res = await fetch(`/purchase-orders/${id}`, {
-      headers: { Authorization: "Bearer " + token }
-    });
+    const res = await authenticatedFetch(`/purchase-orders/${id}`);
     
     if (!res.ok) {
       showToast("Failed to load purchase order", "error");
@@ -861,18 +875,22 @@ function addInvoice(id) {
 async function deletePO(id) {
   if (!(await confirmDialog("Cancel this Purchase Order?\nThis cannot be undone."))) return;
 
-  const res = await fetch(`/purchase-orders/${id}`, {
-    method: "DELETE",
-    headers: { Authorization: "Bearer " + token },
-  });
+  try {
+    const res = await authenticatedFetch(`/purchase-orders/${id}`, {
+      method: "DELETE"
+    });
 
-  if (!res.ok) {
-    const err = await res.json();
-    showToast(err.error || "Failed to cancel Purchase Order", "error");
-    return;
+    if (!res.ok) {
+      const err = await res.json();
+      showToast(err.error || "Failed to cancel Purchase Order", "error");
+      return;
+    }
+
+    loadPOs();
+  } catch (err) {
+    showToast("Failed to cancel Purchase Order", "error");
+    console.error(err);
   }
-
-  loadPOs();
 }
 
 /* ============================
@@ -1223,9 +1241,11 @@ function closeCreatePOModal() {
 
 async function loadPOSuppliers() {
   try {
-    const res = await fetch("/suppliers", {
-      headers: { Authorization: "Bearer " + token }
-    });
+    const res = await authenticatedFetch("/suppliers");
+    if (!res.ok) {
+      console.error("Failed to load suppliers:", res.status);
+      return;
+    }
     const suppliers = await res.json();
     
     // Store suppliers globally for search
@@ -1295,9 +1315,11 @@ async function loadPOSuppliers() {
 
 async function loadPOSites() {
   try {
-    const res = await fetch("/sites", {
-      headers: { Authorization: "Bearer " + token }
-    });
+    const res = await authenticatedFetch("/sites");
+    if (!res.ok) {
+      console.error("Failed to load sites:", res.status);
+      return;
+    }
     const sites = await res.json();
     
     const select = document.getElementById("poSite");
@@ -1315,9 +1337,11 @@ async function loadPOSites() {
 
 async function loadPOStages() {
   try {
-    const res = await fetch("/stages", {
-      headers: { Authorization: "Bearer " + token }
-    });
+    const res = await authenticatedFetch("/stages");
+    if (!res.ok) {
+      console.error("Failed to load stages:", res.status);
+      return;
+    }
     const stages = await res.json();
     
     const select = document.getElementById("poStage");
@@ -1349,9 +1373,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       
       try {
-        const res = await fetch(`/locations?siteId=${siteId}`, {
-          headers: { Authorization: "Bearer " + token }
-        });
+        const res = await authenticatedFetch(`/locations?siteId=${siteId}`);
+        if (!res.ok) {
+          console.error("Failed to load locations:", res.status);
+          return;
+        }
         const locations = await res.json();
         
         locations.forEach(l => {
@@ -1442,11 +1468,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       
       try {
-        const res = await fetch("/purchase-orders", {
+        const res = await authenticatedFetch("/purchase-orders", {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + token
+            "Content-Type": "application/json"
           },
           body: JSON.stringify(payload)
         });
@@ -1475,9 +1500,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function loadEditPOSuppliers(selectedId) {
   try {
-    const res = await fetch("/suppliers", {
-      headers: { Authorization: "Bearer " + token }
-    });
+    const res = await authenticatedFetch("/suppliers");
+    if (!res.ok) {
+      console.error("Failed to load suppliers:", res.status);
+      return;
+    }
     const suppliers = await res.json();
     
     const select = document.getElementById("editPOSupplier");
@@ -1496,9 +1523,11 @@ async function loadEditPOSuppliers(selectedId) {
 
 async function loadEditPOSites(selectedId) {
   try {
-    const res = await fetch("/sites", {
-      headers: { Authorization: "Bearer " + token }
-    });
+    const res = await authenticatedFetch("/sites");
+    if (!res.ok) {
+      console.error("Failed to load sites:", res.status);
+      return;
+    }
     const sites = await res.json();
     
     const select = document.getElementById("editPOSite");
@@ -1517,9 +1546,11 @@ async function loadEditPOSites(selectedId) {
 
 async function loadEditPOStages(selectedId) {
   try {
-    const res = await fetch("/stages", {
-      headers: { Authorization: "Bearer " + token }
-    });
+    const res = await authenticatedFetch("/stages");
+    if (!res.ok) {
+      console.error("Failed to load stages:", res.status);
+      return;
+    }
     const stages = await res.json();
     
     const select = document.getElementById("editPOStage");
@@ -1538,9 +1569,11 @@ async function loadEditPOStages(selectedId) {
 
 async function loadEditPOLocations(siteId, selectedId) {
   try {
-    const res = await fetch(`/locations?siteId=${siteId}`, {
-      headers: { Authorization: "Bearer " + token }
-    });
+    const res = await authenticatedFetch(`/locations?siteId=${siteId}`);
+    if (!res.ok) {
+      console.error("Failed to load locations:", res.status);
+      return;
+    }
     const locations = await res.json();
     
     const select = document.getElementById("editPOLocation");
@@ -1636,11 +1669,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       
       try {
-        const res = await fetch(`/purchase-orders/${poId}`, {
+        const res = await authenticatedFetch(`/purchase-orders/${poId}`, {
           method: "PUT",
           headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + token
+            "Content-Type": "application/json"
           },
           body: JSON.stringify(payload)
         });

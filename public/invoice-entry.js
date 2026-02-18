@@ -1,6 +1,8 @@
+// Ensure user is authenticated before loading page
+ensureAuthenticated();
+
 const token = localStorage.getItem('token');
 const role  = localStorage.getItem('role');
-if (!token) location.href = 'login.html';
 
 const poId = new URLSearchParams(location.search).get('poId');
 if (!poId) location.href = 'dashboard.html';
@@ -82,11 +84,13 @@ function formatVat(rate) {
 
 async function loadVatRates() {
   try {
-    const res = await fetch('/settings/financial', {
-      headers: { Authorization: 'Bearer ' + token }
-    });
-    const data = await res.json();
-    vatRates = Array.isArray(data.vat_rates) ? data.vat_rates.map(Number) : [];
+    const res = await authenticatedFetch('/settings/financial');
+    if (res.ok) {
+      const data = await res.json();
+      vatRates = Array.isArray(data.vat_rates) ? data.vat_rates.map(Number) : [];
+    } else {
+      vatRates = [];
+    }
   } catch (_) {
     vatRates = [];
   }
@@ -116,12 +120,21 @@ async function loadVatRates() {
 
 /* ================= Load PO ================= */
 async function loadPO() {
-  const res = await fetch(`/purchase-orders/${poId}`, {
-    headers: { Authorization: 'Bearer ' + token }
-  });
-  po = await res.json();
-  renderHeader();
-  renderInvoices();
+  try {
+    const res = await authenticatedFetch(`/purchase-orders/${poId}`);
+    if (!res.ok) {
+      alert('Failed to load purchase order');
+      location.href = 'dashboard.html';
+      return;
+    }
+    po = await res.json();
+    renderHeader();
+    renderInvoices();
+  } catch (err) {
+    console.error('Error loading PO:', err);
+    alert('Failed to load purchase order');
+    location.href = 'dashboard.html';
+  }
 }
 
 /* ================= Render PO Header ================= */
@@ -251,29 +264,45 @@ invoiceForm.addEventListener('submit', async e => {
   const url = id ? `/invoices/${id}` : '/invoices';
   const method = id ? 'PUT' : 'POST';
 
-  await fetch(url, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: 'Bearer ' + token
-    },
-    body: JSON.stringify(payload)
-  });
+  try {
+    const res = await authenticatedFetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
 
-  closeInvoiceModal();
-  loadPO();
+    if (!res.ok) {
+      alert('Failed to save invoice');
+      return;
+    }
+
+    closeInvoiceModal();
+    loadPO();
+  } catch (err) {
+    console.error('Error saving invoice:', err);
+    alert('Failed to save invoice');
+  }
 });
 
 /* ================= Delete Invoice ================= */
 async function deleteInvoice(id) {
   if (!(await confirmDialog('Delete this invoice?'))) return;
 
-  await fetch(`/invoices/${id}`, {
-    method: 'DELETE',
-    headers: { Authorization: 'Bearer ' + token }
-  });
+  try {
+    const res = await authenticatedFetch(`/invoices/${id}`, {
+      method: 'DELETE'
+    });
 
-  loadPO();
+    if (!res.ok) {
+      alert('Failed to delete invoice');
+      return;
+    }
+
+    loadPO();
+  } catch (err) {
+    console.error('Error deleting invoice:', err);
+    alert('Failed to delete invoice');
+  }
 }
 
 function resetForm() {

@@ -1,10 +1,13 @@
+// Ensure user is authenticated before loading page
+ensureAuthenticated();
+
 const token = localStorage.getItem("token");
 const role = localStorage.getItem("role");
 
 /* ============================
    AUTH GUARD
    ============================ */
-if (!token || role !== "super_admin") {
+if (role !== "super_admin") {
   location.href = "dashboard.html";
 }
 
@@ -25,14 +28,13 @@ let brandingCache = null;
   HELPERS
   ============================ */
 async function api(url, method = "GET", body) {
-  const res = await fetch(url, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + token,
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const options = { method };
+  if (body) {
+    options.headers = { "Content-Type": "application/json" };
+    options.body = JSON.stringify(body);
+  }
+
+  const res = await authenticatedFetch(url, options);
 
   if (!res.ok) {
     const err = await res.json();

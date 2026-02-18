@@ -1,10 +1,13 @@
+// Ensure user is authenticated before loading page
+ensureAuthenticated();
+
 const token = localStorage.getItem("token");
 const role = localStorage.getItem("role");
 
 /* ============================
    AUTH GUARD
    ============================ */
-if (!token || role !== "super_admin") {
+if (role !== "super_admin") {
   location.href = "dashboard.html";
 }
 
@@ -35,15 +38,13 @@ const changesModalBody = document.getElementById("changesModalBody");
    API HELPER
    ============================ */
 async function api(url, method = "GET", body) {
-  const headers = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
-  };
+  const options = { method };
+  if (body) {
+    options.headers = { "Content-Type": "application/json" };
+    options.body = JSON.stringify(body);
+  }
 
-  const opts = { method, headers };
-  if (body) opts.body = JSON.stringify(body);
-
-  const res = await fetch(url, opts);
+  const res = await authenticatedFetch(url, options);
   if (!res.ok) {
     const err = await res.json();
     throw new Error(err.error || "Request failed");

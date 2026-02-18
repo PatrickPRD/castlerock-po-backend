@@ -1,7 +1,10 @@
+// Ensure user is authenticated before loading page
+ensureAuthenticated();
+
 const token = localStorage.getItem('token');
 const role = localStorage.getItem('role');
 
-if (!token || !['super_admin', 'admin'].includes(role)) {
+if (!['super_admin', 'admin'].includes(role)) {
   location.href = 'dashboard.html';
 }
 

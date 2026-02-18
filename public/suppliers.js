@@ -1,7 +1,10 @@
+// Ensure user is authenticated before loading page
+ensureAuthenticated();
+
 const token = localStorage.getItem("token");
 const role = localStorage.getItem("role");
 
-if (!token || !["admin", "super_admin"].includes(role)) {
+if (!["admin", "super_admin"].includes(role)) {
   location.href = "dashboard.html";
 }
 
@@ -14,15 +17,13 @@ let suppliers = [];
    API helper
    ========================= */
 async function api(url, method = 'GET', body) {
-  const res = await fetch(url, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: 'Bearer ' + token
-    },
-    body: body ? JSON.stringify(body) : undefined
-  });
-
+  const options = { method };
+  if (body) {
+    options.headers = { 'Content-Type': 'application/json' };
+    options.body = JSON.stringify(body);
+  }
+  
+  const res = await authenticatedFetch(url, options);
   const data = await res.json();
   if (!res.ok) {
     throw new Error(data.error || 'Request failed');
