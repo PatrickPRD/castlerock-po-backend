@@ -1,5 +1,42 @@
 const pool = require('../db');
 
+const AUDIT_LOG_RETENTION_LIMIT = 300;
+
+/**
+ * Clean up old audit logs to keep only the latest 300 entries
+ * This function runs asynchronously and doesn't block the main operation
+ */
+async function cleanupOldAuditLogs() {
+  try {
+    // Check current count
+    const [[{ count }]] = await pool.query(
+      'SELECT COUNT(*) as count FROM audit_log'
+    );
+
+    // If we exceed the limit, delete the oldest entries
+    if (count > AUDIT_LOG_RETENTION_LIMIT) {
+      const entriesToDelete = count - AUDIT_LOG_RETENTION_LIMIT;
+      
+      const result = await pool.query(
+        `
+        DELETE FROM audit_log
+        WHERE id IN (
+          SELECT id FROM audit_log
+          ORDER BY created_at ASC
+          LIMIT ?
+        )
+        `,
+        [entriesToDelete]
+      );
+
+      console.log(`🧹 Cleaned up ${result[0].affectedRows} old audit log entries (total: ${count} → ${AUDIT_LOG_RETENTION_LIMIT})`);
+    }
+  } catch (error) {
+    console.error('❌ Audit log cleanup failed:', error.message);
+    // Don't throw - cleanup failure shouldn't affect the application
+  }
+}
+
 /**
  * Write an audit log entry
  * @param {Object} params
@@ -55,6 +92,11 @@ async function logAudit({
       ]
     );
     console.log(`✓ Audit log: ${action} on ${table_name}#${record_id} by user ${changed_by}`);
+
+    // Run cleanup asynchronously without blocking
+    cleanupOldAuditLogs().catch(err => {
+      console.error('Audit log cleanup error:', err.message);
+    });
   } catch (error) {
     console.error('❌ Audit log failed:', error.message);
     console.error('❌ Audit error:', error);
