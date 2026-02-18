@@ -18,8 +18,7 @@ const userTable = document.getElementById("userTable");
 const addUserModal = document.getElementById("addUserModal");
 const editUserModal = document.getElementById("editUserModal");
 const openAddUserBtn = document.getElementById("openAddUser");
-const emailFromAddBtn = document.getElementById("emailFromAdd");
-const emailFromEditBtn = document.getElementById("emailFromEdit");
+const resetPasswordBtn = document.getElementById("resetPasswordBtn");
 
 const userCache = new Map();
 let brandingCache = null;
@@ -42,18 +41,6 @@ async function api(url, method = "GET", body) {
   }
 
   return res.json();
-}
-
-function toggleActions(btn) {
-  // Close any other open menus
-  document.querySelectorAll('.actions-dropdown').forEach(m => {
-    if (m !== btn.nextElementSibling) {
-      m.classList.add('hidden');
-    }
-  });
-
-  const menu = btn.nextElementSibling;
-  menu.classList.toggle('hidden');
 }
 
 function openModal(modal) {
@@ -80,7 +67,6 @@ function resetAddForm() {
   document.getElementById("addFirstName").value = "";
   document.getElementById("addLastName").value = "";
   document.getElementById("addEmail").value = "";
-  document.getElementById("addPassword").value = "";
   document.getElementById("addRole").value = "admin";
 }
 
@@ -91,26 +77,6 @@ function resetEditForm() {
   document.getElementById("editEmail").value = "";
   document.getElementById("editRole").value = "viewer";
   document.getElementById("editActive").value = "1";
-  document.getElementById("editPassword").value = "";
-}
-
-function updateEmailButtonsState() {
-  const addEmail = document.getElementById("addEmail");
-  const addPassword = document.getElementById("addPassword");
-  const editEmail = document.getElementById("editEmail");
-  const editPassword = document.getElementById("editPassword");
-
-  if (emailFromAddBtn) {
-    const hasPassword = !!(addPassword && addPassword.value.trim());
-    emailFromAddBtn.style.display = hasPassword ? "inline-flex" : "none";
-    emailFromAddBtn.disabled = !addEmail || !addEmail.value.trim();
-  }
-
-  if (emailFromEditBtn) {
-    const hasPassword = !!(editPassword && editPassword.value.trim());
-    emailFromEditBtn.style.display = hasPassword ? "inline-flex" : "none";
-    emailFromEditBtn.disabled = !editEmail || !editEmail.value.trim();
-  }
 }
 
 async function fetchBrandingSettings() {
@@ -156,18 +122,6 @@ async function getHeaderBranding() {
   };
 
   return brandingCache;
-}
-
-function buildEmailText({ name, email, password, loginUrl }) {
-  return [
-    `Hi ${name},`,
-    "",
-    "Here are your login details for the Castlerock Homes portal:",
-    "",
-    `Email: ${email}`,
-    `Password: ${password}`,
-    `Login: ${loginUrl}`
-  ].join("\n");
 }
 
 // Close on outside click
@@ -264,10 +218,9 @@ async function addUser() {
   const firstName = document.getElementById("addFirstName").value.trim();
   const lastName = document.getElementById("addLastName").value.trim();
   const email = document.getElementById("addEmail").value.trim();
-  const password = document.getElementById("addPassword").value;
   const userRole = document.getElementById("addRole").value;
 
-  if (!email || !firstName || !lastName || !password) {
+  if (!email || !firstName || !lastName) {
     showToast("Please fill in all required fields", "error");
     return;
   }
@@ -280,13 +233,12 @@ async function addUser() {
   }
 
   try {
-    // Create user with password
+    // Create user - password will be set via email link
     await api("/admin/users", "POST", {
       email,
       role: userRole,
       first_name: firstName,
-      last_name: lastName,
-      password: password,
+      last_name: lastName
     });
 
     // Clear inputs
@@ -297,7 +249,7 @@ async function addUser() {
     await loadUsers();
 
     // User feedback
-    showToast(`User ${email} created successfully`, "success");
+    showToast(`User ${email} created successfully. Welcome email sent.`, "success");
   } catch (err) {
     showToast(err.message || "Failed to create user", "error");
   }
@@ -321,25 +273,21 @@ async function openEditModal(id) {
     document.getElementById("editRole").value = user.role || "viewer";
     document.getElementById("editRole").dataset.currentRole = user.role || "viewer";
     document.getElementById("editActive").value = Number(user.active) === 1 ? "1" : "0";
-    updateEmailButtonsState();
   } catch (err) {
     closeModal(editUserModal);
     showToast(err.message || "Failed to load user", "error");
   }
 }
 
-function sendLoginEmail({ name, email, password, loginUrl }) {
-  if (!email || !password) {
-    showToast("Set email and password in Add/Edit before emailing", "error");
-    return;
-  }
+async function resetPassword(id, email) {
+  if (!(await confirmDialog(`Send password reset email to ${email}?`))) return;
 
-  const url = loginUrl || `${window.location.origin}/login.html`;
-  getHeaderBranding().then((branding) => {
-    const subject = `Your ${branding.logoLabel} login details`;
-    const body = buildEmailText({ name, email, password, loginUrl: url });
-    window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  });
+  try {
+    await api(`/admin/users/${id}/reset-password`, "POST");
+    showToast(`Password reset email sent to ${email}`, "success");
+  } catch (err) {
+    showToast(err.message || "Failed to send password reset email", "error");
+  }
 }
 
 async function saveEditUser() {
@@ -362,11 +310,6 @@ async function saveEditUser() {
     role: nextRole,
     active: Number(document.getElementById("editActive").value),
   };
-
-  const password = document.getElementById("editPassword").value.trim();
-  if (password) {
-    payload.password = password;
-  }
 
   try {
     await api(`/admin/users/${id}`, "PUT", payload);
@@ -431,24 +374,6 @@ async function deleteUser(id, email) {
   }
 }
 
-async function sendInvite(email) {
-  if (!(await confirmDialog(`Send password setup email to ${email}?`))) return;
-
-  try {
-    await fetch("/auth/request-reset", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email }),
-    });
-
-    showToast(`Invite email sent to ${email}`, "success");
-  } catch (err) {
-    showToast("Failed to send invite email", "error");
-  }
-}
-
 /* ============================
    NAVIGATION
    ============================ */
@@ -464,7 +389,6 @@ loadUsers();
 if (openAddUserBtn) {
   openAddUserBtn.addEventListener("click", () => {
     resetAddForm();
-    updateEmailButtonsState();
     openModal(addUserModal);
   });
 }
@@ -485,38 +409,14 @@ if (editUserForm) {
   });
 }
 
-if (emailFromAddBtn) {
-  emailFromAddBtn.addEventListener("click", () => {
-    const name = `${document.getElementById("addFirstName").value.trim()} ${document.getElementById("addLastName").value.trim()}`.trim();
-    const email = document.getElementById("addEmail").value.trim();
-    const password = document.getElementById("addPassword").value.trim();
-    sendLoginEmail({ name, email, password });
+if (resetPasswordBtn) {
+  resetPasswordBtn.addEventListener("click", () => {
+    const id = document.getElementById("editUserId").value;
+    const email = document.getElementById("editEmail").value;
+    if (id && email) {
+      resetPassword(id, email);
+    }
   });
 }
 
-if (emailFromEditBtn) {
-  emailFromEditBtn.addEventListener("click", () => {
-    const name = `${document.getElementById("editFirstName").value.trim()} ${document.getElementById("editLastName").value.trim()}`.trim();
-    const email = document.getElementById("editEmail").value.trim();
-    const password = document.getElementById("editPassword").value.trim();
-    sendLoginEmail({ name, email, password });
-  });
-}
 
-if (document.getElementById("addEmail")) {
-  document.getElementById("addEmail").addEventListener("input", updateEmailButtonsState);
-}
-
-if (document.getElementById("addPassword")) {
-  document.getElementById("addPassword").addEventListener("input", updateEmailButtonsState);
-}
-
-if (document.getElementById("editEmail")) {
-  document.getElementById("editEmail").addEventListener("input", updateEmailButtonsState);
-}
-
-if (document.getElementById("editPassword")) {
-  document.getElementById("editPassword").addEventListener("input", updateEmailButtonsState);
-}
-
-bindModalClosers();

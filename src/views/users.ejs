@@ -33,7 +33,6 @@
           <input id="addFirstName" placeholder="First name" required>
           <input id="addLastName" placeholder="Last name" required>
           <input id="addEmail" placeholder="Email" type="email" required>
-          <input id="addPassword" type="password" placeholder="Password" required>
           <select id="addRole" required>
             <option value="admin">Admin</option>
             <option value="staff">Staff</option>
@@ -42,7 +41,6 @@
         </div>
         <div class="modal-actions">
           <button class="btn btn-outline-secondary" type="button" data-modal-close="addUserModal">Cancel</button>
-          <button class="btn btn-outline-secondary" type="button" id="emailFromAdd" disabled>Email Login Details</button>
           <button class="btn btn-primary" type="submit">Create User</button>
         </div>
       </form>
@@ -71,11 +69,10 @@
             <option value="1">Active</option>
             <option value="0">Disabled</option>
           </select>
-          <input id="editPassword" type="password" placeholder="New password (leave blank to keep current)">
         </div>
         <div class="modal-actions">
           <button class="btn btn-outline-secondary" type="button" data-modal-close="editUserModal">Cancel</button>
-          <button class="btn btn-outline-secondary" type="button" id="emailFromEdit" disabled>Email Login Details</button>
+          <button class="btn btn-outline-secondary" type="button" id="resetPasswordBtn">Reset Password</button>
           <button class="btn btn-primary" type="submit">Save Changes</button>
         </div>
       </form>

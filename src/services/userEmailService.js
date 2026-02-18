@@ -1,6 +1,12 @@
-const createTransporter = require('./emailService');
+const { sendEmail } = require('./sesEmailService');
+const SettingsService = require('./settingsService');
 
-function buildInviteEmail({ firstName, resetUrl }) {
+function buildInviteEmail({ firstName, resetUrl, branding = {} }) {
+  const headerColor = branding.header_color || '#212529';
+  const companyName = branding.header_logo_text || 'Castlerock Homes';
+  const logoUrl = branding.logo_path ? `<img src="${branding.logo_path}" alt="${companyName}" style="max-height:40px;margin-bottom:12px;">` : '';
+  const buttonColor = branding.accent_color || headerColor;
+
   return `
 <!DOCTYPE html>
 <html>
@@ -15,9 +21,10 @@ function buildInviteEmail({ firstName, resetUrl }) {
         <table width="100%" style="max-width:560px;background:#ffffff;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.08);">
 
           <tr>
-            <td style="padding:24px 28px;border-bottom:1px solid #eee;">
-              <h2 style="margin:0;color:#c62828;font-weight:600;">
-                Castlerock Purchase Order Tracker
+            <td style="padding:24px 28px;border-bottom:1px solid #eee;background:${headerColor};text-align:center;">
+              ${logoUrl}
+              <h2 style="margin:0;color:#ffffff;font-weight:600;font-size:18px;">
+                ${companyName} - Purchase Order Tracker
               </h2>
             </td>
           </tr>
@@ -28,7 +35,7 @@ function buildInviteEmail({ firstName, resetUrl }) {
 
               <p>
                 You’ve been invited to access the
-                <strong>Castlerock Purchase Order Tracker</strong>.
+                <strong>${companyName} Purchase Order Tracker</strong>.
               </p>
 
               <p>
@@ -39,10 +46,10 @@ function buildInviteEmail({ firstName, resetUrl }) {
                 <a href="${resetUrl}"
                    style="
                      display:inline-block;
-                     background:#c62828;
+                     background:${buttonColor};
                      color:#ffffff;
                      text-decoration:none;
-                     padding:12px 22px;
+                     padding:12px 24px;
                      border-radius:6px;
                      font-weight:600;
                    ">
@@ -50,7 +57,7 @@ function buildInviteEmail({ firstName, resetUrl }) {
                 </a>
               </p>
 
-              <p>This link will expire in <strong>1 hour</strong>.</p>
+              <p>This link will expire in <strong>6 hours</strong>.</p>
 
               <p>
                 If you weren’t expecting this invitation, you can safely ignore this email.
@@ -58,7 +65,7 @@ function buildInviteEmail({ firstName, resetUrl }) {
 
               <p>
                 Thanks,<br />
-                <strong>Castlerock Homes</strong>
+                <strong>${companyName}</strong>
               </p>
             </td>
           </tr>
@@ -79,20 +86,29 @@ function buildInviteEmail({ firstName, resetUrl }) {
 }
 
 async function sendPasswordSetupEmail(user, token) {
-  const transporter = createTransporter();
+  const appBaseUrl = process.env.APP_BASE_URL || 'https://potracker.blossomhill.ie';
+  const resetUrl = `${appBaseUrl}/reset-password.html?token=${token}`;
 
-  const resetUrl =
-    `https://potracker.blossomhill.ie/reset-password.html?token=${token}`;
+  // Fetch site branding settings
+  let branding = {};
+  try {
+    branding = await SettingsService.getSettings() || {};
+  } catch (err) {
+    console.error('Failed to fetch branding settings:', err);
+    // Use defaults if fetch fails
+  }
+
+  const companyName = branding.header_logo_text || 'Castlerock Homes';
 
   const html = buildInviteEmail({
     firstName: user.first_name,
-    resetUrl
+    resetUrl,
+    branding
   });
 
-  await transporter.sendMail({
-    from: '"Castlerock PO Tracker" <castlerockepc@gmail.com>',
+  await sendEmail({
     to: user.email,
-    subject: 'You’ve been invited to Castlerock PO Tracker',
+    subject: `You've been invited to ${companyName} PO Tracker`,
     html
   });
 }

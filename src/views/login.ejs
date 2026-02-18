@@ -36,6 +36,32 @@
     </div>
 
   </div>
+
+  <!-- Forgot Password Modal -->
+  <div class="modal" id="forgotPasswordModal" style="display:none;">
+    <div class="modal-content" style="width: 420px;">
+      <div class="modal-header">
+        <h3>Reset Password</h3>
+        <button class="modal-close" type="button" data-modal-close="forgotPasswordModal">x</button>
+      </div>
+      <form id="forgotPasswordForm" class="modal-body">
+        <p style="margin-bottom:16px;font-size:14px;color:#666;">
+          Enter your email address and we'll send you a link to reset your password.
+        </p>
+        <input
+          id="forgotEmail"
+          type="email"
+          placeholder="Enter your email"
+          required
+          style="width:100%"
+        >
+        <div class="modal-actions">
+          <button class="btn btn-outline-secondary" type="button" data-modal-close="forgotPasswordModal">Cancel</button>
+          <button class="btn btn-primary" type="submit">Send Reset Link</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </main>
 
 <%- include('partials/footer', { scripts: ['/ui.js', 'login.js'], includeNavScript: false }) %>

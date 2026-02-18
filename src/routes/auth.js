@@ -42,7 +42,7 @@ router.post('/request-reset', async (req, res) => {
   }
 
   const token = crypto.randomBytes(32).toString('hex');
-  const expires = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
+  const expires = new Date(Date.now() + 1000 * 60 * 60 * 6); // 6 hours
 
   await pool.query(
     `
@@ -53,18 +53,15 @@ router.post('/request-reset', async (req, res) => {
     [token, expires, user.id]
   );
 
-  const link = `${process.env.APP_URL}/reset-password.html?token=${token}`;
+  try {
+    const { sendPasswordSetupEmail } = require('../services/userEmailService');
 
+    await sendPasswordSetupEmail(user, token);
 
- try {
-  const { sendPasswordSetupEmail } = require('../services/userEmailService');
-
-await sendPasswordSetupEmail(user, token);
-
-} catch (err) {
-  console.error('❌ EMAIL SEND FAILED:', err);
-  return res.status(500).json({ error: 'Email failed to send' });
-}
+  } catch (err) {
+    console.error('❌ EMAIL SEND FAILED:', err);
+    return res.status(500).json({ error: 'Email failed to send' });
+  }
 
 
   res.json({ success: true });

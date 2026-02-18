@@ -140,37 +140,48 @@ router.post(
   authenticate,
   authorizeRoles('super_admin'),
   async (req, res) => {
-    const { email, role, first_name, last_name, password } = req.body;
+    const { email, role, first_name, last_name } = req.body;
 
     try {
-      // Validate password is provided
-      if (!password) {
-        return res.status(400).json({
-          error: 'Password is required'
-        });
-      }
-
-      // Hash the password
-      const passwordHash = await bcrypt.hash(password, 12);
-
-      // Create user
+      // Create user without password - they will set it via welcome email
       const [result] = await db.query(
         `INSERT INTO users
          (email, role, first_name, last_name, password_hash, active)
-         VALUES (?, ?, ?, ?, ?, 1)`,
+         VALUES (?, ?, ?, ?, '', 1)`,
         [
           email,
           role,
           first_name,
-          last_name,
-          passwordHash
+          last_name
         ]
       );
+
+      const newUserId = result.insertId;
+
+      // Generate password reset token for welcome email
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 6); // 6 hours
+
+      await db.query(
+        `UPDATE users
+         SET reset_token = ?, reset_token_expires = ?
+         WHERE id = ?`,
+        [token, expiresAt, newUserId]
+      );
+
+      // Send welcome email with password setup link (non-blocking)
+      try {
+        const newUser = { id: newUserId, email, first_name, last_name };
+        await sendPasswordSetupEmail(newUser, token);
+      } catch (emailErr) {
+        console.error('Failed to send welcome email:', emailErr);
+        // Don't fail the user creation if email fails, just log it
+      }
 
       // Audit log (non-blocking)
       logAudit({
         table_name: 'users',
-        record_id: result.insertId,
+        record_id: newUserId,
         action: 'CREATE',
         old_data: null,
         new_data: { email, role, first_name, last_name },
@@ -183,7 +194,7 @@ router.post(
       // Respond
       return res.json({
         success: true,
-        userId: result.insertId
+        userId: newUserId
       });
 
     } catch (err) {
@@ -411,6 +422,70 @@ router.delete(
       console.error('DELETE USER ERROR:', err);
       return res.status(500).json({
         error: 'Failed to delete user'
+      });
+    }
+  }
+);
+
+/* ======================================================
+   RESET USER PASSWORD – SUPER ADMIN ONLY
+   Sends password reset email to user
+   ====================================================== */
+router.post(
+  '/users/:id/reset-password',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const userId = Number(req.params.id);
+
+    try {
+      // Get user
+      const [[user]] = await db.query(
+        `SELECT id, email, first_name FROM users WHERE id = ?`,
+        [userId]
+      );
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Generate password reset token
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 6); // 6 hours
+
+      await db.query(
+        `UPDATE users
+         SET reset_token = ?, reset_token_expires = ?
+         WHERE id = ?`,
+        [token, expiresAt, userId]
+      );
+
+      // Send password reset email (non-blocking)
+      try {
+        await sendPasswordSetupEmail(user, token);
+      } catch (emailErr) {
+        console.error('Failed to send password reset email:', emailErr);
+      }
+
+      // Audit log (non-blocking)
+      logAudit({
+        table_name: 'users',
+        record_id: userId,
+        action: 'UPDATE',
+        old_data: null,
+        new_data: { action: 'password_reset_requested' },
+        changed_by: req.user.id,
+        req
+      }).catch(err => {
+        console.error('User password reset audit log failed:', err);
+      });
+
+      res.json({ success: true });
+
+    } catch (err) {
+      console.error('RESET USER PASSWORD ERROR:', err);
+      return res.status(500).json({
+        error: 'Failed to reset user password'
       });
     }
   }
