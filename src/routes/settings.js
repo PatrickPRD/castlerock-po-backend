@@ -34,6 +34,10 @@ router.get('/public', async (req, res) => {
       header_color: settings.header_color || '#212529',
       logo_path: settings.logo_path || '/assets/Logo.png',
       favicon_path: settings.favicon_path || null,
+      favicon_16_path: settings.favicon_16_path || null,
+      apple_touch_icon_path: settings.apple_touch_icon_path || null,
+      android_chrome_192_path: settings.android_chrome_192_path || null,
+      android_chrome_512_path: settings.android_chrome_512_path || null,
       header_logo_mode: settings.header_logo_mode || 'image',
       header_logo_text: settings.header_logo_text || 'Castlerock Homes',
       company_name: settings.company_name || 'Castlerock Homes',
@@ -417,6 +421,75 @@ router.post(
     } catch (error) {
       console.error('Error uploading favicon:', error);
       res.status(500).json({ error: 'Failed to upload favicon' });
+    }
+  }
+);
+
+/**
+ * POST /settings/branding/icon
+ * Upload app icons (favicon variants, apple touch icon, etc.)
+ * Body: { dataUrl, iconType: 'favicon-16'|'apple-touch-icon'|'android-chrome-192'|'android-chrome-512' }
+ */
+router.post(
+  '/branding/icon',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      const { dataUrl, iconType } = req.body || {};
+      
+      if (!dataUrl || typeof dataUrl !== 'string') {
+        return res.status(400).json({ error: 'dataUrl is required' });
+      }
+
+      if (!iconType) {
+        return res.status(400).json({ error: 'iconType is required' });
+      }
+
+      const validTypes = {
+        'favicon-16': { size: 16, maxBytes: 500 * 1024, settingKey: 'favicon_16_path' },
+        'apple-touch-icon': { size: 180, maxBytes: 500 * 1024, settingKey: 'apple_touch_icon_path' },
+        'android-chrome-192': { size: 192, maxBytes: 500 * 1024, settingKey: 'android_chrome_192_path' },
+        'android-chrome-512': { size: 512, maxBytes: 1024 * 1024, settingKey: 'android_chrome_512_path' }
+      };
+
+      if (!validTypes[iconType]) {
+        return res.status(400).json({ error: 'Invalid iconType' });
+      }
+
+      const match = dataUrl.match(/^data:(image\/(?:x-icon|png|svg\+xml|vnd\.microsoft\.icon));base64,([A-Za-z0-9+/=]+)$/);
+      if (!match) {
+        return res.status(400).json({ error: 'Invalid image format. Allowed: ICO, PNG, SVG' });
+      }
+
+      const base64Data = match[2];
+      const imageBuffer = Buffer.from(base64Data, 'base64');
+
+      const config = validTypes[iconType];
+      if (imageBuffer.length > config.maxBytes) {
+        return res.status(400).json({ 
+          error: `Image is too large. Maximum size is ${Math.floor(config.maxBytes / 1024)} KB` 
+        });
+      }
+
+      const finalFileName = `${iconType}-${Date.now()}.png`;
+      const brandingDir = path.join(__dirname, '../../public/assets/branding');
+      const outputPath = path.join(brandingDir, finalFileName);
+
+      fs.mkdirSync(brandingDir, { recursive: true });
+      fs.writeFileSync(outputPath, imageBuffer);
+
+      const publicPath = `/assets/branding/${finalFileName}`;
+      await SettingsService.updateSetting(config.settingKey, publicPath);
+
+      res.json({
+        success: true,
+        message: `${iconType} uploaded successfully`,
+        [config.settingKey]: publicPath
+      });
+    } catch (error) {
+      console.error('Error uploading icon:', error);
+      res.status(500).json({ error: 'Failed to upload icon' });
     }
   }
 );

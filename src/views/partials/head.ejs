@@ -5,39 +5,58 @@
   <title><%= (companyName || 'Castlerock Homes') %> | CostTracker<% if (typeof pageTitle !== 'undefined') { %> | <%= pageTitle %><% } %></title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <link rel="icon" href="https://castlerock-po-assets-eu.s3.eu-north-1.amazonaws.com/POTrackerAssets/favicon.ico">
-  <link rel="icon" type="image/png" sizes="32x32"
-        href="https://castlerock-po-assets-eu.s3.eu-north-1.amazonaws.com/POTrackerAssets/favicon-32x32.png">
-  <link rel="icon" type="image/png" sizes="16x16"
+  <!-- Default favicons (will be replaced by dynamic ones if set) -->
+  <link rel="icon" id="favicon" href="https://castlerock-po-assets-eu.s3.eu-north-1.amazonaws.com/POTrackerAssets/favicon.ico">
+  <link rel="icon" id="favicon-16" type="image/png" sizes="16x16"
         href="https://castlerock-po-assets-eu.s3.eu-north-1.amazonaws.com/POTrackerAssets/favicon-16x16.png">
-  <link rel="apple-touch-icon" sizes="180x180"
+  <link rel="icon" id="favicon-32" type="image/png" sizes="32x32"
+        href="https://castlerock-po-assets-eu.s3.eu-north-1.amazonaws.com/POTrackerAssets/favicon-32x32.png">
+  <link rel="apple-touch-icon" id="apple-touch-icon" sizes="180x180"
         href="https://castlerock-po-assets-eu.s3.eu-north-1.amazonaws.com/POTrackerAssets/apple-touch-icon.png">
-  <link rel="icon" type="image/png" sizes="192x192"
+  <link rel="icon" id="android-chrome-192" type="image/png" sizes="192x192"
         href="https://castlerock-po-assets-eu.s3.eu-north-1.amazonaws.com/POTrackerAssets/android-chrome-192x192.png">
-  <link rel="icon" type="image/png" sizes="512x512"
+  <link rel="icon" id="android-chrome-512" type="image/png" sizes="512x512"
         href="https://castlerock-po-assets-eu.s3.eu-north-1.amazonaws.com/POTrackerAssets/android-chrome-512x512.png">
 
   <script>
-    // Dynamically load custom favicon if set
+    // Dynamically load custom favicons if set
     (async function() {
       try {
         const res = await fetch('/settings/public', { cache: 'no-store' });
         if (!res.ok) return;
         const settings = await res.json();
+        
+        // Update main favicon
         if (settings.favicon_path) {
-          // Update or create favicon link
-          let faviconLink = document.querySelector('link[rel="icon"]');
-          if (faviconLink) {
-            faviconLink.href = settings.favicon_path;
-          } else {
-            faviconLink = document.createElement('link');
-            faviconLink.rel = 'icon';
-            faviconLink.href = settings.favicon_path;
-            document.head.appendChild(faviconLink);
-          }
+          const faviconLink = document.getElementById('favicon');
+          if (faviconLink) faviconLink.href = settings.favicon_path;
+        }
+
+        // Update favicon 16x16
+        if (settings.favicon_16_path) {
+          const favicon16 = document.getElementById('favicon-16');
+          if (favicon16) favicon16.href = settings.favicon_16_path;
+        }
+
+        // Update Apple Touch Icon
+        if (settings.apple_touch_icon_path) {
+          const appleTouchIcon = document.getElementById('apple-touch-icon');
+          if (appleTouchIcon) appleTouchIcon.href = settings.apple_touch_icon_path;
+        }
+
+        // Update Android Chrome 192
+        if (settings.android_chrome_192_path) {
+          const androidChrome192 = document.getElementById('android-chrome-192');
+          if (androidChrome192) androidChrome192.href = settings.android_chrome_192_path;
+        }
+
+        // Update Android Chrome 512
+        if (settings.android_chrome_512_path) {
+          const androidChrome512 = document.getElementById('android-chrome-512');
+          if (androidChrome512) androidChrome512.href = settings.android_chrome_512_path;
         }
       } catch (err) {
-        console.warn('Could not load custom favicon:', err);
+        console.warn('Could not load custom favicons:', err);
       }
     })();
   </script>

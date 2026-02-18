@@ -29,10 +29,39 @@
         <small class="text-muted">Accepted formats: PNG, JPG, WEBP, SVG. Max size 2 MB.</small>
       </div>
 
-      <div id="faviconImageSection">
-        <label for="faviconFile" class="form-label">Upload New Favicon</label>
-        <input id="faviconFile" type="file" class="form-control" accept="image/x-icon,image/png,image/svg+xml" />
-        <small class="text-muted">Accepted formats: ICO, PNG, SVG. Recommended size: 32x32px or 64x64px. Max size 500 KB.</small>
+      <div id="faviconImageSection" class="mb-3">
+        <h5 class="mb-3">Favicon & App Icons</h5>
+        <p class="text-muted small mb-3">Upload icons for browsers, mobile devices, and PWA support.</p>
+        
+        <div class="mb-3">
+          <label for="faviconFile" class="form-label">Favicon (32x32)</label>
+          <input id="faviconFile" type="file" class="form-control" accept="image/x-icon,image/png" />
+          <small class="text-muted">Standard favicon for browsers. Formats: ICO, PNG. Max size 500 KB.</small>
+        </div>
+
+        <div class="mb-3">
+          <label for="favicon16File" class="form-label">Favicon 16x16 (Optional)</label>
+          <input id="favicon16File" type="file" class="form-control" accept="image/png" />
+          <small class="text-muted">Small favicon for browser tabs. Format: PNG. Max size 500 KB.</small>
+        </div>
+
+        <div class="mb-3">
+          <label for="appleTouchIconFile" class="form-label">Apple Touch Icon (180x180)</label>
+          <input id="appleTouchIconFile" type="file" class="form-control" accept="image/png" />
+          <small class="text-muted">Icon for iOS devices when added to home screen. Format: PNG. Max size 500 KB.</small>
+        </div>
+
+        <div class="mb-3">
+          <label for="androidChrome192File" class="form-label">Android Chrome 192x192</label>
+          <input id="androidChrome192File" type="file" class="form-control" accept="image/png" />
+          <small class="text-muted">Icon for Android home screen. Format: PNG. Max size 500 KB.</small>
+        </div>
+
+        <div class="mb-3">
+          <label for="androidChrome512File" class="form-label">Android Chrome 512x512</label>
+          <input id="androidChrome512File" type="file" class="form-control" accept="image/png" />
+          <small class="text-muted">Large icon for Android splash screens. Format: PNG. Max size 1 MB.</small>
+        </div>
       </div>
 
       <div id="logoTextSection" style="display: none;">

@@ -15,6 +15,10 @@ const headerColorHexInput = document.getElementById('headerColorHex');
 const logoModeSelect = document.getElementById('logoMode');
 const logoFileInput = document.getElementById('logoFile');
 const faviconFileInput = document.getElementById('faviconFile');
+const favicon16FileInput = document.getElementById('favicon16File');
+const appleTouchIconFileInput = document.getElementById('appleTouchIconFile');
+const androidChrome192FileInput = document.getElementById('androidChrome192File');
+const androidChrome512FileInput = document.getElementById('androidChrome512File');
 const logoTextInput = document.getElementById('logoText');
 const logoImageSection = document.getElementById('logoImageSection');
 const logoTextSection = document.getElementById('logoTextSection');
@@ -54,6 +58,10 @@ const brandPreviewText = document.getElementById('brandPreviewText');
 let currentLogoPath = '/assets/Logo.png';
 let selectedFileDataUrl = null;
 let selectedFaviconDataUrl = null;
+let selectedFavicon16DataUrl = null;
+let selectedAppleTouchIconDataUrl = null;
+let selectedAndroidChrome192DataUrl = null;
+let selectedAndroidChrome512DataUrl = null;
 let financialVatRates = [];
 let vatUsage = {};
 const BRANDING_EVENT_KEY = 'headerBrandingVersion';
@@ -366,6 +374,42 @@ brandingForm.addEventListener('submit', async (e) => {
       faviconFileInput.value = '';
     }
 
+    if (selectedFavicon16DataUrl) {
+      await api('/settings/branding/icon', 'POST', {
+        dataUrl: selectedFavicon16DataUrl,
+        iconType: 'favicon-16'
+      });
+      selectedFavicon16DataUrl = null;
+      favicon16FileInput.value = '';
+    }
+
+    if (selectedAppleTouchIconDataUrl) {
+      await api('/settings/branding/icon', 'POST', {
+        dataUrl: selectedAppleTouchIconDataUrl,
+        iconType: 'apple-touch-icon'
+      });
+      selectedAppleTouchIconDataUrl = null;
+      appleTouchIconFileInput.value = '';
+    }
+
+    if (selectedAndroidChrome192DataUrl) {
+      await api('/settings/branding/icon', 'POST', {
+        dataUrl: selectedAndroidChrome192DataUrl,
+        iconType: 'android-chrome-192'
+      });
+      selectedAndroidChrome192DataUrl = null;
+      androidChrome192FileInput.value = '';
+    }
+
+    if (selectedAndroidChrome512DataUrl) {
+      await api('/settings/branding/icon', 'POST', {
+        dataUrl: selectedAndroidChrome512DataUrl,
+        iconType: 'android-chrome-512'
+      });
+      selectedAndroidChrome512DataUrl = null;
+      androidChrome512FileInput.value = '';
+    }
+
     applyPreview();
     applyLiveHeaderBranding({
       headerColor,
@@ -510,6 +554,126 @@ faviconFileInput.addEventListener('change', async () => {
   } catch (err) {
     selectedFaviconDataUrl = null;
     showToast(err.message || 'Failed to read favicon', 'error');
+  }
+});
+
+favicon16FileInput.addEventListener('change', async () => {
+  const file = favicon16FileInput.files[0];
+  if (!file) {
+    selectedFavicon16DataUrl = null;
+    return;
+  }
+
+  if (!['image/png'].includes(file.type)) {
+    favicon16FileInput.value = '';
+    selectedFavicon16DataUrl = null;
+    showToast('Invalid file type. Use PNG', 'warning');
+    return;
+  }
+
+  if (file.size > 500 * 1024) {
+    favicon16FileInput.value = '';
+    selectedFavicon16DataUrl = null;
+    showToast('Icon too large. Max size is 500 KB', 'warning');
+    return;
+  }
+
+  try {
+    selectedFavicon16DataUrl = await readFileAsDataUrl(file);
+    showToast('Favicon 16x16 selected. Click Save Branding to apply', 'success');
+  } catch (err) {
+    selectedFavicon16DataUrl = null;
+    showToast(err.message || 'Failed to read icon', 'error');
+  }
+});
+
+appleTouchIconFileInput.addEventListener('change', async () => {
+  const file = appleTouchIconFileInput.files[0];
+  if (!file) {
+    selectedAppleTouchIconDataUrl = null;
+    return;
+  }
+
+  if (!['image/png'].includes(file.type)) {
+    appleTouchIconFileInput.value = '';
+    selectedAppleTouchIconDataUrl = null;
+    showToast('Invalid file type. Use PNG', 'warning');
+    return;
+  }
+
+  if (file.size > 500 * 1024) {
+    appleTouchIconFileInput.value = '';
+    selectedAppleTouchIconDataUrl = null;
+    showToast('Icon too large. Max size is 500 KB', 'warning');
+    return;
+  }
+
+  try {
+    selectedAppleTouchIconDataUrl = await readFileAsDataUrl(file);
+    showToast('Apple Touch Icon selected. Click Save Branding to apply', 'success');
+  } catch (err) {
+    selectedAppleTouchIconDataUrl = null;
+    showToast(err.message || 'Failed to read icon', 'error');
+  }
+});
+
+androidChrome192FileInput.addEventListener('change', async () => {
+  const file = androidChrome192FileInput.files[0];
+  if (!file) {
+    selectedAndroidChrome192DataUrl = null;
+    return;
+  }
+
+  if (!['image/png'].includes(file.type)) {
+    androidChrome192FileInput.value = '';
+    selectedAndroidChrome192DataUrl = null;
+    showToast('Invalid file type. Use PNG', 'warning');
+    return;
+  }
+
+  if (file.size > 500 * 1024) {
+    androidChrome192FileInput.value = '';
+    selectedAndroidChrome192DataUrl = null;
+    showToast('Icon too large. Max size is 500 KB', 'warning');
+    return;
+  }
+
+  try {
+    selectedAndroidChrome192DataUrl = await readFileAsDataUrl(file);
+    showToast('Android Chrome 192 selected. Click Save Branding to apply', 'success');
+  } catch (err) {
+    selectedAndroidChrome192DataUrl = null;
+    showToast(err.message || 'Failed to read icon', 'error');
+  }
+});
+
+androidChrome512FileInput.addEventListener('change', async () => {
+  const file = androidChrome512FileInput.files[0];
+  if (!file) {
+    selectedAndroidChrome512DataUrl = null;
+    return;
+  }
+
+  if (!['image/png'].includes(file.type)) {
+    androidChrome512FileInput.value = '';
+    selectedAndroidChrome512DataUrl = null;
+    showToast('Invalid file type. Use PNG', 'warning');
+    return;
+  }
+
+  if (file.size > 1024 * 1024) {
+    androidChrome512FileInput.value = '';
+    selectedAndroidChrome512DataUrl = null;
+    showToast('Icon too large. Max size is 1 MB', 'warning');
+    return;
+  }
+
+  try {
+    selectedAndroidChrome512DataUrl = await readFileAsDataUrl(file);
+    showToast('Android Chrome 512 selected. Click Save Branding to apply', 'success');
+  } catch (err) {
+    selectedAndroidChrome512DataUrl = null;
+    showToast(err.message || 'Failed to read icon', 'error');
   }
 });
 
