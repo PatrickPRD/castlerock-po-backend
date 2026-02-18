@@ -386,6 +386,7 @@ function back() {
    INIT
    ============================ */
 loadUsers();
+bindModalClosers();
 
 if (openAddUserBtn) {
   openAddUserBtn.addEventListener("click", () => {
