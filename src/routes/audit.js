@@ -86,18 +86,34 @@ router.get(
         let oldValues = null;
         let newValues = null;
         
-        try {
-          oldValues = row.old_values ? JSON.parse(row.old_values) : null;
-        } catch (e) {
-          console.error('Failed to parse old_values for audit entry', row.id, ':', e.message);
-          oldValues = row.old_values; // Return raw string if parsing fails
+        // Parse old_values - handle corrupted data gracefully
+        if (row.old_values) {
+          try {
+            // Check if it's already an object (some databases may return parsed JSON)
+            if (typeof row.old_values === 'object') {
+              oldValues = row.old_values;
+            } else {
+              oldValues = JSON.parse(row.old_values);
+            }
+          } catch (e) {
+            // Silently ignore JSON parse errors for corrupted legacy data
+            oldValues = null;
+          }
         }
         
-        try {
-          newValues = row.new_values ? JSON.parse(row.new_values) : null;
-        } catch (e) {
-          console.error('Failed to parse new_values for audit entry', row.id, ':', e.message);
-          newValues = row.new_values; // Return raw string if parsing fails
+        // Parse new_values - handle corrupted data gracefully  
+        if (row.new_values) {
+          try {
+            // Check if it's already an object (some databases may return parsed JSON)
+            if (typeof row.new_values === 'object') {
+              newValues = row.new_values;
+            } else {
+              newValues = JSON.parse(row.new_values);
+            }
+          } catch (e) {
+            // Silently ignore JSON parse errors for corrupted legacy data
+            newValues = null;
+          }
         }
         
         return {
@@ -160,7 +176,43 @@ router.get(
         [tableName, recordId]
       );
 
-      res.json(rows);
+      // Parse JSON fields with error handling
+      const parsedRows = rows.map(row => {
+        let oldValues = null;
+        let newValues = null;
+        
+        if (row.old_values) {
+          try {
+            if (typeof row.old_values === 'object') {
+              oldValues = row.old_values;
+            } else {
+              oldValues = JSON.parse(row.old_values);
+            }
+          } catch (e) {
+            oldValues = null;
+          }
+        }
+        
+        if (row.new_values) {
+          try {
+            if (typeof row.new_values === 'object') {
+              newValues = row.new_values;
+            } else {
+              newValues = JSON.parse(row.new_values);
+            }
+          } catch (e) {
+            newValues = null;
+          }
+        }
+        
+        return {
+          ...row,
+          old_values: oldValues,
+          new_values: newValues
+        };
+      });
+
+      res.json(parsedRows);
     } catch (error) {
       console.error('Error fetching record audit logs:', error);
       res.status(500).json({ error: 'Failed to fetch audit logs' });
