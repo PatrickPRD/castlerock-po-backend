@@ -4,32 +4,35 @@ const AUDIT_LOG_RETENTION_LIMIT = 300;
 
 /**
  * Clean up old audit logs to keep only the latest 300 entries
+ * Worker table entries are EXCLUDED from cleanup and kept indefinitely
  * This function runs asynchronously and doesn't block the main operation
  */
 async function cleanupOldAuditLogs() {
   try {
-    // Check current count
+    // Count non-worker entries only
     const [[{ count }]] = await pool.query(
-      'SELECT COUNT(*) as count FROM audit_log'
+      `SELECT COUNT(*) as count FROM audit_log WHERE table_name != 'workers'`
     );
 
-    // If we exceed the limit, delete the oldest entries
+    // If we exceed the limit, delete oldest non-worker entries
     if (count > AUDIT_LOG_RETENTION_LIMIT) {
       const entriesToDelete = count - AUDIT_LOG_RETENTION_LIMIT;
       
       const result = await pool.query(
         `
         DELETE FROM audit_log
-        WHERE id IN (
-          SELECT id FROM audit_log
-          ORDER BY created_at ASC
-          LIMIT ?
-        )
+        WHERE table_name != 'workers'
+          AND id IN (
+            SELECT id FROM audit_log
+            WHERE table_name != 'workers'
+            ORDER BY created_at ASC
+            LIMIT ?
+          )
         `,
         [entriesToDelete]
       );
 
-      console.log(`🧹 Cleaned up ${result[0].affectedRows} old audit log entries (total: ${count} → ${AUDIT_LOG_RETENTION_LIMIT})`);
+      console.log(`🧹 Cleaned up ${result[0].affectedRows} old audit log entries (${count} → ${AUDIT_LOG_RETENTION_LIMIT}). Worker entries preserved indefinitely.`);
     }
   } catch (error) {
     console.error('❌ Audit log cleanup failed:', error.message);
