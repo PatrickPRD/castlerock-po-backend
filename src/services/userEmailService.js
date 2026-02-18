@@ -7,7 +7,7 @@ function buildInviteEmail({ firstName, resetUrl, branding = {}, appBaseUrl = '' 
   
   // Convert relative logo path to absolute URL for email
   let logoUrl = '';
-  if (branding.logo_path && branding.header_logo_mode === 'image') {
+  if (branding.logo_path) {
     const logoSrc = branding.logo_path.startsWith('http') 
       ? branding.logo_path 
       : `${appBaseUrl}${branding.logo_path}`;
@@ -100,7 +100,7 @@ function buildPasswordResetEmail({ firstName, resetUrl, branding = {}, appBaseUr
   
   // Convert relative logo path to absolute URL for email
   let logoUrl = '';
-  if (branding.logo_path && branding.header_logo_mode === 'image') {
+  if (branding.logo_path) {
     const logoSrc = branding.logo_path.startsWith('http') 
       ? branding.logo_path 
       : `${appBaseUrl}${branding.logo_path}`;
@@ -195,6 +195,12 @@ async function sendPasswordSetupEmail(user, token) {
   let branding = {};
   try {
     branding = await SettingsService.getSettings() || {};
+    console.log('📧 Email branding settings:', {
+      logo_path: branding.logo_path,
+      header_color: branding.header_color,
+      header_logo_text: branding.header_logo_text,
+      accent_color: branding.accent_color
+    });
   } catch (err) {
     console.error('Failed to fetch branding settings:', err);
     // Use defaults if fetch fails
@@ -208,6 +214,9 @@ async function sendPasswordSetupEmail(user, token) {
     branding,
     appBaseUrl
   });
+
+  console.log('📧 Sending welcome email to:', user.email, 'with logo URL:', 
+    branding.logo_path ? `${appBaseUrl}${branding.logo_path}` : 'NO LOGO');
 
   await sendEmail({
     to: user.email,
@@ -224,6 +233,12 @@ async function sendPasswordResetEmail(user, token) {
   let branding = {};
   try {
     branding = await SettingsService.getSettings() || {};
+    console.log('📧 Email branding settings:', {
+      logo_path: branding.logo_path,
+      header_color: branding.header_color,
+      header_logo_text: branding.header_logo_text,
+      accent_color: branding.accent_color
+    });
   } catch (err) {
     console.error('Failed to fetch branding settings:', err);
     // Use defaults if fetch fails
@@ -237,6 +252,9 @@ async function sendPasswordResetEmail(user, token) {
     branding,
     appBaseUrl
   });
+
+  console.log('📧 Sending password reset email to:', user.email, 'with logo URL:', 
+    branding.logo_path ? `${appBaseUrl}${branding.logo_path}` : 'NO LOGO');
 
   await sendEmail({
     to: user.email,
