@@ -120,7 +120,11 @@ function renderTable() {
     const hasUnpaid = num(row.sick) > 0 || num(row.unpaid_leave) > 0 || num(row.absent) > 0;
     const safePassExpiry = formatDisplayDate(row.safe_pass_expiry_date);
     const safePassExpired = isPastDate(row.safe_pass_expiry_date);
-    const safePassClass = safePassExpired ? 'text-danger fw-semibold' : '';
+    const hasSafePassDate = safePassExpiry !== '-';
+    const safePassBadgeClass = safePassExpired ? 'text-bg-danger' : 'text-bg-secondary';
+    const safePassContent = hasSafePassDate
+      ? `<span class="badge ${safePassBadgeClass}">${safePassExpiry}</span>`
+      : '<span class="text-muted">-</span>';
     table.innerHTML += `
       <tr class="${hasUnpaid ? 'leave-row-unpaid' : ''}">
         <td data-label="Worker"><span class="cell-value">${row.name}</span></td>
@@ -133,7 +137,7 @@ function renderTable() {
         <td data-label="Bank Holidays"><span class="cell-value">${num(row.bank_holiday)}</span></td>
         <td data-label="Bank Holidays Remaining"><span class="cell-value">${num(row.bank_holiday_remaining)}</span></td>
         <td data-label="Absent"><span class="cell-value">${num(row.absent)}</span></td>
-        <td data-label="Safe Pass Expiry"><span class="cell-value ${safePassClass}">${safePassExpiry}</span></td>
+        <td data-label="Safe Pass Expiry" class="safe-pass-col"><span class="cell-value">${safePassContent}</span></td>
         <td class="pdf-col">
           <button
             type="button"

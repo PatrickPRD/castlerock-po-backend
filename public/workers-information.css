@@ -78,6 +78,12 @@
   width: 200px;
 }
 
+.leave-report-table th.safe-pass-col,
+.leave-report-table td.safe-pass-col {
+  width: 120px;
+  text-align: center;
+}
+
 
 .leave-report-table th {
   vertical-align: bottom;
@@ -90,12 +96,13 @@
 }
 
 .leave-report-table th:first-child .header-label,
+.leave-report-table th.safe-pass-col .header-label,
 .leave-report-table th.pdf-col .header-label {
   writing-mode: horizontal-tb;
   transform: none;
 }
 
-.leave-report-table th:not(:first-child):not(.pdf-col) .header-label {
+.leave-report-table th:not(:first-child):not(.safe-pass-col):not(.pdf-col) .header-label {
   writing-mode: vertical-rl;
   transform: translateX(-50%) rotate(180deg);
   transform-origin: center;
@@ -104,20 +111,20 @@
   left: 50%;
 }
 
-.leave-report-table th:not(:first-child):not(.pdf-col) {
+.leave-report-table th:not(:first-child):not(.safe-pass-col):not(.pdf-col) {
   height: 140px;
   padding: 0 0 6px 0;
   text-align: center;
   position: relative;
 }
 
-.leave-report-table th:not(:first-child):not(.pdf-col) .sort-indicator {
+.leave-report-table th:not(:first-child):not(.safe-pass-col):not(.pdf-col) .sort-indicator {
   position: absolute;
   top: 6px;
   right: 6px;
 }
 
-.leave-report-table td:not(:first-child):not(.pdf-col) {
+.leave-report-table td:not(:first-child):not(.safe-pass-col):not(.pdf-col) {
   text-align: center;
   padding-left: 0;
 }
@@ -126,10 +133,15 @@
   text-align: left;
 }
 
-@media (min-width: 769px) {
-  .leave-report-table th:not(:first-child):not(.pdf-col),
-  .leave-report-table td:not(:first-child):not(.pdf-col) {
-    width: 46px;
+@media (min-width: 1101px) {
+  .leave-report-table th:not(:first-child):not(.safe-pass-col):not(.pdf-col),
+  .leave-report-table td:not(:first-child):not(.safe-pass-col):not(.pdf-col) {
+    width: 42px;
+  }
+
+  .leave-report-table th.safe-pass-col,
+  .leave-report-table td.safe-pass-col {
+    width: 132px;
   }
 
   .leave-report-table th.pdf-col,
@@ -194,7 +206,7 @@
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1100px) {
   .leave-report-table th,
   .leave-report-table td {
     width: auto;
