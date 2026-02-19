@@ -1369,6 +1369,18 @@ function normalizeHeader(value) {
     .replace(/[^a-z0-9]+/g, '_');
 }
 
+function hasProvidedCellValue(value) {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') return value.trim() !== '';
+  return true;
+}
+
+function normalizeOptionalText(value, { lowercase = false } = {}) {
+  if (!hasProvidedCellValue(value)) return null;
+  const normalized = String(value).trim();
+  return lowercase ? normalized.toLowerCase() : normalized;
+}
+
 router.post(
   '/workers/bulk',
   authenticate,
@@ -1388,7 +1400,24 @@ router.post(
       }
 
       const [existingWorkers] = await db.query(
-        'SELECT id, first_name, last_name, login_no FROM workers'
+        `SELECT
+           id,
+           first_name,
+           last_name,
+           nickname,
+           email,
+           mobile_number,
+           address,
+           bank_details,
+           pps_number,
+           weekly_take_home,
+           weekly_cost,
+           safe_pass_number,
+           safe_pass_expiry_date,
+           date_of_employment,
+           login_no,
+           notes
+         FROM workers`
       );
       const existingByName = new Map(
         existingWorkers.map(worker => [
@@ -1447,10 +1476,12 @@ router.post(
         const loginNo = row.getCell(headerMap.login_no || 14).value;
         const notes = row.getCell(headerMap.notes || 15).value;
 
-        const weeklyTakeHome = weeklyTakeHomeValue !== null && weeklyTakeHomeValue !== ''
+        const weeklyTakeHomeProvided = hasProvidedCellValue(weeklyTakeHomeValue);
+        const weeklyTakeHome = weeklyTakeHomeProvided
           ? Number(weeklyTakeHomeValue)
           : null;
-        const weeklyCost = weeklyCostValue !== null && weeklyCostValue !== ''
+        const weeklyCostProvided = hasProvidedCellValue(weeklyCostValue);
+        const weeklyCost = weeklyCostProvided
           ? Number(weeklyCostValue)
           : null;
 
@@ -1460,22 +1491,22 @@ router.post(
           continue;
         }
 
-        const normalizedLoginNo = loginNo != null && String(loginNo).trim() !== ''
-          ? String(loginNo).trim()
-          : '';
+        const normalizedLoginNo = normalizeOptionalText(loginNo) || '';
         if (normalizedLoginNo && !/^\d+$/.test(normalizedLoginNo)) {
           skipped.push({ row: rowNumber, reason: 'Login number must be numeric' });
           continue;
         }
 
         const normalizedDate = toIsoDate(dateValue);
-        if (dateValue && !normalizedDate) {
+        const dateProvided = hasProvidedCellValue(dateValue);
+        if (dateProvided && !normalizedDate) {
           skipped.push({ row: rowNumber, reason: 'Invalid date of employment (DD-MM-YYYY)' });
           continue;
         }
 
         const normalizedSafePassExpiry = toIsoDate(safePassExpiryValue);
-        if (safePassExpiryValue && !normalizedSafePassExpiry) {
+        const safePassExpiryProvided = hasProvidedCellValue(safePassExpiryValue);
+        if (safePassExpiryProvided && !normalizedSafePassExpiry) {
           skipped.push({ row: rowNumber, reason: 'Invalid safe pass expiry (DD-MM-YYYY)' });
           continue;
         }
@@ -1496,19 +1527,19 @@ router.post(
           rowsToUpdate.push([
             firstName,
             lastName,
-            nicknameValue ? String(nicknameValue).trim() : null,
-            emailValue ? String(emailValue).trim().toLowerCase() : null,
-            mobileNumberValue ? String(mobileNumberValue).trim() : null,
-            addressValue ? String(addressValue).trim() : null,
-            bankDetailsValue ? String(bankDetailsValue).trim() : null,
-            ppsNumber ? String(ppsNumber).trim() : null,
-            weeklyTakeHome,
-            weeklyCost,
-            safePassNumberValue ? String(safePassNumberValue).trim() : null,
-            normalizedSafePassExpiry,
-            normalizedDate,
-            normalizedLoginNo || null,
-            notes ? String(notes).trim() : null,
+            normalizeOptionalText(nicknameValue) ?? existingWorker.nickname,
+            normalizeOptionalText(emailValue, { lowercase: true }) ?? existingWorker.email,
+            normalizeOptionalText(mobileNumberValue) ?? existingWorker.mobile_number,
+            normalizeOptionalText(addressValue) ?? existingWorker.address,
+            normalizeOptionalText(bankDetailsValue) ?? existingWorker.bank_details,
+            normalizeOptionalText(ppsNumber) ?? existingWorker.pps_number,
+            weeklyTakeHomeProvided ? weeklyTakeHome : existingWorker.weekly_take_home,
+            weeklyCostProvided ? weeklyCost : existingWorker.weekly_cost,
+            normalizeOptionalText(safePassNumberValue) ?? existingWorker.safe_pass_number,
+            safePassExpiryProvided ? normalizedSafePassExpiry : existingWorker.safe_pass_expiry_date,
+            dateProvided ? normalizedDate : existingWorker.date_of_employment,
+            normalizedLoginNo || existingWorker.login_no,
+            normalizeOptionalText(notes) ?? existingWorker.notes,
             existingWorker.id
           ]);
           seenNames.add(nameKey);
@@ -1535,19 +1566,19 @@ router.post(
         rowsToInsert.push([
           firstName,
           lastName,
-          nicknameValue ? String(nicknameValue).trim() : null,
-          emailValue ? String(emailValue).trim().toLowerCase() : null,
-          mobileNumberValue ? String(mobileNumberValue).trim() : null,
-          addressValue ? String(addressValue).trim() : null,
-          bankDetailsValue ? String(bankDetailsValue).trim() : null,
-          ppsNumber ? String(ppsNumber).trim() : null,
+          normalizeOptionalText(nicknameValue),
+          normalizeOptionalText(emailValue, { lowercase: true }),
+          normalizeOptionalText(mobileNumberValue),
+          normalizeOptionalText(addressValue),
+          normalizeOptionalText(bankDetailsValue),
+          normalizeOptionalText(ppsNumber),
           weeklyTakeHome,
           weeklyCost,
-          safePassNumberValue ? String(safePassNumberValue).trim() : null,
+          normalizeOptionalText(safePassNumberValue),
           normalizedSafePassExpiry,
           normalizedDate,
           normalizedLoginNo || null,
-          notes ? String(notes).trim() : null,
+          normalizeOptionalText(notes),
           1
         ]);
       }
