@@ -54,9 +54,9 @@ router.post('/request-reset', async (req, res) => {
   );
 
   try {
-    const { sendPasswordSetupEmail } = require('../services/userEmailService');
+    const { sendPasswordResetEmail } = require('../services/userEmailService');
 
-    await sendPasswordSetupEmail(user, token);
+    await sendPasswordResetEmail(user, token);
 
   } catch (err) {
     console.error('❌ EMAIL SEND FAILED:', err);
