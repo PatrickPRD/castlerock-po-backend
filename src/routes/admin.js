@@ -1890,6 +1890,14 @@ router.post(
           [keep_location_id, merge_location_id]
         );
 
+        // Step 1b: Update all Timesheet Entries pointing to merge_location to keep_location
+        // Required because timesheet_entries.location_id has ON DELETE RESTRICT
+        console.log(`📝 Updating Timesheet Entries from location ${merge_location_id} to ${keep_location_id}`);
+        await connection.query(
+          'UPDATE timesheet_entries SET location_id = ? WHERE location_id = ?',
+          [keep_location_id, merge_location_id]
+        );
+
         // Step 2: Delete location_spread_rule_locations entries for merged location
         // (rather than updating, since updating would create duplicates)
         console.log(`🗑️  Deleting location spread rule location entries for ${merge_location_id}`);

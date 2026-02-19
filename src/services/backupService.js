@@ -44,6 +44,25 @@ const RESTORE_ORDER = [
   'timesheet_entries'
 ];
 
+const CLEAR_ORDER_PREFERENCE = [
+  'timesheet_entries',
+  'timesheets',
+  'workers',
+  'invoices',
+  'po_line_items',
+  'purchase_orders',
+  'location_spread_rule_locations',
+  'location_spread_rule_sites',
+  'location_spread_rules',
+  'locations',
+  'site_letters',
+  'sites',
+  'suppliers',
+  'po_sequences',
+  'po_stages',
+  'site_settings'
+];
+
 async function clearDatabaseExceptUsers(connection) {
   const [tables] = await connection.query(
     `
@@ -56,7 +75,16 @@ async function clearDatabaseExceptUsers(connection) {
 
   const clearOrder = tables
     .map(t => t.tableName)
-    .filter(table => !EXCLUDED_TABLES.has(table));
+    .filter(table => !EXCLUDED_TABLES.has(table))
+    .sort((a, b) => {
+      const indexA = CLEAR_ORDER_PREFERENCE.indexOf(a);
+      const indexB = CLEAR_ORDER_PREFERENCE.indexOf(b);
+      const rankA = indexA === -1 ? Number.MAX_SAFE_INTEGER : indexA;
+      const rankB = indexB === -1 ? Number.MAX_SAFE_INTEGER : indexB;
+
+      if (rankA !== rankB) return rankA - rankB;
+      return a.localeCompare(b);
+    });
 
   for (const table of clearOrder) {
 
