@@ -221,6 +221,9 @@ function openMergeLocationModal() {
   // Populate location dropdowns
   api('/admin/locations')
     .then(locations => {
+      // Sort locations using natural number ordering (so 10 comes after 5)
+      locations.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base', numeric: true }));
+      
       // Store all locations for filtering
       window.allLocationsForMerge = locations;
 
