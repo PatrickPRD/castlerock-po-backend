@@ -32,6 +32,86 @@ const upload = multer({
   }
 });
 
+const RESTORE_JOB_TTL_MS = 24 * 60 * 60 * 1000;
+const restoreJobs = new Map();
+
+function cleanupRestoreJobs() {
+  const now = Date.now();
+  for (const [jobId, job] of restoreJobs.entries()) {
+    if (!job.finishedAt) continue;
+    if (now - job.finishedAt > RESTORE_JOB_TTL_MS) {
+      restoreJobs.delete(jobId);
+    }
+  }
+}
+
+async function performRestore({ backup, sql, filename, force, req }) {
+  let sqlContent = sql;
+
+  if (filename && !sqlContent) {
+    sqlContent = await getBackupFile(filename);
+  }
+
+  if (!backup && !sqlContent) {
+    throw new Error('No backup data provided');
+  }
+
+  if (!force && backup) {
+    try {
+      const report = await validateBackup(backup);
+      if (report.errors.length > 0 || report.warnings.length > 0) {
+        const err = new Error('Backup validation found issues. Send force: true to proceed anyway.');
+        err.code = 'RESTORE_VALIDATION_REQUIRED';
+        err.report = report;
+        throw err;
+      }
+    } catch (validateErr) {
+      if (validateErr.code === 'RESTORE_VALIDATION_REQUIRED') {
+        throw validateErr;
+      }
+      throw new Error('Validation failed: ' + validateErr.message);
+    }
+  }
+
+  console.log('='.repeat(80));
+  console.log('🔄 RESTORE OPERATION STARTED');
+  console.log('='.repeat(80));
+  console.log('📝 User ID for audit:', req.user?.id);
+  console.log('📝 Authenticated user:', req.user);
+  console.log('📝 Backup type:', sqlContent ? 'SQL' : 'JSON');
+  if (filename) {
+    console.log('📝 Restore filename:', filename);
+  }
+
+  const result = sqlContent ? await restoreBackupSql(sqlContent) : await restoreBackup(backup);
+
+  console.log('='.repeat(80));
+  console.log('✅ RESTORE COMPLETED SUCCESSFULLY');
+  console.log('✅ Result:', result);
+  console.log('='.repeat(80));
+
+  try {
+    await logAudit({
+      table_name: 'system',
+      record_id: 0,
+      action: 'BACKUP_RESTORE',
+      old_data: null,
+      new_data: { success: true, timestamp: new Date(), filename: filename || null },
+      changed_by: req.user.id,
+      req
+    });
+    console.log('✅ Audit log: BACKUP_RESTORE recorded');
+  } catch (auditErr) {
+    console.error('⚠️ Audit logging failed (non-fatal):', auditErr.message);
+  }
+
+  return {
+    success: true,
+    message: 'Backup restored successfully',
+    ...result
+  };
+}
+
 /* ======================================================
    CREATE BACKUP (SUPER ADMIN ONLY)
    ====================================================== */
@@ -162,93 +242,141 @@ router.post(
    RESTORE BACKUP (SUPER ADMIN ONLY)
    ====================================================== */
 router.post(
+  '/restore/start',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      cleanupRestoreJobs();
+
+      const { backup, sql, filename, force } = req.body;
+      const jobId = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      const startedAt = Date.now();
+
+      restoreJobs.set(jobId, {
+        id: jobId,
+        status: 'running',
+        message: 'Restore started',
+        startedAt,
+        finishedAt: null,
+        filename: filename || null,
+        error: null,
+        result: null
+      });
+
+      const requestForJob = {
+        ...req,
+        user: req.user
+      };
+
+      (async () => {
+        try {
+          const result = await performRestore({ backup, sql, filename, force, req: requestForJob });
+          const existing = restoreJobs.get(jobId);
+          if (!existing) return;
+
+          restoreJobs.set(jobId, {
+            ...existing,
+            status: 'completed',
+            message: 'Restore completed successfully',
+            finishedAt: Date.now(),
+            result,
+            error: null
+          });
+        } catch (err) {
+          const existing = restoreJobs.get(jobId);
+          if (!existing) return;
+
+          try {
+            await logAudit({
+              table_name: 'system',
+              record_id: 0,
+              action: 'BACKUP_RESTORE',
+              old_data: null,
+              new_data: { success: false, error: err.message, timestamp: new Date(), filename: filename || null },
+              changed_by: req.user.id,
+              req: requestForJob
+            });
+          } catch (auditErr) {
+            console.error('⚠️ Audit logging failed:', auditErr.message);
+          }
+
+          restoreJobs.set(jobId, {
+            ...existing,
+            status: 'failed',
+            message: 'Restore failed',
+            finishedAt: Date.now(),
+            error: err.message,
+            result: null
+          });
+          console.error('❌ Async restore job failed:', err.message);
+        }
+      })();
+
+      res.status(202).json({
+        success: true,
+        jobId,
+        status: 'running',
+        message: 'Restore started in background'
+      });
+    } catch (err) {
+      console.error('❌ Restore start error:', err);
+      res.status(500).json({ error: 'Failed to start restore: ' + err.message });
+    }
+  }
+);
+
+router.get(
+  '/restore/status/:jobId',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    cleanupRestoreJobs();
+
+    const { jobId } = req.params;
+    const job = restoreJobs.get(jobId);
+
+    if (!job) {
+      return res.status(404).json({ error: 'Restore job not found' });
+    }
+
+    res.json({
+      success: true,
+      job: {
+        id: job.id,
+        status: job.status,
+        message: job.message,
+        startedAt: job.startedAt,
+        finishedAt: job.finishedAt,
+        filename: job.filename,
+        error: job.error,
+        result: job.result
+      }
+    });
+  }
+);
+
+router.post(
   '/restore',
   authenticate,
   authorizeRoles('super_admin'),
   async (req, res) => {
     try {
       const { backup, sql, filename, force } = req.body;
-      let sqlContent = sql;
-
-      if (filename && !sqlContent) {
-        sqlContent = await getBackupFile(filename);
-      }
-
-      if (!backup && !sqlContent) {
-        return res
-          .status(400)
-          .json({ error: 'No backup data provided' });
-      }
-
-      // If not forcing and backup data provided, validate first
-      if (!force && backup) {
-        try {
-          const report = await validateBackup(backup);
-          if (report.errors.length > 0 || report.warnings.length > 0) {
-            return res.status(400).json({
-              success: false,
-              requiresConfirmation: true,
-              report,
-              message: 'Backup validation found issues. Review the report above. Send force: true to proceed anyway.'
-            });
-          }
-        } catch (validateErr) {
-          return res.status(400).json({
-            success: false,
-            requiresConfirmation: true,
-            error: 'Validation failed: ' + validateErr.message,
-            message: 'Send force: true to proceed without validation.'
-          });
-        }
-      }
-
-      console.log('='.repeat(80));
-      console.log('🔄 RESTORE OPERATION STARTED');
-      console.log('='.repeat(80));
-      console.log('📝 User ID for audit:', req.user?.id);
-      console.log('📝 Authenticated user:', req.user);
-      console.log('📝 Backup type:', sqlContent ? 'SQL' : 'JSON');
-      if (filename) {
-        console.log('📝 Restore filename:', filename);
-      }
-      
-      const result = sqlContent ? await restoreBackupSql(sqlContent) : await restoreBackup(backup);
-      
-      console.log('='.repeat(80));
-      console.log('✅ RESTORE COMPLETED SUCCESSFULLY');
-      console.log('✅ Result:', result);
-      console.log('='.repeat(80));
-
-      // Log to audit trail (don't let failures here prevent success response)
-      try {
-        console.log('📋 Attempting to log audit entry for BACKUP_RESTORE...');
-        const auditData = {
-          table_name: 'system',
-          record_id: 0,
-          action: 'BACKUP_RESTORE',
-          old_data: null,
-          new_data: { success: true, timestamp: new Date() },
-          changed_by: req.user.id,
-          req
-        };
-        console.log('📋 Audit data:', auditData);
-        
-        await logAudit(auditData);
-        console.log('✅ Audit log: BACKUP_RESTORE recorded');
-      } catch (auditErr) {
-        console.error('⚠️ Audit logging failed (non-fatal):', auditErr.message);
-        console.error('⚠️ Audit error stack:', auditErr.stack);
-      }
-
-      const response = {
-        success: true, 
-        message: 'Backup restored successfully',
-        ...result 
-      };
+      const response = await performRestore({ backup, sql, filename, force, req });
       console.log('📤 Sending restore response:', response);
       res.json(response);
     } catch (err) {
       console.error('❌ Restore error:', err);
+
+      if (err.code === 'RESTORE_VALIDATION_REQUIRED') {
+        return res.status(400).json({
+          success: false,
+          requiresConfirmation: true,
+          report: err.report,
+          message: err.message
+        });
+      }
       
       // Try to log the error to audit trail
       try {

@@ -457,6 +457,37 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+async function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function waitForRestoreJob(jobId) {
+  const startedAt = Date.now();
+  const timeoutMs = 30 * 60 * 1000;
+  const pollIntervalMs = 3000;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const statusResponse = await api(`/backups/restore/status/${encodeURIComponent(jobId)}`);
+    const job = statusResponse?.job;
+
+    if (!job) {
+      throw new Error('Invalid restore status response');
+    }
+
+    if (job.status === 'completed') {
+      return job;
+    }
+
+    if (job.status === 'failed') {
+      throw new Error(job.error || 'Restore failed');
+    }
+
+    await wait(pollIntervalMs);
+  }
+
+  throw new Error('Restore is taking longer than expected. Please check server logs and try again.');
+}
+
 // Proceed with restore (after preview)
 async function proceedWithRestore() {
   if (!currentRestoreFilename) {
@@ -466,12 +497,22 @@ async function proceedWithRestore() {
   
   try {
     restorePreviewModal.hide();
-    showToast('Restoring database...', 'info');
+    showToast('Starting restore job...', 'info');
     
-    // Restore the backup
-    console.log('📤 Sending restore request...');
-    const result = await api('/backups/restore', 'POST', { filename: currentRestoreFilename, force: true });
-    console.log('✅ Restore response received:', result);
+    // Start async restore job
+    console.log('📤 Starting restore job...');
+    const startResult = await api('/backups/restore/start', 'POST', { filename: currentRestoreFilename, force: true });
+    const jobId = startResult?.jobId;
+
+    if (!jobId) {
+      throw new Error('Restore job did not return a job ID');
+    }
+
+    showToast('Restore in progress... this can take several minutes.', 'info');
+
+    console.log('⏳ Waiting for restore job:', jobId);
+    const jobResult = await waitForRestoreJob(jobId);
+    console.log('✅ Restore job completed:', jobResult);
     
     showToast('✅ Backup restored successfully! Please refresh the page manually (F5) to see changes.', 'success');
     

@@ -102,7 +102,7 @@
     <div class="modal-content">
       <div class="modal-header bg-info text-white">
         <h5 class="modal-title"><i class="bi bi-binoculars me-2"></i>Restore Preview</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        <button type="button" class="btn-close btn-close-white" id="closeRestorePreviewBtn" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
         <div id="validationSpinner" class="text-center py-5" style="display: none;">
@@ -115,6 +115,22 @@
         <div id="validationContent" style="display: none;">
           <p class="mb-2"><strong>Backup File:</strong></p>
           <p id="previewFilename" class="font-monospace bg-light p-2 rounded mb-3"></p>
+
+          <div id="restoreProgressSection" class="alert alert-primary" style="display: none;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <strong id="restoreProgressStatus">Restore in progress...</strong>
+              <span id="restoreElapsedTime" class="font-monospace">00:00</span>
+            </div>
+            <div class="progress" role="progressbar" aria-label="Restore progress" aria-valuemin="0" aria-valuemax="100">
+              <div
+                id="restoreProgressBar"
+                class="progress-bar progress-bar-striped progress-bar-animated"
+                style="width: 0%"
+                aria-valuenow="0"
+              >0%</div>
+            </div>
+            <small class="text-muted mt-2 d-block">Restoring database backup. Please keep this page open.</small>
+          </div>
           
           <div id="validationWarnings" style="display: none;">
             <div class="alert alert-warning">
@@ -166,7 +182,7 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-secondary" id="cancelRestorePreviewBtn" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-danger" id="confirmPreviewBtn" onclick="proceedWithRestore()">
           <i class="bi bi-arrow-clockwise me-1"></i> Yes, Restore This Backup
         </button>
