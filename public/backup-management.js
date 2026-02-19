@@ -13,6 +13,8 @@ let allBackups = []; // Store all backups for pagination
 let currentPage = 1;
 const ITEMS_PER_PAGE = 10;
 const MAX_BACKUPS = 20;
+let restoreProgressInterval = null;
+let restoreStartedAt = null;
 
 // API helper
 async function api(url, method = 'GET', body) {
@@ -248,6 +250,7 @@ async function downloadBackup(filename) {
 async function openRestoreConfirmation(filename) {
   currentRestoreFilename = filename;
   currentRestoreSqlContent = null;
+  resetRestoreProgressUi();
   
   try {
     // Show spinner
@@ -461,6 +464,102 @@ async function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function formatElapsedTime(totalSeconds) {
+  const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+  const seconds = String(totalSeconds % 60).padStart(2, '0');
+  return `${minutes}:${seconds}`;
+}
+
+function setRestoreUiRunningState(isRunning) {
+  const confirmBtn = document.getElementById('confirmPreviewBtn');
+  const cancelBtn = document.getElementById('cancelRestorePreviewBtn');
+  const closeBtn = document.getElementById('closeRestorePreviewBtn');
+
+  if (confirmBtn) confirmBtn.disabled = isRunning;
+  if (cancelBtn) cancelBtn.disabled = isRunning;
+  if (closeBtn) closeBtn.disabled = isRunning;
+}
+
+function updateRestoreProgress(percent, statusText, totalSeconds, variant = 'primary') {
+  const progressSection = document.getElementById('restoreProgressSection');
+  const progressBar = document.getElementById('restoreProgressBar');
+  const status = document.getElementById('restoreProgressStatus');
+  const elapsed = document.getElementById('restoreElapsedTime');
+
+  if (!progressSection || !progressBar || !status || !elapsed) return;
+
+  progressSection.style.display = 'block';
+  status.textContent = statusText;
+  elapsed.textContent = formatElapsedTime(totalSeconds);
+
+  progressBar.className = `progress-bar progress-bar-striped progress-bar-animated bg-${variant}`;
+  progressBar.style.width = `${percent}%`;
+  progressBar.setAttribute('aria-valuenow', String(percent));
+  progressBar.textContent = `${percent}%`;
+}
+
+function startRestoreProgressUi() {
+  restoreStartedAt = Date.now();
+  setRestoreUiRunningState(true);
+
+  if (restoreProgressInterval) {
+    clearInterval(restoreProgressInterval);
+    restoreProgressInterval = null;
+  }
+
+  updateRestoreProgress(5, 'Restore in progress...', 0, 'primary');
+
+  restoreProgressInterval = setInterval(() => {
+    const elapsedSeconds = Math.floor((Date.now() - restoreStartedAt) / 1000);
+    const estimatedPercent = Math.min(95, 5 + Math.floor(elapsedSeconds * 1.5));
+    updateRestoreProgress(estimatedPercent, 'Restore in progress...', elapsedSeconds, 'primary');
+  }, 1000);
+}
+
+function finishRestoreProgressUi({ success, message }) {
+  const elapsedSeconds = restoreStartedAt
+    ? Math.floor((Date.now() - restoreStartedAt) / 1000)
+    : 0;
+
+  if (restoreProgressInterval) {
+    clearInterval(restoreProgressInterval);
+    restoreProgressInterval = null;
+  }
+
+  if (success) {
+    updateRestoreProgress(100, message || 'Restore completed successfully', elapsedSeconds, 'success');
+  } else {
+    updateRestoreProgress(100, message || 'Restore failed', elapsedSeconds, 'danger');
+  }
+
+  setRestoreUiRunningState(false);
+}
+
+function resetRestoreProgressUi() {
+  if (restoreProgressInterval) {
+    clearInterval(restoreProgressInterval);
+    restoreProgressInterval = null;
+  }
+
+  restoreStartedAt = null;
+  setRestoreUiRunningState(false);
+
+  const progressSection = document.getElementById('restoreProgressSection');
+  const progressBar = document.getElementById('restoreProgressBar');
+  const status = document.getElementById('restoreProgressStatus');
+  const elapsed = document.getElementById('restoreElapsedTime');
+
+  if (progressSection) progressSection.style.display = 'none';
+  if (progressBar) {
+    progressBar.style.width = '0%';
+    progressBar.setAttribute('aria-valuenow', '0');
+    progressBar.textContent = '0%';
+    progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated';
+  }
+  if (status) status.textContent = 'Restore in progress...';
+  if (elapsed) elapsed.textContent = '00:00';
+}
+
 async function waitForRestoreJob(jobId) {
   const startedAt = Date.now();
   const timeoutMs = 30 * 60 * 1000;
@@ -496,7 +595,7 @@ async function proceedWithRestore() {
   }
   
   try {
-    restorePreviewModal.hide();
+    startRestoreProgressUi();
     showToast('Starting restore job...', 'info');
     
     // Start async restore job
@@ -513,6 +612,7 @@ async function proceedWithRestore() {
     console.log('⏳ Waiting for restore job:', jobId);
     const jobResult = await waitForRestoreJob(jobId);
     console.log('✅ Restore job completed:', jobResult);
+    finishRestoreProgressUi({ success: true, message: 'Restore completed successfully' });
     
     showToast('✅ Backup restored successfully! Please refresh the page manually (F5) to see changes.', 'success');
     
@@ -522,6 +622,7 @@ async function proceedWithRestore() {
   } catch (err) {
     console.error('Restore error:', err);
     console.error('Error details:', err.message);
+    finishRestoreProgressUi({ success: false, message: 'Restore failed' });
     showToast('❌ Failed to restore backup: ' + err.message, 'error');
   }
 }
