@@ -82,6 +82,15 @@ function formatVat(rate) {
   return `${n}%`;
 }
 
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
 async function loadVatRates() {
   try {
     const res = await authenticatedFetch('/settings/financial');
@@ -220,7 +229,7 @@ function renderInvoices() {
     tr.innerHTML = `
       <td data-label="ID:">${inv.id}</td>
       <td data-label="Invoice No:">${inv.invoice_number}</td>
-      <td data-label="Date:">${inv.invoice_date}</td>
+      <td data-label="Date:">${formatDate(inv.invoice_date)}</td>
       <td data-label="Net (ex VAT):">${euro(inv.net_amount)}</td>
       <td data-label="VAT %:">${formatVat(inv.vat_rate)}</td>
       <td data-label="Total (inc VAT):">${euro(inv.total_amount)}</td>

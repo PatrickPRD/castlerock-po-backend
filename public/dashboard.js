@@ -385,6 +385,15 @@ function formatVat(rate) {
   return `${n}%`;
 }
 
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
 /* ============================
    Load Purchase Orders
    ============================ */
@@ -601,7 +610,7 @@ function renderPO(po) {
 
   mainRow.innerHTML = `
   <td data-label="PO Number">${po.po_number}</td>
-  <td data-label="Date">${po.po_date}</td>
+  <td data-label="Date">${formatDate(po.po_date)}</td>
   <td data-label="Supplier">${po.supplier}</td>
   <td data-label="Location">${po.location}</td>
   <td data-label="Stage">${po.stage.slice(0, 10)}</td>
@@ -763,7 +772,7 @@ async function loadInvoices(poId, container) {
     <tr>
       <td>${i.id}</td>
       <td>${i.invoice_number}</td>
-      <td>${i.invoice_date}</td>
+      <td>${formatDate(i.invoice_date)}</td>
       <td>${euro(Number(i.net_amount))}</td>
       <td>${formatVat(i.vat_rate)}</td>
       <td>${euro(vatAmount)}</td>
