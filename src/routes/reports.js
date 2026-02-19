@@ -668,6 +668,7 @@ router.get(
           w.id,
           w.first_name,
           w.last_name,
+          w.safe_pass_expiry_date,
           SUM(CASE WHEN te.leave_type = 'paid_sick' THEN 1 ELSE 0 END) AS paid_sick,
           SUM(CASE WHEN te.leave_type = 'sick' THEN 1 ELSE 0 END) AS sick,
           SUM(CASE WHEN te.leave_type = 'annual_leave' THEN 1 ELSE 0 END) AS annual_leave,
@@ -681,7 +682,7 @@ router.get(
           AND te.work_date >= ?
           AND te.work_date < ?
         WHERE w.left_at IS NULL OR w.left_at >= CURDATE()
-        GROUP BY w.id, w.first_name, w.last_name
+        GROUP BY w.id, w.first_name, w.last_name, w.safe_pass_expiry_date
         ORDER BY w.last_name, w.first_name
         `,
         [formatDate(startDate), formatDate(endDate)]
@@ -703,6 +704,7 @@ router.get(
         rows: rows.map(row => ({
           id: row.id,
           name: `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Unnamed worker',
+          safe_pass_expiry_date: row.safe_pass_expiry_date,
           paid_sick: Number(row.paid_sick || 0),
           paid_sick_remaining: Math.max(paidSickAllowance - Number(row.paid_sick || 0), 0),
           sick: Number(row.sick || 0),

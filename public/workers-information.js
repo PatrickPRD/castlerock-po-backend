@@ -23,6 +23,27 @@ function num(value) {
   return Number.isFinite(Number(value)) ? Number(value) : 0;
 }
 
+function formatDisplayDate(value) {
+  if (!value) return '-';
+  const raw = value instanceof Date ? value : String(value);
+  const date = raw.includes('T') ? new Date(raw) : new Date(`${raw}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return '-';
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
+function isPastDate(value) {
+  if (!value) return false;
+  const raw = value instanceof Date ? value : String(value);
+  const date = raw.includes('T') ? new Date(raw) : new Date(`${raw}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return date < today;
+}
+
 function formatDate(dateStr) {
   if (!dateStr) return '-';
   const date = new Date(`${dateStr}T00:00:00`);
@@ -87,7 +108,7 @@ function renderTable() {
   if (!filtered.length) {
     table.innerHTML = `
       <tr>
-        <td colspan="11" style="text-align: center; padding: 2rem; color: #9ca3af;">
+        <td colspan="12" style="text-align: center; padding: 2rem; color: #9ca3af;">
           ${term ? 'No workers match your search' : 'No worker information found'}
         </td>
       </tr>
@@ -97,6 +118,9 @@ function renderTable() {
 
   filtered.forEach(row => {
     const hasUnpaid = num(row.sick) > 0 || num(row.unpaid_leave) > 0 || num(row.absent) > 0;
+    const safePassExpiry = formatDisplayDate(row.safe_pass_expiry_date);
+    const safePassExpired = isPastDate(row.safe_pass_expiry_date);
+    const safePassClass = safePassExpired ? 'text-danger fw-semibold' : '';
     table.innerHTML += `
       <tr class="${hasUnpaid ? 'leave-row-unpaid' : ''}">
         <td data-label="Worker"><span class="cell-value">${row.name}</span></td>
@@ -109,6 +133,7 @@ function renderTable() {
         <td data-label="Bank Holidays"><span class="cell-value">${num(row.bank_holiday)}</span></td>
         <td data-label="Bank Holidays Remaining"><span class="cell-value">${num(row.bank_holiday_remaining)}</span></td>
         <td data-label="Absent"><span class="cell-value">${num(row.absent)}</span></td>
+        <td data-label="Safe Pass Expiry"><span class="cell-value ${safePassClass}">${safePassExpiry}</span></td>
         <td class="pdf-col">
           <button
             type="button"
