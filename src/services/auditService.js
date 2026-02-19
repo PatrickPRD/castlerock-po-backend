@@ -68,12 +68,13 @@ async function logAudit({
     let ip_address = null;
     if (req) {
       // req.ip properly handles X-Forwarded-For when trust proxy is enabled
+      // Use optional chaining to safely handle mock/incomplete request objects
       ip_address = req.ip || 
-                   req.headers['x-forwarded-for']?.split(',')[0].trim() ||
-                   req.connection.remoteAddress || 
+                   req.headers?.['x-forwarded-for']?.split(',')[0].trim() ||
+                   req.connection?.remoteAddress || 
                    null;
     }
-    const user_agent = req ? (req.get('user-agent') || null) : null;
+    const user_agent = req ? (req.get?.('user-agent') || null) : null;
     
     console.log('🔍 Inserting into audit_log:', { changed_by, action, table_name, record_id, ip_address });
     

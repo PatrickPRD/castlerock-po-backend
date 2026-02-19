@@ -616,6 +616,11 @@ async function proceedWithRestore() {
     
     showToast('✅ Backup restored successfully! Please refresh the page manually (F5) to see changes.', 'success');
     
+    // Close modal after success
+    setTimeout(() => {
+      restorePreviewModal.hide();
+    }, 1000);
+    
     // Don't auto-reload - let user check console and refresh manually
     console.log('✅ RESTORE COMPLETE - Check server console for audit log messages');
     console.log('✅ Refresh the page (F5) when ready');
