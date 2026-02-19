@@ -422,25 +422,15 @@ async function restoreBackupSql(sqlText) {
     await clearDatabaseExceptUsers(connection);
     console.log('✅ Database cleared');
 
-    // Process SQL to handle duplicates: replace INSERT with REPLACE
-    let processedSql = sqlText;
-    
-    // Replace INSERT INTO with REPLACE INTO for duplicate handling
-    // This will delete old rows with same unique keys and insert new ones
-    processedSql = processedSql.replace(/INSERT\s+INTO\s+/gi, 'REPLACE INTO ');
-    
-    // Also handle INSERT IGNORE
-    processedSql = processedSql.replace(/INSERT\s+IGNORE\s+/gi, 'REPLACE INTO ');
-    
-    console.log('📥 Executing SQL restore (duplicates will replace)...');
-    await connection.query(processedSql);
+    console.log('📥 Executing SQL restore...');
+    await connection.query(sqlText);
     console.log('✅ SQL restore completed');
     
     await connection.query('SET FOREIGN_KEY_CHECKS=1');
 
     return { 
       success: true, 
-      message: 'SQL backup restored successfully (duplicates replaced)' 
+      message: 'SQL backup restored successfully' 
     };
   } catch (err) {
     console.error('❌ SQL restore error:', err.message);

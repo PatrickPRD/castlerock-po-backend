@@ -25,9 +25,22 @@ async function api(url, method = 'GET', body) {
     body: body ? JSON.stringify(body) : undefined
   });
 
+  const contentType = res.headers.get('content-type') || '';
+  const isJson = contentType.includes('application/json');
+
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || 'Request failed');
+    if (isJson) {
+      const err = await res.json();
+      throw new Error(err.error || 'Request failed');
+    }
+
+    const text = await res.text();
+    const firstLine = (text || '').split('\n').find(line => line.trim()) || '';
+    throw new Error(firstLine.slice(0, 200) || `Request failed (${res.status})`);
+  }
+
+  if (!isJson) {
+    return { success: true };
   }
 
   return await res.json();
@@ -446,8 +459,8 @@ function escapeHtml(text) {
 
 // Proceed with restore (after preview)
 async function proceedWithRestore() {
-  if (!currentRestoreSqlContent) {
-    showToast('❌ No backup content loaded', 'error');
+  if (!currentRestoreFilename) {
+    showToast('❌ No backup file selected', 'error');
     return;
   }
   
@@ -457,7 +470,7 @@ async function proceedWithRestore() {
     
     // Restore the backup
     console.log('📤 Sending restore request...');
-    const result = await api('/backups/restore', 'POST', { sql: currentRestoreSqlContent, force: true });
+    const result = await api('/backups/restore', 'POST', { filename: currentRestoreFilename, force: true });
     console.log('✅ Restore response received:', result);
     
     showToast('✅ Backup restored successfully! Please refresh the page manually (F5) to see changes.', 'success');

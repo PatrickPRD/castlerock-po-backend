@@ -167,9 +167,14 @@ router.post(
   authorizeRoles('super_admin'),
   async (req, res) => {
     try {
-      const { backup, sql, force } = req.body;
+      const { backup, sql, filename, force } = req.body;
+      let sqlContent = sql;
 
-      if (!backup && !sql) {
+      if (filename && !sqlContent) {
+        sqlContent = await getBackupFile(filename);
+      }
+
+      if (!backup && !sqlContent) {
         return res
           .status(400)
           .json({ error: 'No backup data provided' });
@@ -202,9 +207,12 @@ router.post(
       console.log('='.repeat(80));
       console.log('📝 User ID for audit:', req.user?.id);
       console.log('📝 Authenticated user:', req.user);
-      console.log('📝 Backup type:', sql ? 'SQL' : 'JSON');
+      console.log('📝 Backup type:', sqlContent ? 'SQL' : 'JSON');
+      if (filename) {
+        console.log('📝 Restore filename:', filename);
+      }
       
-      const result = sql ? await restoreBackupSql(sql) : await restoreBackup(backup);
+      const result = sqlContent ? await restoreBackupSql(sqlContent) : await restoreBackup(backup);
       
       console.log('='.repeat(80));
       console.log('✅ RESTORE COMPLETED SUCCESSFULLY');
