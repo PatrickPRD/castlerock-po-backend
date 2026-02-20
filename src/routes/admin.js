@@ -815,7 +815,7 @@ router.delete(
 router.get(
   '/workers',
   authenticate,
-  authorizeRoles('super_admin'),
+  authorizeRoles('super_admin', 'admin'),
   async (req, res) => {
     const includeInactive = String(req.query.include_inactive) === '1';
     const whereClause = includeInactive ? '' : 'WHERE left_at IS NULL OR left_at >= CURDATE()';
@@ -850,6 +850,14 @@ router.get(
          ORDER BY last_name, first_name`
       );
 
+      // Remove financial data for non-super_admin users
+      if (req.user.role !== 'super_admin') {
+        rows.forEach(row => {
+          delete row.weekly_take_home;
+          delete row.weekly_cost;
+        });
+      }
+
       res.json(rows);
     } catch (err) {
       console.error('LOAD WORKERS ERROR:', err);
@@ -861,7 +869,7 @@ router.get(
 router.post(
   '/workers',
   authenticate,
-  authorizeRoles('super_admin'),
+  authorizeRoles('super_admin', 'admin'),
   async (req, res) => {
     const {
       first_name,
@@ -959,6 +967,10 @@ router.post(
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const isActive = !normalizedLeftAt || new Date(`${normalizedLeftAt}T00:00:00`) >= today;
+      // Only allow super_admin to set financial fields
+      const finalWeeklyTakeHome = req.user.role === 'super_admin' ? weekly_take_home ?? null : null;
+      const finalWeeklyCost = req.user.role === 'super_admin' ? weekly_cost ?? null : null;
+      
       const [result] = await db.query(
         `INSERT INTO workers
          (first_name, last_name, nickname, email, mobile_number, address, bank_details, pps_number, weekly_take_home, weekly_cost, safe_pass_number, safe_pass_expiry_date, date_of_employment, left_at, employee_id, login_no, notes, active)
@@ -972,8 +984,8 @@ router.post(
           normalizedAddress || null,
           normalizedBankDetails || null,
           pps_number || null,
-          weekly_take_home ?? null,
-          weekly_cost ?? null,
+          finalWeeklyTakeHome,
+          finalWeeklyCost,
           safe_pass_number || null,
           toIsoDate(safe_pass_expiry_date),
           normalizedDate,
@@ -996,8 +1008,8 @@ router.post(
           email: normalizedEmail,
           employee_id,
           login_no: normalizedLoginNo,
-          weekly_take_home: weekly_take_home ?? null,
-          weekly_cost: weekly_cost ?? null,
+          weekly_take_home: finalWeeklyTakeHome,
+          weekly_cost: finalWeeklyCost,
           date_of_employment: normalizedDate,
           active: isActive
         },
@@ -1016,7 +1028,7 @@ router.post(
 router.put(
   '/workers/:id',
   authenticate,
-  authorizeRoles('super_admin'),
+  authorizeRoles('super_admin', 'admin'),
   async (req, res) => {
     const workerId = Number(req.params.id);
     const {
@@ -1120,6 +1132,11 @@ router.put(
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const isActive = !normalizedLeftAt || new Date(`${normalizedLeftAt}T00:00:00`) >= today;
+      
+      // Only allow super_admin to modify financial fields
+      const finalWeeklyTakeHome = req.user.role === 'super_admin' ? weekly_take_home ?? null : oldWorker?.weekly_take_home ?? null;
+      const finalWeeklyCost = req.user.role === 'super_admin' ? weekly_cost ?? null : oldWorker?.weekly_cost ?? null;
+      
       await db.query(
         `UPDATE workers
          SET
@@ -1151,8 +1168,8 @@ router.put(
           normalizedAddress || null,
           normalizedBankDetails || null,
           pps_number || null,
-          weekly_take_home ?? null,
-          weekly_cost ?? null,
+          finalWeeklyTakeHome,
+          finalWeeklyCost,
           safe_pass_number || null,
           toIsoDate(safe_pass_expiry_date),
           normalizedDate,
@@ -1187,8 +1204,8 @@ router.put(
             email: normalizedEmail,
             employee_id,
             login_no: normalizedLoginNo,
-            weekly_take_home: weekly_take_home ?? null,
-            weekly_cost: weekly_cost ?? null,
+            weekly_take_home: finalWeeklyTakeHome,
+            weekly_cost: finalWeeklyCost,
             date_of_employment: normalizedDate,
             active: isActive
           },
@@ -1208,7 +1225,7 @@ router.put(
 router.put(
   '/workers/:id/status',
   authenticate,
-  authorizeRoles('super_admin'),
+  authorizeRoles('super_admin', 'admin'),
   async (req, res) => {
     const workerId = Number(req.params.id);
     const active = Number(req.body.active) === 1 ? 1 : 0;
@@ -1249,8 +1266,8 @@ router.put(
 router.get(
   '/workers/template',
   authenticate,
-  authorizeRoles('super_admin'),
-  async (_req, res) => {
+  authorizeRoles('super_admin', 'admin'),
+  async (req, res) => {
     try {
       const [activeWorkers] = await db.query(
         `SELECT
@@ -1298,7 +1315,7 @@ router.get(
 
       const workbook = new ExcelJS.Workbook();
 
-      const columns = [
+      const columns = req.user.role === 'super_admin' ? [
         { header: 'First Name', key: 'first_name', width: 20 },
         { header: 'Last Name', key: 'last_name', width: 20 },
         { header: 'Nickname', key: 'nickname', width: 18 },
@@ -1314,6 +1331,20 @@ router.get(
         { header: 'Date of Employment (DD-MM-YYYY)', key: 'date_of_employment', width: 26 },
         { header: 'Login No', key: 'login_no', width: 16 },
         { header: 'Notes', key: 'notes', width: 30 }
+      ] : [
+        { header: 'First Name', key: 'first_name', width: 20 },
+        { header: 'Last Name', key: 'last_name', width: 20 },
+        { header: 'Nickname', key: 'nickname', width: 18 },
+        { header: 'Email', key: 'email', width: 25 },
+        { header: 'Mobile Number', key: 'mobile_number', width: 16 },
+        { header: 'Address', key: 'address', width: 30 },
+        { header: 'Bank Details', key: 'bank_details', width: 25 },
+        { header: 'PPS Number', key: 'pps_number', width: 18 },
+        { header: 'Safe Pass Number', key: 'safe_pass_number', width: 18 },
+        { header: 'Safe Pass Expiry (DD-MM-YYYY)', key: 'safe_pass_expiry_date', width: 26 },
+        { header: 'Date of Employment (DD-MM-YYYY)', key: 'date_of_employment', width: 26 },
+        { header: 'Login No', key: 'login_no', width: 16 },
+        { header: 'Notes', key: 'notes', width: 30 }
       ];
 
       const addWorkersSheet = (sheetName, rows) => {
@@ -1321,7 +1352,7 @@ router.get(
         sheet.columns = columns;
 
         rows.forEach(worker => {
-          sheet.addRow({
+          const rowData = {
             first_name: worker.first_name || '',
             last_name: worker.last_name || '',
             nickname: worker.nickname || '',
@@ -1330,14 +1361,20 @@ router.get(
             address: worker.address || '',
             bank_details: worker.bank_details || '',
             pps_number: worker.pps_number || '',
-            weekly_take_home: worker.weekly_take_home ?? null,
-            weekly_cost: worker.weekly_cost ?? null,
             safe_pass_number: worker.safe_pass_number || '',
             safe_pass_expiry_date: toUkDate(worker.safe_pass_expiry_date),
             date_of_employment: toUkDate(worker.date_of_employment),
             login_no: worker.login_no ?? '',
             notes: worker.notes || ''
-          });
+          };
+          
+          // Include financial data only for super_admin
+          if (req.user.role === 'super_admin') {
+            rowData.weekly_take_home = worker.weekly_take_home ?? null;
+            rowData.weekly_cost = worker.weekly_cost ?? null;
+          }
+          
+          sheet.addRow(rowData);
         });
       };
 
@@ -1384,7 +1421,7 @@ function normalizeOptionalText(value, { lowercase = false } = {}) {
 router.post(
   '/workers/bulk',
   authenticate,
-  authorizeRoles('super_admin'),
+  authorizeRoles('super_admin', 'admin'),
   upload.single('file'),
   async (req, res) => {
     if (!req.file) {
@@ -1581,6 +1618,20 @@ router.post(
           normalizeOptionalText(notes),
           1
         ]);
+      }
+
+      // For non-super_admin users, clear financial data
+      if (req.user.role !== 'super_admin') {
+        rowsToInsert.forEach(row => {
+          // weekly_take_home is at index 8, weekly_cost is at index 9
+          row[8] = null;
+          row[9] = null;
+        });
+        rowsToUpdate.forEach(row => {
+          // weekly_take_home is at index 8, weekly_cost is at index 9
+          row[8] = null;
+          row[9] = null;
+        });
       }
 
       if (rowsToInsert.length > 0) {

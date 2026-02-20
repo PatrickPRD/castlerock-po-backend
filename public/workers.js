@@ -1,7 +1,7 @@
 const token = localStorage.getItem('token');
 const role = localStorage.getItem('role');
 
-if (!token || role !== 'super_admin') {
+if (!token || !['super_admin', 'admin'].includes(role)) {
   location.href = 'dashboard.html';
 }
 
@@ -230,6 +230,9 @@ function renderWorkers() {
 
     const detailsRow = document.createElement('tr');
     detailsRow.className = 'details-row';
+    const financialData = role === 'super_admin' ? `
+          <div><strong>Weekly take home:</strong> ${weeklyPay}</div>
+          <div><strong>Weekly cost:</strong> ${weeklyCost}</div>` : '';
     detailsRow.innerHTML = `
       <td colspan="4">
         <div class="details-grid">
@@ -243,8 +246,7 @@ function renderWorkers() {
           <div><strong>Employee ID:</strong> ${escapeHtml(worker.employee_id) || '—'}</div>
           <div><strong>Login No:</strong> ${escapeHtml(worker.login_no) || '—'}</div>
           <div><strong>PPS Number:</strong> ${escapeHtml(worker.pps_number) || '—'}</div>
-          <div><strong>Weekly take home:</strong> ${weeklyPay}</div>
-          <div><strong>Weekly cost:</strong> ${weeklyCost}</div>
+          ${financialData}
           <div><strong>Safe Pass Number:</strong> ${escapeHtml(worker.safe_pass_number) || '—'}</div>
           <div><strong>Safe Pass Expiry:</strong> <span class="${safePassExpired ? 'expired-date' : ''}">${safePassExpiry || '—'}</span></div>
           <div><strong>Date of employment:</strong> ${formatDate(worker.date_of_employment)}</div>
@@ -443,8 +445,8 @@ async function saveWorker() {
     employee_id: employeeId || null,
     login_no: loginNoRaw || null,
     pps_number: ppsNumber || null,
-    weekly_take_home: weeklyPay,
-    weekly_cost: weeklyCost,
+    weekly_take_home: role === 'super_admin' ? weeklyPay : null,
+    weekly_cost: role === 'super_admin' ? weeklyCost : null,
     safe_pass_number: safePassNumber || null,
     safe_pass_expiry_date: safePassExpiry || null,
     date_of_employment: employmentDate || null,
@@ -542,6 +544,30 @@ if (showInactiveCheckbox) {
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
+  // Hide financial fields and tool for non-super_admin users
+  if (role !== 'super_admin') {
+    const weeklyPayField = document.getElementById('workerWeeklyPay');
+    const weeklyCostField = document.getElementById('workerWeeklyCost');
+    
+    if (weeklyPayField && weeklyPayField.parentElement) {
+      weeklyPayField.parentElement.style.display = 'none';
+    }
+    if (weeklyCostField && weeklyCostField.parentElement) {
+      weeklyCostField.parentElement.style.display = 'none';
+    }
+
+    // Hide Download Excel and Bulk Upload buttons
+    const downloadBtn = Array.from(document.querySelectorAll('button')).find(btn => 
+      btn.textContent.includes('Download Excel')
+    );
+    const bulkUploadBtn = Array.from(document.querySelectorAll('button')).find(btn => 
+      btn.textContent.includes('Bulk Upload')
+    );
+    
+    if (downloadBtn) downloadBtn.style.display = 'none';
+    if (bulkUploadBtn) bulkUploadBtn.style.display = 'none';
+  }
+
   try {
     await loadCurrencySettings();
   } catch (_) {}
