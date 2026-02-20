@@ -337,4 +337,30 @@
   </div>
 </div>
 
+<!-- Delete Backup Confirmation Modal -->
+<div class="modal fade" id="deleteBackupModal" tabindex="-1" style="z-index: 1055;">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title"><i class="bi bi-trash me-2"></i>Delete Backup</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-danger">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>
+          <strong>Are you sure?</strong> This cannot be undone.
+        </div>
+        <p class="mb-2">Backup file:</p>
+        <p id="deleteBackupFilename" class="font-monospace bg-light p-2 rounded mb-0"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" onclick="proceedWithDelete()">
+          <i class="bi bi-trash me-1"></i> Yes, Delete Backup
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <%- include('partials/footer', { scripts: ['/ui.js', 'backup-management.js'], includeNavScript: true }) %>

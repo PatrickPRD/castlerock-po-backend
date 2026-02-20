@@ -1,22 +1,24 @@
 const pool = require('../db');
-
-const AUDIT_LOG_RETENTION_LIMIT = 300;
+const SettingsService = require('./settingsService');
 
 /**
- * Clean up old audit logs to keep only the latest 300 entries
+ * Clean up old audit logs based on the configured retention limit
  * Worker table entries are EXCLUDED from cleanup and kept indefinitely
  * This function runs asynchronously and doesn't block the main operation
  */
 async function cleanupOldAuditLogs() {
   try {
+    // Get the retention limit from settings (default to 300 if not set)
+    const retentionLimit = Number(await SettingsService.getSetting('audit_log_retention', '300')) || 300;
+    
     // Count non-worker entries only
     const [[{ count }]] = await pool.query(
       `SELECT COUNT(*) as count FROM audit_log WHERE table_name != 'workers'`
     );
 
     // If we exceed the limit, delete oldest non-worker entries
-    if (count > AUDIT_LOG_RETENTION_LIMIT) {
-      const entriesToDelete = count - AUDIT_LOG_RETENTION_LIMIT;
+    if (count > retentionLimit) {
+      const entriesToDelete = count - retentionLimit;
       
       const result = await pool.query(
         `
@@ -32,7 +34,7 @@ async function cleanupOldAuditLogs() {
         [entriesToDelete]
       );
 
-      console.log(`🧹 Cleaned up ${result[0].affectedRows} old audit log entries (${count} → ${AUDIT_LOG_RETENTION_LIMIT}). Worker entries preserved indefinitely.`);
+      console.log(`🧹 Cleaned up ${result[0].affectedRows} old audit log entries (${count} → ${retentionLimit}). Worker entries preserved indefinitely.`);
     }
   } catch (error) {
     console.error('❌ Audit log cleanup failed:', error.message);

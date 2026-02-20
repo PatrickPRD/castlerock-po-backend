@@ -143,15 +143,20 @@ const exportRoutes = require('./routes/exports');
 app.use('/exports', exportRoutes);
 
 async function ensureSchemaReady() {
+  console.log('🔄 Waiting for database connection...');
   await pool.ready;
+  console.log('✅ Database connection established');
 
   try {
+    console.log('🔍 Checking schema tables...');
     await pool.query('SELECT 1 FROM site_settings LIMIT 1');
+    console.log('✅ Schema tables verified');
   } catch (error) {
     const message = String(error?.message || '');
     if (error?.code === 'ER_NO_SUCH_TABLE' || message.includes("doesn't exist")) {
       console.warn('⚠️  Missing schema tables; running database setup...');
       await setupDatabase();
+      console.log('✅ Database setup completed');
       return;
     }
 
@@ -164,7 +169,9 @@ const PORT = process.env.PORT || 3000;
 const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
 
 async function startServer() {
+  console.log('🔧 Starting server initialization...');
   await ensureSchemaReady();
+  console.log('✅ Schema ready, starting HTTP listener...');
 
   app.listen(PORT, HOST, () => {
     console.log(`🚀 Server running on ${HOST}:${PORT}`);

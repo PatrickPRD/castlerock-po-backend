@@ -8,7 +8,8 @@ if (!token || role !== 'super_admin') {
 
 let currentRestoreFilename = null;
 let currentRestoreSqlContent = null;
-let uploadModal, restoreModal, restorePreviewModal, resetModal, backupLimitModal;
+let pendingDeleteFilename = null;
+let uploadModal, restoreModal, restorePreviewModal, resetModal, backupLimitModal, deleteBackupModal;
 let allBackups = []; // Store all backups for pagination
 let currentPage = 1;
 const ITEMS_PER_PAGE = 10;
@@ -794,12 +795,20 @@ async function confirmRestore() {
 
 // Delete backup
 async function deleteBackupConfirm(filename) {
-  if (!confirm(`Delete backup "${filename}"?\n\nThis cannot be undone.`)) {
+  pendingDeleteFilename = filename;
+  document.getElementById('deleteBackupFilename').textContent = filename;
+  deleteBackupModal.show();
+}
+
+// Proceed with backup deletion
+async function proceedWithDelete() {
+  if (!pendingDeleteFilename) {
+    showToast('❌ No backup selected', 'error');
     return;
   }
   
   try {
-    const response = await fetch(`/backups/${encodeURIComponent(filename)}`, {
+    const response = await fetch(`/backups/${encodeURIComponent(pendingDeleteFilename)}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -812,6 +821,7 @@ async function deleteBackupConfirm(filename) {
       throw new Error(err.error || 'Delete failed');
     }
     
+    deleteBackupModal.hide();
     showToast('✅ Backup deleted', 'success');
     loadBackups();
   } catch (err) {
@@ -954,6 +964,7 @@ document.addEventListener('DOMContentLoaded', () => {
   restorePreviewModal = new bootstrap.Modal(document.getElementById('restorePreviewModal'));
   resetModal = new bootstrap.Modal(document.getElementById('resetModal'));
   backupLimitModal = new bootstrap.Modal(document.getElementById('backupLimitModal'));
+  deleteBackupModal = new bootstrap.Modal(document.getElementById('deleteBackupModal'));
   
   // Reset confirmation text validation
   const resetConfirmInput = document.getElementById('resetConfirmText');

@@ -50,6 +50,9 @@ const vatInput = document.getElementById('vatInput');
 const vatAddBtn = document.getElementById('vatAddBtn');
 const vatList = document.getElementById('vatList');
 const financialResetBtn = document.getElementById('financialResetBtn');
+const systemSettingsForm = document.getElementById('systemSettingsForm');
+const auditLogRetentionInput = document.getElementById('auditLogRetention');
+const systemResetBtn = document.getElementById('systemResetBtn');
 
 const brandPreviewBar = document.getElementById('brandPreviewBar');
 const brandPreviewImage = document.getElementById('brandPreviewImage');
@@ -255,6 +258,15 @@ async function loadFinancialSettings() {
   renderVatList();
 }
 
+async function loadSystemSettings() {
+  const settings = await api('/settings/system');
+  if (auditLogRetentionInput) {
+    auditLogRetentionInput.value = Number.isFinite(Number(settings.audit_log_retention))
+      ? Number(settings.audit_log_retention)
+      : 300;
+  }
+}
+
 function renderVatList() {
   if (!vatList) return;
   vatList.innerHTML = '';
@@ -317,6 +329,15 @@ async function saveFinancialSettings() {
   if (window.applyCurrencySymbols) {
     await window.applyCurrencySymbols();
   }
+}
+
+async function saveSystemSettings() {
+  const payload = {
+    auditLogRetention: Number(auditLogRetentionInput?.value || 300)
+  };
+  await api('/settings/system', 'PUT', payload);
+  showToast('System settings updated', 'success');
+  await loadSystemSettings();
 }
 
 async function handleDeleteVat(rate) {
@@ -473,6 +494,25 @@ if (financialResetBtn) {
   financialResetBtn.addEventListener('click', () => {
     loadFinancialSettings().catch((err) => {
       showToast(err.message || 'Failed to load financial settings', 'error');
+    });
+  });
+}
+
+if (systemSettingsForm) {
+  systemSettingsForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      await saveSystemSettings();
+    } catch (err) {
+      showToast(err.message || 'Failed to update system settings', 'error');
+    }
+  });
+}
+
+if (systemResetBtn) {
+  systemResetBtn.addEventListener('click', () => {
+    loadSystemSettings().catch((err) => {
+      showToast(err.message || 'Failed to load system settings', 'error');
     });
   });
 }
@@ -696,6 +736,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadFinancialSettings();
   } catch (err) {
     showToast(err.message || 'Failed to load financial settings', 'error');
+  }
+
+  try {
+    await loadSystemSettings();
+  } catch (err) {
+    showToast(err.message || 'Failed to load system settings', 'error');
   }
 });
 

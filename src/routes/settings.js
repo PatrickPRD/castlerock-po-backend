@@ -186,6 +186,31 @@ router.get(
 );
 
 /**
+ * GET /settings/system
+ * Get system settings (super admin only)
+ */
+router.get(
+  '/system',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      const settings = await SettingsService.getSettings();
+      const audit_log_retention = Number.isFinite(Number(settings.audit_log_retention))
+        ? Number(settings.audit_log_retention)
+        : 300;
+
+      res.json({
+        audit_log_retention
+      });
+    } catch (error) {
+      console.error('Error fetching system settings:', error);
+      res.status(500).json({ error: 'Failed to fetch system settings' });
+    }
+  }
+);
+
+/**
  * PUT /settings/financial
  * Update currency + VAT list; block removal of in-use VAT rates
  */
@@ -243,7 +268,7 @@ router.put(
         });
       }
 
-      // Current usage
+      
       const [poRates] = await db.query(
         'SELECT vat_rate, COUNT(*) AS count FROM purchase_orders GROUP BY vat_rate'
       );
@@ -289,6 +314,39 @@ router.put(
     } catch (error) {
       console.error('Error updating financial settings:', error);
       res.status(500).json({ error: 'Failed to update financial settings' });
+    }
+  }
+);
+
+/**
+ * PUT /settings/system
+ * Update system-wide settings
+ */
+router.put(
+  '/system',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      const { auditLogRetention } = req.body || {};
+
+      // Validate audit log retention
+      const retention = Number(auditLogRetention);
+      if (!Number.isFinite(retention) || retention < 100 || retention > 999) {
+        return res.status(400).json({
+          error: 'auditLogRetention must be a number between 100 and 999'
+        });
+      }
+
+      await SettingsService.updateSetting('audit_log_retention', retention);
+
+      res.json({
+        success: true,
+        audit_log_retention: retention
+      });
+    } catch (error) {
+      console.error('Error updating system settings:', error);
+      res.status(500).json({ error: 'Failed to update system settings' });
     }
   }
 );

@@ -27,7 +27,8 @@ async function ensureDatabaseExists() {
     host: baseConfig.host,
     user: baseConfig.user,
     password: baseConfig.password,
-    port: baseConfig.port
+    port: baseConfig.port,
+    connectTimeout: 5000
   });
 
   try {
@@ -37,16 +38,21 @@ async function ensureDatabaseExists() {
   }
 }
 
-const dbReady = ensureDatabaseExists()
-  .then(() => pool.getConnection())
-  .then(conn => {
-    console.log('✅ Database connection successful');
+const dbReady = (async () => {
+  try {
+    await ensureDatabaseExists();
+    const conn = await Promise.race([
+      pool.getConnection(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Connection timeout after 5 seconds')), 5000)
+      )
+    ]);
     conn.release();
-  })
-  .catch(err => {
+  } catch (err) {
     console.error('❌ Database connection failed:', err.message);
     throw err;
-  });
+  }
+})();
 
 pool.ready = dbReady;
 

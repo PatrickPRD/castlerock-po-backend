@@ -104,7 +104,8 @@ class SettingsService {
       company_vat_number: '',
       company_cro_number: '',
       company_phone: '',
-      company_email: ''
+      company_email: '',
+      audit_log_retention: '300'
     };
   }
 
