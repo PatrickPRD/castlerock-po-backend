@@ -1501,11 +1501,134 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
-});
 
-/* ============================
-   Edit PO Modal Functions
-   ============================ */
+  // Save & Add Invoices button for Create PO
+  const poSaveAndAddInvoicesBtn = document.getElementById("poSaveAndAddInvoices");
+  if (poSaveAndAddInvoicesBtn) {
+    poSaveAndAddInvoicesBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      
+      const payload = {
+        supplierId: document.getElementById("poSupplier").value,
+        siteId: document.getElementById("poSite").value,
+        locationId: document.getElementById("poLocation").value,
+        stageId: document.getElementById("poStage").value,
+        poDate: document.getElementById("poDate").value,
+        description: document.getElementById("poDescription").value || "",
+        netAmount: Number(document.getElementById("poNetAmount").value) || 0,
+        vatRate: Number(document.getElementById("poVatRate").value) || 0
+      };
+
+      if (createLineItems && createLineItems.isEnabled()) {
+        const { items, hasIncomplete } = createLineItems.collectItems();
+        if (hasIncomplete) {
+          showToast("Please complete all line item fields", "error");
+          return;
+        }
+        if (items.length === 0) {
+          showToast("Add at least one line item", "error");
+          return;
+        }
+        payload.lineItems = items;
+        payload.description = '';
+      }
+      
+      if (!payload.supplierId || !payload.siteId || !payload.locationId || !payload.poDate || !payload.stageId) {
+        showToast("Supplier, site, location, stage and date are required", "error");
+        return;
+      }
+      
+      try {
+        const res = await authenticatedFetch("/purchase-orders", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+        
+        if (!res.ok) {
+          const err = await res.json();
+          showToast(err.error || "Failed to create purchase order", "error");
+          return;
+        }
+        
+        const data = await res.json();
+        showToast(`Purchase Order ${data.poNumber} created successfully`, "success");
+        closeCreatePOModal();
+        window.location.href = `invoice-entry.html?poId=${data.id}`;
+      } catch (err) {
+        showToast("Failed to create purchase order", "error");
+        console.error(err);
+      }
+    });
+  }
+
+  // Save & Add Invoices button for Edit PO
+  const editPOSaveAndAddInvoicesBtn = document.getElementById("editPOSaveAndAddInvoices");
+  if (editPOSaveAndAddInvoicesBtn) {
+    editPOSaveAndAddInvoicesBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      
+      const editPOForm = document.getElementById("editPOForm");
+      const poId = editPOForm.dataset.poId;
+      const siteId = editPOForm.dataset.siteId;
+      
+      const payload = {
+        supplierId: document.getElementById("editPOSupplier").value,
+        siteId: siteId,
+        locationId: document.getElementById("editPOLocation").value,
+        stageId: document.getElementById("editPOStage").value,
+        poDate: document.getElementById("editPODate").value,
+        description: document.getElementById("editPODescription").value || "",
+        netAmount: Number(document.getElementById("editPONetAmount").value) || 0,
+        vatRate: Number(document.getElementById("editPOVatRate").value) || 0
+      };
+
+      if (editLineItems && editLineItems.isEnabled()) {
+        const { items, hasIncomplete } = editLineItems.collectItems();
+        if (hasIncomplete) {
+          showToast("Please complete all line item fields", "error");
+          return;
+        }
+        if (items.length === 0) {
+          showToast("Add at least one line item", "error");
+          return;
+        }
+        payload.lineItems = items;
+        payload.description = '';
+      }
+      
+      if (!payload.supplierId || !payload.siteId || !payload.locationId || !payload.poDate || !payload.stageId) {
+        showToast("Supplier, site, location, stage and date are required", "error");
+        return;
+      }
+      
+      try {
+        const res = await authenticatedFetch(`/purchase-orders/${poId}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+        
+        if (!res.ok) {
+          const err = await res.json();
+          showToast(err.error || "Failed to update purchase order", "error");
+          return;
+        }
+        
+        showToast("Purchase order updated successfully", "success");
+        closeEditPOModal();
+        window.location.href = `invoice-entry.html?poId=${poId}`;
+      } catch (err) {
+        showToast("Failed to update purchase order", "error");
+        console.error(err);
+      }
+    });
+  }
+});
 
 async function loadEditPOSuppliers(selectedId) {
   try {

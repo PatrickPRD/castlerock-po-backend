@@ -314,11 +314,9 @@ toggleLineItemsBtn.addEventListener('click', () => setLineItemsMode(!lineItemsMo
 addLineItemBtn.addEventListener('click', () => addLineItemRow());
 
 /* =========================
-   Submit PO
+   Build PO Payload
    ========================= */
-document.getElementById('poForm').addEventListener('submit', async e => {
-  e.preventDefault();
-
+async function buildPOPayload() {
   const payload = {
     supplierId: supplierSelect.value,
     siteId: siteSelect.value,
@@ -334,24 +332,32 @@ document.getElementById('poForm').addEventListener('submit', async e => {
     const { items, hasIncomplete } = collectLineItems();
     if (hasIncomplete) {
       showToast('Please complete all line item fields', 'error');
-      return;
+      return null;
     }
     if (items.length === 0) {
       showToast('Add at least one line item', 'error');
-      return;
+      return null;
     }
     payload.lineItems = items;
     payload.description = '';
   }
 
-console.log(payload);
+  if (!payload.supplierId || !payload.siteId || !payload.locationId || !payload.poDate || !payload.stageId) {
+    showToast('Supplier, site, location, stage and date are required', 'error');
+    return null;
+  }
 
-
-if (!payload.supplierId || !payload.siteId || !payload.locationId || !payload.poDate || !payload.stageId) {
-  showToast('Supplier, site, location, stage and date are required', 'error');
-  return;
+  return payload;
 }
 
+/* =========================
+   Submit PO
+   ========================= */
+document.getElementById('poForm').addEventListener('submit', async e => {
+  e.preventDefault();
+
+  const payload = await buildPOPayload();
+  if (!payload) return;
 
   const res = await fetch('/purchase-orders', {
     method: 'POST',
@@ -368,19 +374,55 @@ if (!payload.supplierId || !payload.siteId || !payload.locationId || !payload.po
     return;
   }
 
-const data = await res.json();
+  const data = await res.json();
 
-sessionStorage.setItem(
-  'toast',
-  JSON.stringify({
-    message: `Purchase Order ${data.poNumber} created successfully`,
-    type: 'success'
-  })
-);
+  sessionStorage.setItem(
+    'toast',
+    JSON.stringify({
+      message: `Purchase Order ${data.poNumber} created successfully`,
+      type: 'success'
+    })
+  );
 
-window.location.href = 'dashboard.html';
+  window.location.href = 'dashboard.html';
+});
 
+/* =========================
+   Save & Add Invoices
+   ========================= */
+document.getElementById('saveAndAddInvoicesBtn').addEventListener('click', async e => {
+  e.preventDefault();
 
+  const payload = await buildPOPayload();
+  if (!payload) return;
+
+  const res = await fetch('/purchase-orders', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + token
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    showToast(err.error || 'Failed to create purchase order', 'error');
+    return;
+  }
+
+  const data = await res.json();
+
+  sessionStorage.setItem(
+    'toast',
+    JSON.stringify({
+      message: `Purchase Order ${data.poNumber} created successfully`,
+      type: 'success'
+    })
+  );
+
+  const poId = data.id;
+  window.location.href = `invoice-entry.html?poId=${poId}`;
 });
 });
 

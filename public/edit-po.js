@@ -59,6 +59,10 @@
      ========================= */
   if (role === 'viewer') {
     saveBtn.style.display = 'none';
+    const saveAndAddInvoicesBtn = document.getElementById('saveAndAddInvoicesBtn');
+    if (saveAndAddInvoicesBtn) {
+      saveAndAddInvoicesBtn.style.display = 'none';
+    }
   }
 
   // ...existing code (move all remaining code inside this IIFE)...
@@ -461,15 +465,14 @@ siteSelect.addEventListener('change', async () => {
   await loadOptions('/locations?siteId=' + siteId, locationSelect);
 });
 
-
-
 /* =========================
-   Save changes
+   Build PO Payload
    ========================= */
-document.getElementById('poForm').addEventListener('submit', async e => {
-  e.preventDefault();
-
-  if (role === 'viewer') return;
+async function buildPOPayload() {
+  if (role === 'viewer') {
+    showToast('Viewers cannot edit purchase orders', 'error');
+    return null;
+  }
 
   const payload = {
     supplierId: supplierSelect.value,
@@ -486,15 +489,27 @@ document.getElementById('poForm').addEventListener('submit', async e => {
     const { items, hasIncomplete } = collectLineItems();
     if (hasIncomplete) {
       showToast('Please complete all line item fields', 'error');
-      return;
+      return null;
     }
     if (items.length === 0) {
       showToast('Add at least one line item', 'error');
-      return;
+      return null;
     }
     payload.lineItems = items;
     payload.description = '';
   }
+
+  return payload;
+}
+
+/* =========================
+   Save changes
+   ========================= */
+document.getElementById('poForm').addEventListener('submit', async e => {
+  e.preventDefault();
+
+  const payload = await buildPOPayload();
+  if (!payload) return;
 
   const res = await fetch('/purchase-orders/' + poId, {
     method: 'PUT',
@@ -513,6 +528,37 @@ document.getElementById('poForm').addEventListener('submit', async e => {
 
   window.location.href = 'dashboard.html';
 });
+
+/* =========================
+   Save & Add Invoices
+   ========================= */
+const saveAndAddInvoicesBtn = document.getElementById('saveAndAddInvoicesBtn');
+if (saveAndAddInvoicesBtn) {
+  saveAndAddInvoicesBtn.addEventListener('click', async e => {
+    e.preventDefault();
+
+    const payload = await buildPOPayload();
+    if (!payload) return;
+
+    const res = await fetch('/purchase-orders/' + poId, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + token
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      showToast(err.error || 'Failed to save changes', 'error');
+      return;
+    }
+
+    showToast('Purchase Order saved successfully', 'success');
+    window.location.href = `invoice-entry.html?poId=${poId}`;
+  });
+}
 
 /* =========================
    Events

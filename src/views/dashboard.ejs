@@ -114,7 +114,7 @@
 
   <!-- Edit Purchase Order Modal -->
   <div id="editPOModal" class="modal" style="display:none;">
-    <div class="modal-dialog modal-dialog-scrollable" style="max-width: 600px;">
+    <div class="modal-dialog modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title">Edit Purchase Order</h5>
@@ -206,6 +206,7 @@
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" onclick="closeEditPOModal()">Cancel</button>
             <button type="submit" class="btn btn-primary">Save Changes</button>
+            <button type="button" id="editPOSaveAndAddInvoices" class="btn btn-primary">Save & Add Invoices</button>
           </div>
         </form>
       </div>
@@ -214,7 +215,7 @@
 
   <!-- Create Purchase Order Modal -->
   <div id="createPOModal" class="modal" style="display:none;">
-    <div class="modal-dialog modal-dialog-scrollable" style="max-width: 600px;">
+    <div class="modal-dialog modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title">Create Purchase Order</h5>
@@ -311,7 +312,8 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" onclick="closeCreatePOModal()">Cancel</button>
-            <button type="submit" class="btn btn-primary">Create Purchase Order</button>
+            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="button" id="poSaveAndAddInvoices" class="btn btn-primary">Save & Add Invoices</button>
           </div>
         </form>
       </div>
