@@ -5,14 +5,19 @@ const path = require('path');
 const {
   createBackup,
   createBackupSql,
+  createCTBackupData,
   validateBackup,
   validateSqlBackup,
+  validateCTBackupFile,
   restoreBackup,
   restoreBackupSql,
   listBackups,
   getBackupFile,
   deleteBackup,
-  saveBackup
+  saveBackup,
+  saveCTBackupFile,
+  loadCTBackupFile,
+  getCTBackupMetadata
 } = require('../services/backupService');
 const { authenticate } = require('../middleware/auth');
 const authorizeRoles = require('../middleware/authorizeRoles');
@@ -24,10 +29,10 @@ const upload = multer({
   storage,
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
   fileFilter: (req, file, cb) => {
-    if (file.originalname.endsWith('.sql')) {
+    if (file.originalname.endsWith('.sql') || file.originalname.endsWith('.CTBackup')) {
       cb(null, true);
     } else {
-      cb(new Error('Only .sql files are allowed'));
+      cb(new Error('Only .sql and .CTBackup files are allowed'));
     }
   }
 });
@@ -47,15 +52,46 @@ function cleanupRestoreJobs() {
 
 async function performRestore({ backup, sql, filename, force, req }) {
   let sqlContent = sql;
+  let ctBackup = null;
 
-  if (filename && !sqlContent) {
-    sqlContent = await getBackupFile(filename);
+  // Load backup from file if filename provided
+  if (filename && !sqlContent && !backup) {
+    const backupData = await getBackupFile(filename);
+    
+    // Check if it's a CTBackup or SQL
+    if (typeof backupData === 'object' && backupData.format === 'CTBackup') {
+      ctBackup = backupData;
+    } else if (typeof backupData === 'string') {
+      sqlContent = backupData;
+    } else {
+      // Try to treat it as JSON backup
+      backup = backupData;
+    }
   }
 
-  if (!backup && !sqlContent) {
+  if (!backup && !sqlContent && !ctBackup) {
     throw new Error('No backup data provided');
   }
 
+  // Validate CTBackup if provided
+  if (!force && ctBackup) {
+    try {
+      const report = await validateCTBackupFile(ctBackup);
+      if (!report.isValid || report.errors.length > 0) {
+        const err = new Error('CTBackup validation failed. Send force: true to proceed anyway.');
+        err.code = 'RESTORE_VALIDATION_REQUIRED';
+        err.report = report;
+        throw err;
+      }
+    } catch (validateErr) {
+      if (validateErr.code === 'RESTORE_VALIDATION_REQUIRED') {
+        throw validateErr;
+      }
+      throw new Error('CTBackup validation error: ' + validateErr.message);
+    }
+  }
+
+  // Validate regular backup if provided
   if (!force && backup) {
     try {
       const report = await validateBackup(backup);
@@ -78,12 +114,20 @@ async function performRestore({ backup, sql, filename, force, req }) {
   console.log('='.repeat(80));
   console.log('📝 User ID for audit:', req.user?.id);
   console.log('📝 Authenticated user:', req.user);
-  console.log('📝 Backup type:', sqlContent ? 'SQL' : 'JSON');
+  console.log('📝 Backup type:', ctBackup ? 'CTBackup' : (sqlContent ? 'SQL' : 'JSON'));
   if (filename) {
     console.log('📝 Restore filename:', filename);
   }
 
-  const result = sqlContent ? await restoreBackupSql(sqlContent) : await restoreBackup(backup);
+  // Perform restore based on backup type
+  let result;
+  if (ctBackup) {
+    result = await restoreBackup(ctBackup);
+  } else if (sqlContent) {
+    result = await restoreBackupSql(sqlContent);
+  } else {
+    result = await restoreBackup(backup);
+  }
 
   console.log('='.repeat(80));
   console.log('✅ RESTORE COMPLETED SUCCESSFULLY');
@@ -165,6 +209,138 @@ router.post(
 );
 
 /* ======================================================
+   CREATE ADVANCED BACKUP (SUPER ADMIN ONLY)
+   Creates a CTBackup with compression, validation, and signatures
+   ====================================================== */
+router.post(
+  '/create-advanced',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      console.log('📦 Creating advanced CTBackup with compression and validation...');
+      
+      // Create the data with CTBackup formatting
+      const ctBackupData = await createCTBackupData(req.user);
+      
+      // Save backup to disk with compression and limit management
+      const result = await saveCTBackupFile(ctBackupData);
+      console.log(`✅ Advanced backup saved as ${result.filename}`);
+      console.log(`📊 Compression: ${result.originalSize} → ${result.size} bytes (${result.compressionRatio}% reduction)`);
+      
+      if (result.deletedOldest) {
+        console.log(`🗑️ Deleted oldest backup: ${result.deletedOldest}`);
+      }
+      
+      // Log to audit trail (don't block the response)
+      try {
+        await logAudit({
+          table_name: 'system',
+          record_id: 0,
+          action: 'BACKUP_CREATE_ADVANCED',
+          old_data: null,
+          new_data: { 
+            filename: result.filename, 
+            timestamp: new Date(),
+            format: 'CTBackup',
+            compressionRatio: result.compressionRatio
+          },
+          changed_by: req.user.id,
+          req
+        });
+        console.log('✅ Audit log: BACKUP_CREATE_ADVANCED recorded');
+      } catch (auditErr) {
+        console.error('⚠️ Audit logging failed (non-fatal):', auditErr.message);
+      }
+      
+      res.json({ 
+        success: true, 
+        filename: result.filename,
+        format: 'CTBackup',
+        size: result.size,
+        originalSize: result.originalSize,
+        compressionRatio: result.compressionRatio,
+        deletedOldest: result.deletedOldest,
+        isAtLimit: result.isAtLimit,
+        message: 'Advanced backup created and saved successfully'
+      });
+    } catch (err) {
+      console.error('❌ Advanced backup error:', err);
+      res
+        .status(500)
+        .json({ error: 'Failed to create advanced backup: ' + err.message });
+    }
+  }
+);
+
+/* ======================================================
+   CREATE ADVANCED CTBACKUP (SUPER ADMIN ONLY)
+   Creates secure backup with metadata, checksums, and signatures
+   ====================================================== */
+router.post(
+  '/create-advanced',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      console.log('📦 Creating advanced CTBackup...');
+      const ctBackup = await createCTBackupData({
+        id: req.user.id,
+        username: req.user.username
+      });
+      
+      // Save CTBackup to disk
+      const result = await saveCTBackupFile(ctBackup);
+      console.log(`✅ CTBackup saved as ${result.filename}`);
+      console.log(`📊 Compression: ${result.originalSize} → ${result.size} bytes (${result.compressionRatio}% smaller)`);
+      
+      if (result.deletedOldest) {
+        console.log(`🗑️ Deleted oldest backup: ${result.deletedOldest}`);
+      }
+      
+      // Log to audit trail (don't block the response)
+      try {
+        await logAudit({
+          table_name: 'system',
+          record_id: 0,
+          action: 'BACKUP_CREATE_ADVANCED',
+          old_data: null,
+          new_data: { 
+            filename: result.filename, 
+            timestamp: new Date(),
+            totalRecords: ctBackup.metadata.totalRecords,
+            tableCount: Object.keys(ctBackup.tables).length
+          },
+          changed_by: req.user.id,
+          req
+        });
+        console.log('✅ Audit log: BACKUP_CREATE_ADVANCED recorded');
+      } catch (auditErr) {
+        console.error('⚠️ Audit logging failed (non-fatal):', auditErr.message);
+      }
+      
+      res.json({ 
+        success: true, 
+        filename: result.filename,
+        format: 'CTBackup',
+        size: result.size,
+        originalSize: result.originalSize,
+        compressionRatio: result.compressionRatio,
+        totalRecords: ctBackup.metadata.totalRecords,
+        deletedOldest: result.deletedOldest,
+        isAtLimit: result.isAtLimit,
+        message: 'Advanced backup created successfully'
+      });
+    } catch (err) {
+      console.error('❌ Advanced backup error:', err);
+      res
+        .status(500)
+        .json({ error: 'Failed to create advanced backup: ' + err.message });
+    }
+  }
+);
+
+/* ======================================================
    VALIDATE BACKUP (SUPER ADMIN ONLY)
    Returns a report of what will be restored without actually restoring
    ====================================================== */
@@ -234,6 +410,40 @@ router.post(
       res
         .status(500)
         .json({ error: 'Failed to validate SQL backup: ' + err.message });
+    }
+  }
+);
+
+/* ======================================================
+   VALIDATE CTBACKUP (SUPER ADMIN ONLY)
+   Full validation including checksums and signatures
+   ====================================================== */
+router.post(
+  '/validate-ctbackup',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      const { ctbackup } = req.body;
+
+      if (!ctbackup) {
+        return res
+          .status(400)
+          .json({ error: 'No CTBackup provided' });
+      }
+
+      console.log('📋 Validating CTBackup...');
+      const report = await validateCTBackupFile(ctbackup);
+      
+      res.json({ 
+        success: true, 
+        report 
+      });
+    } catch (err) {
+      console.error('❌ CTBackup validation error:', err);
+      res
+        .status(500)
+        .json({ error: 'Failed to validate CTBackup: ' + err.message });
     }
   }
 );
@@ -478,6 +688,7 @@ router.delete(
 
 /* ======================================================
    UPLOAD BACKUP (SUPER ADMIN ONLY)
+   Supports both SQL and CTBackup formats
    ====================================================== */
 router.post(
   '/upload',
@@ -490,8 +701,21 @@ router.post(
         return res.status(400).json({ error: 'No file uploaded' });
       }
       
-      const sqlContent = req.file.buffer.toString('utf-8');
-      const result = await saveBackup(sqlContent);
+      const filename = req.file.originalname;
+      let result;
+
+      // Handle CTBackup format
+      if (filename.endsWith('.CTBackup')) {
+        console.log('📦 Processing CTBackup upload...');
+        const ctBackupJson = req.file.buffer.toString('utf-8');
+        const ctBackup = JSON.parse(ctBackupJson);
+        result = await saveCTBackupFile(ctBackup);
+      } else {
+        // Handle SQL format
+        console.log('📦 Processing SQL backup upload...');
+        const sqlContent = req.file.buffer.toString('utf-8');
+        result = await saveBackup(sqlContent);
+      }
       
       // Log to audit trail (don't block the response)
       try {
@@ -500,7 +724,11 @@ router.post(
           record_id: 0,
           action: 'BACKUP_UPLOAD',
           old_data: null,
-          new_data: { filename: result.filename, timestamp: new Date() },
+          new_data: { 
+            filename: result.filename, 
+            timestamp: new Date(),
+            format: filename.endsWith('.CTBackup') ? 'CTBackup' : 'SQL'
+          },
           changed_by: req.user.id,
           req
         });
@@ -512,6 +740,8 @@ router.post(
       res.json({ 
         success: true, 
         filename: result.filename,
+        format: filename.endsWith('.CTBackup') ? 'CTBackup' : 'SQL',
+        size: result.size,
         deletedOldest: result.deletedOldest,
         isAtLimit: result.isAtLimit,
         message: 'Backup uploaded successfully'

@@ -94,15 +94,29 @@ function renderPage(page) {
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const pageBackups = allBackups.slice(startIndex, endIndex);
   
-  tableBody.innerHTML = pageBackups.map(backup => `
-    <tr>
-      <td><i class="bi bi-file-earmark-arrow-down me-2"></i><span class="font-monospace">${backup.filename}</span></td>
-      <td>${formatDate(backup.created)}</td>
-      <td>${formatFileSize(backup.size)}</td>
-      <td>
-        <div class="btn-group btn-group-sm" role="group">
-          <button class="btn btn-outline-primary" onclick="downloadBackup('${backup.filename}')" title="Download">
-            <i class="bi bi-download"></i>
+  tableBody.innerHTML = pageBackups.map(backup => {
+    const formatBadge = backup.type === 'ctbackup' 
+      ? '<span class="badge bg-success"><i class="bi bi-shield-check me-1"></i>CTBackup</span>'
+      : '<span class="badge bg-secondary"><i class="bi bi-file-earmark-code me-1"></i>SQL</span>';
+    
+    const metaInfo = backup.metadata 
+      ? `<small class="text-muted d-block">${backup.metadata.totalRecords} records from ${backup.tableCount} tables</small>`
+      : '';
+    
+    return `
+      <tr>
+        <td>
+          <i class="bi bi-file-earmark-arrow-down me-2"></i>
+          <span class="font-monospace">${backup.filename}</span>
+          ${metaInfo}
+        </td>
+        <td>${formatBadge}</td>
+        <td>${formatDate(backup.created)}</td>
+        <td>${formatFileSize(backup.size)}</td>
+        <td>
+          <div class="btn-group btn-group-sm" role="group">
+            <button class="btn btn-outline-primary" onclick="downloadBackup('${backup.filename}')" title="Download">
+              <i class="bi bi-download"></i>
           </button>
           <button class="btn btn-outline-success" onclick="openRestoreConfirmation('${backup.filename}')" title="Restore">
             <i class="bi bi-arrow-clockwise"></i>
@@ -113,12 +127,10 @@ function renderPage(page) {
         </div>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
   
-  // Update pagination info
-  document.getElementById('paginationStart').textContent = allBackups.length > 0 ? startIndex + 1 : 0;
-  document.getElementById('paginationEnd').textContent = Math.min(endIndex, allBackups.length);
-  document.getElementById('paginationTotal').textContent = allBackups.length;
+  renderPagination();
 }
 
 // Render pagination controls
@@ -165,6 +177,13 @@ function renderPagination() {
   `;
   
   paginationButtons.innerHTML = buttonsHtml;
+  
+  // Update pagination info
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, allBackups.length);
+  document.getElementById('paginationStart').textContent = allBackups.length > 0 ? startIndex + 1 : 0;
+  document.getElementById('paginationEnd').textContent = endIndex;
+  document.getElementById('paginationTotal').textContent = allBackups.length;
 }
 
 // Navigate to a specific page
@@ -213,6 +232,46 @@ async function proceedWithBackup() {
   }
 }
 
+// Create advanced CTBackup with security features
+async function createAdvancedBackup() {
+  // Check if at limit
+  if (allBackups.length >= MAX_BACKUPS) {
+    const oldestBackup = allBackups[allBackups.length - 1];
+    document.getElementById('oldestBackupName').textContent = oldestBackup.filename;
+    backupLimitModal.show();
+    return;
+  }
+  
+  await proceedWithAdvancedBackup();
+}
+
+// Proceed with advanced backup creation
+async function proceedWithAdvancedBackup() {
+  try {
+    if (backupLimitModal) {
+      backupLimitModal.hide();
+    }
+    
+    showToast('Creating advanced backup with validation...', 'info');
+    const response = await api('/backups/create-advanced', 'POST');
+    
+    const compressionMsg = ` Compressed: ${response.originalSize} → ${response.size} bytes (${response.compressionRatio}% smaller)`;
+    const deletedMsg = response.deletedOldest 
+      ? `\n🗑️ Deleted oldest: ${response.deletedOldest}`
+      : '';
+    
+    showToast(
+      `✅ Advanced backup created: ${response.filename}\n📊${compressionMsg}${deletedMsg}`,
+      'success'
+    );
+    
+    loadBackups();
+  } catch (err) {
+    console.error('Create advanced backup error:', err);
+    showToast('❌ Failed to create advanced backup: ' + err.message, 'error');
+  }
+}
+
 // Download backup
 async function downloadBackup(filename) {
   try {
@@ -258,8 +317,6 @@ async function openRestoreConfirmation(filename) {
     document.getElementById('validationContent').style.display = 'none';
     restorePreviewModal.show();
     
-    showToast('Loading backup file...', 'info');
-    
     // Download the backup content
     const response = await fetch(`/backups/download/${encodeURIComponent(filename)}`, {
       headers: { 'Authorization': 'Bearer ' + token }
@@ -273,7 +330,6 @@ async function openRestoreConfirmation(filename) {
     currentRestoreSqlContent = sqlContent;
     
     // Try to validate the backup
-    showToast('Analyzing backup...', 'info');
     await validateAndPreviewBackup(sqlContent);
     
     // Show content and hide spinner
@@ -300,15 +356,36 @@ async function openRestoreConfirmation(filename) {
 // Validate and preview backup
 async function validateAndPreviewBackup(sqlContent) {
   try {
+    // Show validation spinner
+    const spinner = document.getElementById('validationSpinner');
+    const content = document.getElementById('validationContent');
+    if (spinner) spinner.style.display = 'block';
+    if (content) content.style.display = 'none';
+
+    // Simulate analysis progress
+    updateAnalysisProgress(10, 'Parsing backup file...');
+    await wait(300);
+    updateAnalysisProgress(25, 'Checking format and structure...');
+    await wait(300);
+
     // For backward compatibility, try to validate as JSON backup format
     try {
+      updateAnalysisProgress(40, 'Attempting JSON parse...');
       const backupData = JSON.parse(sqlContent);
       
       if (backupData.metadata && backupData.tables) {
         // This is a JSON backup with structured data
+        updateAnalysisProgress(60, 'Validating CTBackup structure...');
         const report = await api('/backups/validate', 'POST', { backup: backupData });
         
         if (report && report.report) {
+          updateAnalysisProgress(100, 'Validation complete');
+          finishAnalysisProgress();
+          await wait(500);
+          
+          if (spinner) spinner.style.display = 'none';
+          if (content) content.style.display = 'block';
+          
           displayValidationReport(report.report);
           return;
         }
@@ -319,19 +396,43 @@ async function validateAndPreviewBackup(sqlContent) {
     
     // It's a SQL dump - validate using SQL validation endpoint
     try {
+      updateAnalysisProgress(80, 'Validating SQL backup...');
       const report = await api('/backups/validate-sql', 'POST', { sql: sqlContent });
       
       if (report && report.report) {
+        updateAnalysisProgress(100, 'Validation complete');
+        finishAnalysisProgress();
+        await wait(500);
+        
+        if (spinner) spinner.style.display = 'none';
+        if (content) content.style.display = 'block';
+        
         displaySqlValidationReport(report.report);
         return;
       }
     } catch (sqlValidationErr) {
       console.warn('SQL validation error:', sqlValidationErr);
+      updateAnalysisProgress(100, 'Validation complete');
+      finishAnalysisProgress();
+      await wait(500);
+      
+      if (spinner) spinner.style.display = 'none';
+      if (content) content.style.display = 'block';
+      
       displaySqlBackupPreview();
     }
     
   } catch (err) {
     console.error('Validation error:', err);
+    updateAnalysisProgress(100, 'Validation complete');
+    finishAnalysisProgress();
+    await wait(500);
+    
+    const spinner = document.getElementById('validationSpinner');
+    const content = document.getElementById('validationContent');
+    if (spinner) spinner.style.display = 'none';
+    if (content) content.style.display = 'block';
+    
     displaySqlBackupPreview();
   }
 }
@@ -480,11 +581,37 @@ function setRestoreUiRunningState(isRunning) {
   if (closeBtn) closeBtn.disabled = isRunning;
 }
 
-function updateRestoreProgress(percent, statusText, totalSeconds, variant = 'primary') {
+// Update analysis progress during backup validation
+function updateAnalysisProgress(percent, message = 'Analyzing backup contents...') {
+  const spinner = document.getElementById('validationSpinner');
+  const progressBar = document.getElementById('analysisProgressBar');
+  const meta = document.getElementById('analysisMeta');
+
+  if (!spinner || !progressBar || !meta) return;
+
+  spinner.style.display = 'block';
+  progressBar.style.width = `${Math.min(percent, 99)}%`;
+  progressBar.setAttribute('aria-valuenow', String(percent));
+  meta.textContent = message;
+}
+
+function finishAnalysisProgress() {
+  const progressBar = document.getElementById('analysisProgressBar');
+  if (progressBar) {
+    progressBar.style.width = '100%';
+    progressBar.setAttribute('aria-valuenow', '100');
+  }
+}
+
+function updateRestoreProgress(percent, statusText, totalSeconds, totalRecords = 0, currentRecords = 0, variant = 'info') {
   const progressSection = document.getElementById('restoreProgressSection');
   const progressBar = document.getElementById('restoreProgressBar');
+  const percentDisplay = document.getElementById('restorePercent');
   const status = document.getElementById('restoreProgressStatus');
   const elapsed = document.getElementById('restoreElapsedTime');
+  const recordCount = document.getElementById('restoreRecordCount');
+  const timeLeft = document.getElementById('restoreTimeLeft');
+  const phase = document.getElementById('restorePhase');
 
   if (!progressSection || !progressBar || !status || !elapsed) return;
 
@@ -495,7 +622,31 @@ function updateRestoreProgress(percent, statusText, totalSeconds, variant = 'pri
   progressBar.className = `progress-bar progress-bar-striped progress-bar-animated bg-${variant}`;
   progressBar.style.width = `${percent}%`;
   progressBar.setAttribute('aria-valuenow', String(percent));
-  progressBar.textContent = `${percent}%`;
+  if (percentDisplay) percentDisplay.textContent = `${percent}%`;
+
+  if (recordCount && currentRecords) {
+    recordCount.textContent = currentRecords.toLocaleString();
+  }
+
+  if (timeLeft && totalSeconds > 0 && percent < 100) {
+    const estimatedTotal = Math.max(60, (totalSeconds / percent) * 100);
+    const remaining = Math.max(0, estimatedTotal - totalSeconds);
+    if (remaining > 0) {
+      timeLeft.textContent = formatElapsedTime(Math.floor(remaining));
+    }
+  }
+
+  if (phase) {
+    if (percent < 20) {
+      phase.textContent = 'Phase: Validating & Preparing';
+    } else if (percent < 40) {
+      phase.textContent = 'Phase: Clearing Database';
+    } else if (percent < 85) {
+      phase.textContent = 'Phase: Restoring Data';
+    } else {
+      phase.textContent = 'Phase: Finalizing';
+    }
+  }
 }
 
 function startRestoreProgressUi() {
@@ -507,12 +658,17 @@ function startRestoreProgressUi() {
     restoreProgressInterval = null;
   }
 
-  updateRestoreProgress(5, 'Restore in progress...', 0, 'primary');
+  updateRestoreProgress(5, 'Initializing restore...', 0, 0, 0, 'info');
 
   restoreProgressInterval = setInterval(() => {
     const elapsedSeconds = Math.floor((Date.now() - restoreStartedAt) / 1000);
-    const estimatedPercent = Math.min(95, 5 + Math.floor(elapsedSeconds * 1.5));
-    updateRestoreProgress(estimatedPercent, 'Restore in progress...', elapsedSeconds, 'primary');
+    // Progress curve: faster at start, slower near completion
+    let estimatedPercent = 5 + Math.floor(elapsedSeconds * 1.5);
+    if (estimatedPercent > 25) estimatedPercent = 25 + ((estimatedPercent - 25) * 0.7);
+    if (estimatedPercent > 60) estimatedPercent = 60 + ((estimatedPercent - 60) * 0.3);
+    estimatedPercent = Math.min(95, estimatedPercent);
+    
+    updateRestoreProgress(estimatedPercent, 'Restore in progress...', elapsedSeconds, 0, 0, 'info');
   }, 1000);
 }
 
@@ -526,11 +682,9 @@ function finishRestoreProgressUi({ success, message }) {
     restoreProgressInterval = null;
   }
 
-  if (success) {
-    updateRestoreProgress(100, message || 'Restore completed successfully', elapsedSeconds, 'success');
-  } else {
-    updateRestoreProgress(100, message || 'Restore failed', elapsedSeconds, 'danger');
-  }
+  const variant = success ? 'success' : 'danger';
+  const finalMessage = message || (success ? 'Restore completed successfully' : 'Restore failed');
+  updateRestoreProgress(100, finalMessage, elapsedSeconds, 0, 0, variant);
 
   setRestoreUiRunningState(false);
 }
@@ -682,8 +836,8 @@ async function uploadBackup() {
     return;
   }
   
-  if (!file.name.endsWith('.sql')) {
-    showToast('Only .sql files are allowed', 'error');
+  if (!file.name.endsWith('.sql') && !file.name.endsWith('.CTBackup')) {
+    showToast('Only .sql and .CTBackup files are allowed', 'error');
     return;
   }
   

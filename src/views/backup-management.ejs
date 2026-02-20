@@ -10,6 +10,9 @@
         <button class="btn btn-sm btn-primary" onclick="createBackup()">
           <i class="bi bi-download me-1"></i> Create Backup
         </button>
+        <button class="btn btn-sm btn-success" onclick="createAdvancedBackup()" title="Create secure backup with validation">
+          <i class="bi bi-shield-check me-1"></i> Advanced Backup
+        </button>
         <button class="btn btn-sm btn-secondary" onclick="openUploadModal()">
           <i class="bi bi-upload me-1"></i> Upload Backup
         </button>
@@ -37,6 +40,7 @@
           <thead>
             <tr>
               <th>Filename</th>
+              <th>Format</th>
               <th>Created</th>
               <th>Size</th>
               <th>Actions</th>
@@ -44,7 +48,7 @@
           </thead>
           <tbody id="backupsTableBody">
             <tr>
-              <td colspan="4" class="text-center text-muted py-4">
+              <td colspan="5" class="text-center text-muted py-4">
                 No backups found. Create your first backup above.
               </td>
             </tr>
@@ -82,8 +86,8 @@
           <strong>Warning:</strong> Only upload backup files created by this application.
         </div>
         <div class="mb-3">
-          <label for="backupFileInput" class="form-label">Select Backup File (.sql)</label>
-          <input type="file" class="form-control" id="backupFileInput" accept=".sql">
+          <label for="backupFileInput" class="form-label">Select Backup File (.sql or .CTBackup)</label>
+          <input type="file" class="form-control" id="backupFileInput" accept=".sql,.CTBackup">
         </div>
       </div>
       <div class="modal-footer">
@@ -106,30 +110,72 @@
       </div>
       <div class="modal-body">
         <div id="validationSpinner" class="text-center py-5" style="display: none;">
-          <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
+          <div class="mb-3">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
           </div>
-          <p class="mt-2">Analyzing backup contents...</p>
+          <p class="fw-bold">Analyzing backup contents...</p>
+          <div class="progress mt-3" style="height: 6px;">
+            <div
+              id="analysisProgressBar"
+              class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+              style="width: 0%"
+              role="progressbar"
+              aria-valuenow="0"
+              aria-valuemin="0"
+              aria-valuemax="100"
+            ></div>
+          </div>
+          <small id="analysisMeta" class="text-muted mt-2 d-block">Validating backup structure...</small>
         </div>
         
         <div id="validationContent" style="display: none;">
           <p class="mb-2"><strong>Backup File:</strong></p>
           <p id="previewFilename" class="font-monospace bg-light p-2 rounded mb-3"></p>
 
-          <div id="restoreProgressSection" class="alert alert-primary" style="display: none;">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <strong id="restoreProgressStatus">Restore in progress...</strong>
-              <span id="restoreElapsedTime" class="font-monospace">00:00</span>
+          <div id="restoreProgressSection" class="alert alert-info border-info" style="display: none;">
+            <div class="mb-3">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                  <strong id="restoreProgressStatus">Initializing restore...</strong>
+                  <small id="restorePhase" class="d-block text-muted">Phase: Starting</small>
+                </div>
+                <span id="restoreElapsedTime" class="font-monospace fw-bold">00:00</span>
+              </div>
+              <div class="progress" role="progressbar" aria-label="Restore progress" aria-valuemin="0" aria-valuemax="100" style="height: 24px;">
+                <div
+                  id="restoreProgressBar"
+                  class="progress-bar progress-bar-striped progress-bar-animated bg-info"
+                  style="width: 0%"
+                  aria-valuenow="0"
+                  role="progressbar"
+                  aria-valuenow="0"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                >
+                  <span id="restorePercent">0%</span>
+                </div>
+              </div>
+              <small class="text-muted mt-2 d-block">
+                <i class="bi bi-info-circle me-1"></i>
+                Restoring database backup. Please keep this page open.
+              </small>
             </div>
-            <div class="progress" role="progressbar" aria-label="Restore progress" aria-valuemin="0" aria-valuemax="100">
-              <div
-                id="restoreProgressBar"
-                class="progress-bar progress-bar-striped progress-bar-animated"
-                style="width: 0%"
-                aria-valuenow="0"
-              >0%</div>
+            <div id="restoreStats" class="row g-2 mt-2" style="font-size: 0.9rem;">
+              <div class="col-md-4">
+                <span class="text-muted">Records Restored:</span>
+                <br><strong id="restoreRecordCount">0</strong>
+              </div>
+              <div class="col-md-4">
+                <span class="text-muted">Tables:</span>
+                <br><strong><span id="restoreTableCount">0</span>/0</strong>
+              </div>
+              <div class="col-md-4">
+                <span class="text-muted">Est. Time Left:</span>
+                <br><strong id="restoreTimeLeft">-- </strong>
+              </div>
             </div>
-            <small class="text-muted mt-2 d-block">Restoring database backup. Please keep this page open.</small>
           </div>
           
           <div id="validationWarnings" style="display: none;">

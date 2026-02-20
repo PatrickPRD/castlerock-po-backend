@@ -1,6 +1,13 @@
 const pool = require('../db');
 const fs = require('fs').promises;
 const path = require('path');
+const {
+  createCTBackup,
+  validateCTBackup,
+  saveCTBackupFile: saveCTBackupFileImpl,
+  loadCTBackupFile,
+  getCTBackupMetadata
+} = require('./ctBackupService');
 
 const BACKUP_DIR = path.join(__dirname, '../../backups');
 
@@ -145,6 +152,38 @@ async function createBackup() {
 }
 
 /**
+ * Create a CTBackup file (advanced format with compression and validation)
+ * @param {Object} user - User creating the backup
+ * @returns {Promise<Object>} CTBackup structure
+ */
+async function createCTBackupData(user = {}) {
+  const connection = await pool.getConnection();
+
+  try {
+    const backup = {
+      metadata: {
+        version: '1.0',
+        createdAt: new Date().toISOString(),
+        database: process.env.DB_NAME
+      },
+      tables: {}
+    };
+
+    // Get all backup tables
+    for (const table of BACKUP_TABLES) {
+      const [rows] = await connection.query(`SELECT * FROM ${table}`);
+      backup.tables[table] = rows;
+    }
+
+    // Create advanced CTBackup with metadata and signatures
+    const ctBackup = await createCTBackup(backup, user);
+    return ctBackup;
+  } finally {
+    connection.release();
+  }
+}
+
+/**
  * Create a SQL backup file
  * Returns SQL INSERT statements for all data except users
  */
@@ -280,6 +319,45 @@ async function validateBackup(backupData) {
 }
 
 /**
+ * Validate CTBackup file and generate validation report
+ * @param {Object} ctBackup - CTBackup object
+ * @returns {Promise<Object>} Validation report
+ */
+async function validateCTBackupFile(ctBackup) {
+  try {
+    // Use ctBackupService validation
+    const validationReport = await validateCTBackup(ctBackup);
+    
+    // Add table summaries
+    const tableReport = {
+      metadata: ctBackup.metadata,
+      tables: {},
+      warnings: validationReport.warnings,
+      errors: validationReport.errors,
+      totalRecords: validationReport.totalRecords,
+      checksumValidation: validationReport.checksumValidation,
+      signatureValidation: validationReport.signatureValidation,
+      isValid: validationReport.valid
+    };
+
+    // Add per-table info
+    for (const table of RESTORE_ORDER) {
+      const rows = ctBackup.tables[table];
+      if (rows) {
+        tableReport.tables[table] = {
+          rowCount: rows.length,
+          status: validationReport.tables[table]?.checksumValid ? 'VALID' : 'CHECKSUM_MISMATCH'
+        };
+      } else {
+        tableReport.warnings.push(`Table '${table}' not found in backup`);
+      }
+    }
+
+    return tableReport;
+  } catch (err) {
+    throw new Error(`CTBackup validation failed: ${err.message}`);
+  }
+}/**
  * Restore a backup
  * Clears all data except users, then restores from backup
  */
@@ -296,9 +374,10 @@ async function restoreBackup(backupData) {
     await connection.beginTransaction();
 
     try {
-      // Disable foreign key checks
+      // Disable foreign key checks and unique constraint checks
       await connection.query('SET FOREIGN_KEY_CHECKS=0');
-      console.log('🔓 Foreign key checks disabled');
+      await connection.query('SET UNIQUE_CHECKS=0');
+      console.log('🔓 Foreign key and unique constraint checks disabled');
 
       // Clear all tables except users
       console.log('🧹 Clearing database...');
@@ -340,6 +419,12 @@ async function restoreBackup(backupData) {
             continue;
           }
 
+          // Create a map of column types for date conversion
+          const columnTypeMap = {};
+          columns.forEach(col => {
+            columnTypeMap[col.Field] = col.Type.toLowerCase();
+          });
+
           const placeholders = backupColumns.map(() => '?').join(',');
           // Use REPLACE instead of INSERT to handle duplicates automatically
           // REPLACE will delete any existing row with the same unique key and insert the new one
@@ -349,7 +434,34 @@ async function restoreBackup(backupData) {
           let replacedCount = 0;
           for (const row of rows) {
             try {
-              const values = backupColumns.map(col => row[col]);
+              const values = backupColumns.map(col => {
+                let value = row[col];
+                
+                // Convert ISO date strings to MySQL format for DATE/DATETIME/TIMESTAMP columns
+                const colType = columnTypeMap[col];
+                if (value && (colType === 'date' || colType.startsWith('datetime') || colType === 'timestamp')) {
+                  if (typeof value === 'string' && value.includes('T')) {
+                    if (colType === 'date') {
+                      // For DATE: extract just YYYY-MM-DD
+                      value = value.split('T')[0]; // 2026-02-14T10:14:00.000Z → 2026-02-14
+                    } else {
+                      // For DATETIME/TIMESTAMP: convert T to space and remove .000Z
+                      // 2026-02-14T10:14:00.000Z → 2026-02-14 10:14:00
+                      value = value.split('.')[0].replace('T', ' ');
+                    }
+                  } else if (value instanceof Date) {
+                    if (colType === 'date') {
+                      // Convert Date object to YYYY-MM-DD
+                      value = value.toISOString().split('T')[0];
+                    } else {
+                      // Convert Date object to YYYY-MM-DD HH:MM:SS
+                      value = value.toISOString().split('.')[0].replace('T', ' ');
+                    }
+                  }
+                }
+                
+                return value;
+              });
               const result = await connection.query(sql, values);
               // result[0] has affectedRows: 1 for INSERT, 2 for REPLACE
               if (result[0].affectedRows === 2) {
@@ -383,8 +495,9 @@ async function restoreBackup(backupData) {
         }
       }
 
-      // Re-enable foreign key checks
+      // Re-enable foreign key checks and unique constraints
       await connection.query('SET FOREIGN_KEY_CHECKS=1');
+      await connection.query('SET UNIQUE_CHECKS=1');
 
       // Commit transaction
       await connection.commit();
@@ -395,6 +508,12 @@ async function restoreBackup(backupData) {
         report: restoreReport
       };
     } catch (err) {
+      try {
+        await connection.query('SET FOREIGN_KEY_CHECKS=1');
+        await connection.query('SET UNIQUE_CHECKS=1');
+      } catch (resetErr) {
+        // ignore error
+      }
       await connection.rollback();
       throw err;
     }
@@ -412,21 +531,26 @@ async function restoreBackupSql(sqlText) {
     throw new Error('Invalid SQL backup: empty file');
   }
 
+  // Convert INSERT statements to REPLACE to handle duplicate key errors
+  const modifiedSql = sqlText.replace(/^(\s*)INSERT INTO/gim, '$1REPLACE INTO');
+
   const connection = await pool.getConnection();
 
   try {
     console.log('🔓 Foreign key checks disabled (SQL restore)');
     await connection.query('SET FOREIGN_KEY_CHECKS=0');
+    await connection.query('SET UNIQUE_CHECKS=0');
     
     console.log('🧹 Clearing database before SQL restore...');
     await clearDatabaseExceptUsers(connection);
     console.log('✅ Database cleared');
 
     console.log('📥 Executing SQL restore...');
-    await connection.query(sqlText);
+    await connection.query(modifiedSql);
     console.log('✅ SQL restore completed');
     
     await connection.query('SET FOREIGN_KEY_CHECKS=1');
+    await connection.query('SET UNIQUE_CHECKS=1');
 
     return { 
       success: true, 
@@ -436,6 +560,7 @@ async function restoreBackupSql(sqlText) {
     console.error('❌ SQL restore error:', err.message);
     try {
       await connection.query('SET FOREIGN_KEY_CHECKS=1');
+      await connection.query('SET UNIQUE_CHECKS=1');
     } catch (restoreErr) {
       // ignore secondary error
     }
@@ -486,21 +611,59 @@ async function validateSqlBackup(sqlContent) {
   return report;
 }
 
+/**
+ * Save a CTBackup file with backup limit management
+ * @param {Object} ctBackup - The CTBackup object
+ * @returns {Promise<Object>} Save result
+ */
+async function saveCTBackupFile(ctBackup) {
+  try {
+    const MAX_BACKUPS = 20;
+    const existingBackups = await listBackups();
+    let deletedOldest = null;
+    
+    // Delete oldest backup if at limit
+    if (existingBackups.length >= MAX_BACKUPS) {
+      const oldestBackup = existingBackups[existingBackups.length - 1];
+      await deleteBackup(oldestBackup.filename);
+      deletedOldest = oldestBackup.filename;
+      console.log(`🗑️ Deleted oldest backup to maintain limit: ${oldestBackup.filename}`);
+    }
+    
+    // Save the CTBackup file using the imported implementation
+    const result = await saveCTBackupFileImpl(ctBackup);
+    
+    return {
+      ...result,
+      deletedOldest,
+      isAtLimit: existingBackups.length >= MAX_BACKUPS
+    };
+  } catch (err) {
+    console.error('Error saving CTBackup:', err);
+    throw err;
+  }
+}
+
 module.exports = {
   createBackup,
   createBackupSql,
+  createCTBackupData,
   validateBackup,
   validateSqlBackup,
+  validateCTBackupFile,
   restoreBackup,
   restoreBackupSql,
   listBackups,
   getBackupFile,
   deleteBackup,
-  saveBackup
+  saveBackup,
+  saveCTBackupFile,
+  loadCTBackupFile: require('./ctBackupService').loadCTBackupFile,
+  getCTBackupMetadata: require('./ctBackupService').getCTBackupMetadata
 };
 
 /**
- * List all backup files in the backups directory
+ * List all backup files in the backups directory (both SQL and CTBackup formats)
  */
 async function listBackups() {
   try {
@@ -509,17 +672,33 @@ async function listBackups() {
     
     const backups = [];
     for (const file of files) {
-      if (!file.endsWith('.sql')) continue;
+      // Support both old SQL and new CTBackup formats
+      if (!file.endsWith('.sql') && !file.endsWith('.CTBackup')) continue;
       
       const filePath = path.join(BACKUP_DIR, file);
       const stats = await fs.stat(filePath);
       
-      backups.push({
+      const backup = {
         filename: file,
         size: stats.size,
         created: stats.mtime,
-        type: 'sql'
-      });
+        type: file.endsWith('.CTBackup') ? 'ctbackup' : 'sql'
+      };
+
+      // For CTBackup files, try to load metadata
+      if (backup.type === 'ctbackup') {
+        try {
+          const metadata = await getCTBackupMetadata(file);
+          backup.metadata = metadata.metadata;
+          backup.tableCount = metadata.tableCount;
+          backup.formatVersion = metadata.version;
+        } catch (err) {
+          console.warn(`Could not read metadata for ${file}:`, err.message);
+          backup.metadata = null;
+        }
+      }
+      
+      backups.push(backup);
     }
     
     // Sort by creation date, newest first
@@ -533,7 +712,7 @@ async function listBackups() {
 }
 
 /**
- * Get a specific backup file content
+ * Get a specific backup file content (handles both SQL and CTBackup formats)
  */
 async function getBackupFile(filename) {
   // Sanitize filename to prevent directory traversal
@@ -546,7 +725,14 @@ async function getBackupFile(filename) {
   } catch (err) {
     throw new Error('Backup file not found');
   }
-  
+
+  // Handle CTBackup format
+  if (safeName.endsWith('.CTBackup')) {
+    const backup = await loadCTBackupFile(safeName);
+    return backup;
+  }
+
+  // Handle SQL format (backward compatibility)
   const content = await fs.readFile(filePath, 'utf-8');
   return content;
 }
