@@ -36,6 +36,20 @@ async function downloadPOPDF(poId, buttonEl) {
     // Show loading state
     setButtonLoading(buttonEl, true);
 
+    // First, fetch PO data to get the PO number
+    let poNumber = null;
+    try {
+      const poResponse = await fetch(`/purchase-orders/${poId}`, {
+        headers: { Authorization: 'Bearer ' + token }
+      });
+      if (poResponse.ok) {
+        const poData = await poResponse.json();
+        poNumber = poData.po_number;
+      }
+    } catch (err) {
+      console.warn('Could not fetch PO number, using ID as fallback:', err);
+    }
+
     // Fetch PDF
     const response = await fetch(`/pdfs/po/${poId}`, {
       headers: { Authorization: 'Bearer ' + token }
@@ -52,7 +66,7 @@ async function downloadPOPDF(poId, buttonEl) {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `PO-${poId}.pdf`;
+    link.download = `PO-${poNumber || poId}.pdf`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
