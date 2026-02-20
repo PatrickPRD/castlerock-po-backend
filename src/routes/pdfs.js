@@ -336,6 +336,7 @@ router.get(
         start_date: formatDate(startDate),
         end_date: formatDate(endDate),
         leave_year_start: leaveYearStart,
+        leave_year: String(selectedStartYear),
         allowances: {
           paid_sick: paidSickAllowance,
           annual_leave: annualLeaveAllowance,

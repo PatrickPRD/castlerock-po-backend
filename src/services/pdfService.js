@@ -921,7 +921,7 @@ class PDFService {
 
             ${leaveSummary ? `
               <div class="section">
-                <div class="section-title">Leave Information (${this.escapeHtml(leaveSummary.leave_year_start || '01-01')})</div>
+                <div class="section-title">Leave Information (${this.escapeHtml(leaveSummary.leave_year || '01-01')})</div>
                 <div class="field" style="margin-bottom: 8px; font-size: 11px; color: #666;">
                   ${this.escapeHtml(leaveSummary.start_date || '')} to ${this.escapeHtml(leaveSummary.end_date || '')}
                 </div>
