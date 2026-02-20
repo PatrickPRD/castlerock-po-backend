@@ -264,6 +264,7 @@ function renderWorkers() {
         </div>
         <div class="details-actions">
           <button class="btn btn-outline-primary" onclick="event.stopPropagation(); editWorker(${worker.id})">Edit</button>
+          <button class="btn btn-outline-secondary" onclick="event.stopPropagation(); downloadWorkerPDF(${worker.id}, '${escapeHtml(worker.first_name)} ${escapeHtml(worker.last_name)}');"><i class="bi bi-file-pdf"></i> PDF</button>
         </div>
       </td>
     `;
@@ -475,6 +476,35 @@ async function saveWorker() {
     loadWorkers();
   } catch (err) {
     showToast(err.message || 'Failed to save worker', 'error');
+  }
+}
+
+async function downloadWorkerPDF(workerId, workerName) {
+  try {
+    showToast('Generating PDF...', 'info');
+    const res = await fetch(`/pdfs/worker/${workerId}`, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+
+    if (!res.ok) {
+      showToast('Failed to download worker PDF', 'error');
+      return;
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Worker-${workerName.replace(/\s+/g, '-')}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    showToast('Worker PDF downloaded', 'success');
+  } catch (err) {
+    console.error('Failed to download worker PDF:', err);
+    showToast('Failed to download worker PDF', 'error');
   }
 }
 
