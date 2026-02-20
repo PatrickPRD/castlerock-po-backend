@@ -5,6 +5,14 @@ if (!token || !['super_admin', 'admin'].includes(role)) {
   location.href = 'dashboard.html';
 }
 
+// Show Download Excel and Bulk Upload buttons only for super_admin
+if (role === 'super_admin') {
+  const downloadBtn = document.getElementById('downloadExcelBtn');
+  const bulkUploadBtn = document.getElementById('bulkUploadBtnAction');
+  if (downloadBtn) downloadBtn.style.display = '';
+  if (bulkUploadBtn) bulkUploadBtn.style.display = '';
+}
+
 const workerTable = document.getElementById('workerTable');
 const showInactiveCheckbox = document.getElementById('showInactiveWorkers');
 const bulkUploadModal = document.getElementById('bulkUploadModal');
@@ -544,7 +552,7 @@ if (showInactiveCheckbox) {
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
-  // Hide financial fields and tool for non-super_admin users
+  // Hide financial fields for non-super_admin users
   if (role !== 'super_admin') {
     const weeklyPayField = document.getElementById('workerWeeklyPay');
     const weeklyCostField = document.getElementById('workerWeeklyCost');
@@ -555,17 +563,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (weeklyCostField && weeklyCostField.parentElement) {
       weeklyCostField.parentElement.style.display = 'none';
     }
-
-    // Hide Download Excel and Bulk Upload buttons
-    const downloadBtn = Array.from(document.querySelectorAll('button')).find(btn => 
-      btn.textContent.includes('Download Excel')
-    );
-    const bulkUploadBtn = Array.from(document.querySelectorAll('button')).find(btn => 
-      btn.textContent.includes('Bulk Upload')
-    );
-    
-    if (downloadBtn) downloadBtn.style.display = 'none';
-    if (bulkUploadBtn) bulkUploadBtn.style.display = 'none';
   }
 
   try {

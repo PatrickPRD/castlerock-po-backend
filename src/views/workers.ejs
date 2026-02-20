@@ -10,10 +10,10 @@
           <input type="checkbox" id="showInactiveWorkers">
           Show ceased workers
         </label>
-        <button class="btn btn-outline-secondary" onclick="downloadWorkerTemplate()">
+        <button class="btn btn-outline-secondary" id="downloadExcelBtn" onclick="downloadWorkerTemplate()" style="display:none;">
           Download Excel
         </button>
-        <button class="btn btn-outline-secondary" onclick="openBulkUploadModal()">
+        <button class="btn btn-outline-secondary" id="bulkUploadBtnAction" onclick="openBulkUploadModal()" style="display:none;">
           Bulk Upload
         </button>
         <button class="btn btn-primary" onclick="openWorkerModal()">
