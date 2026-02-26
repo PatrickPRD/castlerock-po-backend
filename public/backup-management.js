@@ -63,7 +63,7 @@ async function loadBackups() {
       tableBody.innerHTML = `
         <tr>
           <td colspan="4" class="text-center text-muted py-4">
-            No backups found. Create your first backup above.
+            No backups found. Upload a backup file to begin.
           </td>
         </tr>
       `;

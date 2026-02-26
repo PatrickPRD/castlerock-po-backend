@@ -7,11 +7,8 @@
     <div class="card-header d-flex justify-content-between align-items-center">
       <h3 class="mb-0"><i class="bi bi-database me-2"></i>Database Backups</h3>
       <div class="d-flex gap-2">
-        <button class="btn btn-sm btn-primary" onclick="createBackup()">
+        <button class="btn btn-sm btn-primary" onclick="createAdvancedBackup()" title="Create structured JSON backup">
           <i class="bi bi-download me-1"></i> Create Backup
-        </button>
-        <button class="btn btn-sm btn-success" onclick="createAdvancedBackup()" title="Create secure backup with validation">
-          <i class="bi bi-shield-check me-1"></i> Advanced Backup
         </button>
         <button class="btn btn-sm btn-secondary" onclick="openUploadModal()">
           <i class="bi bi-upload me-1"></i> Upload Backup
@@ -49,7 +46,7 @@
           <tbody id="backupsTableBody">
             <tr>
               <td colspan="5" class="text-center text-muted py-4">
-                No backups found. Create your first backup above.
+                No backups found. Upload a backup file to begin.
               </td>
             </tr>
           </tbody>
