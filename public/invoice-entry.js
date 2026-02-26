@@ -132,7 +132,7 @@ async function loadPO() {
   try {
     const res = await authenticatedFetch(`/purchase-orders/${poId}`);
     if (!res.ok) {
-      alert('Failed to load purchase order');
+      showToast('Failed to load purchase order', 'error');
       location.href = 'dashboard.html';
       return;
     }
@@ -141,7 +141,7 @@ async function loadPO() {
     renderInvoices();
   } catch (err) {
     console.error('Error loading PO:', err);
-    alert('Failed to load purchase order');
+    showToast('Failed to load purchase order', 'error');
     location.href = 'dashboard.html';
   }
 }
@@ -281,15 +281,21 @@ invoiceForm.addEventListener('submit', async e => {
     });
 
     if (!res.ok) {
-      alert('Failed to save invoice');
+      let message = 'Failed to save invoice';
+      try {
+        const err = await res.json();
+        if (err && err.error) message = err.error;
+      } catch (_) {}
+      showToast(message, 'error');
       return;
     }
 
     closeInvoiceModal();
+    showToast('Invoice saved', 'success');
     loadPO();
   } catch (err) {
     console.error('Error saving invoice:', err);
-    alert('Failed to save invoice');
+    showToast('Failed to save invoice', 'error');
   }
 });
 
@@ -303,14 +309,15 @@ async function deleteInvoice(id) {
     });
 
     if (!res.ok) {
-      alert('Failed to delete invoice');
+      showToast('Failed to delete invoice', 'error');
       return;
     }
 
+    showToast('Invoice deleted', 'success');
     loadPO();
   } catch (err) {
     console.error('Error deleting invoice:', err);
-    alert('Failed to delete invoice');
+    showToast('Failed to delete invoice', 'error');
   }
 }
 

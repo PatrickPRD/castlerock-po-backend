@@ -280,7 +280,7 @@ CREATE TABLE `po_line_items` (
 CREATE TABLE `invoices` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `purchase_order_id` INT NOT NULL,
-  `invoice_number` VARCHAR(100) NOT NULL UNIQUE,
+  `invoice_number` VARCHAR(100) NOT NULL,
   `invoice_date` DATE NOT NULL,
   `net_amount` DECIMAL(15, 2) NOT NULL,
   `vat_rate` DECIMAL(5, 4) NOT NULL DEFAULT 0.2300 COMMENT 'Valid rates: 0.0000, 0.1350, 0.2300',
@@ -294,6 +294,7 @@ CREATE TABLE `invoices` (
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (`purchase_order_id`) REFERENCES `purchase_orders`(`id`) ON DELETE RESTRICT,
   FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE RESTRICT,
+  UNIQUE KEY `uniq_invoice_number_per_po` (`purchase_order_id`, `invoice_number`),
   INDEX `idx_invoice_number` (`invoice_number`),
   INDEX `idx_purchase_order_id` (`purchase_order_id`),
   INDEX `idx_status` (`status`),
