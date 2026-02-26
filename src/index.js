@@ -164,6 +164,44 @@ async function ensureSchemaReady() {
   }
 }
 
+async function ensureInvoiceUniquenessPerPO() {
+  console.log('🔍 Checking invoice uniqueness indexes...');
+
+  const [indexRows] = await pool.query(`
+    SELECT
+      INDEX_NAME,
+      NON_UNIQUE,
+      GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX SEPARATOR ',') AS columns_csv
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE()
+      AND table_name = 'invoices'
+    GROUP BY INDEX_NAME, NON_UNIQUE
+  `);
+
+  const hasCompositeUnique = indexRows.some(
+    row => Number(row.NON_UNIQUE) === 0 && row.columns_csv === 'purchase_order_id,invoice_number'
+  );
+
+  const legacyGlobalUniqueIndexes = indexRows
+    .filter(row => Number(row.NON_UNIQUE) === 0 && row.columns_csv === 'invoice_number' && row.INDEX_NAME !== 'PRIMARY')
+    .map(row => row.INDEX_NAME);
+
+  for (const indexName of legacyGlobalUniqueIndexes) {
+    const safeIndexName = String(indexName).replace(/`/g, '');
+    console.log(`🛠️  Dropping legacy unique index: ${safeIndexName}`);
+    await pool.query(`ALTER TABLE invoices DROP INDEX \`${safeIndexName}\``);
+  }
+
+  if (!hasCompositeUnique) {
+    console.log('🛠️  Adding composite unique index: uniq_invoice_number_per_po');
+    await pool.query(
+      'ALTER TABLE invoices ADD UNIQUE KEY uniq_invoice_number_per_po (purchase_order_id, invoice_number)'
+    );
+  }
+
+  console.log('✅ Invoice uniqueness index verified (per PO)');
+}
+
 // Start server
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
@@ -171,6 +209,7 @@ const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
 async function startServer() {
   console.log('🔧 Starting server initialization...');
   await ensureSchemaReady();
+  await ensureInvoiceUniquenessPerPO();
   console.log('✅ Schema ready, starting HTTP listener...');
 
   app.listen(PORT, HOST, () => {
