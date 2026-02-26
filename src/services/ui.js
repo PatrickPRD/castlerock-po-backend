@@ -186,19 +186,31 @@ window.showToast = function (message, type = 'success', timeout = 5000) {
 
 
 /* ---------- Confirm Dialog ---------- */
-window.confirmDialog = function (message) {
+window.confirmDialog = function (message, options = {}) {
   ensureUI();
 
   return new Promise(resolve => {
+    const {
+      okText = 'Confirm',
+      cancelText = 'Cancel',
+      showCancel = true,
+      disableBackdropClose = false,
+      okClass = 'btn btn-danger'
+    } = options || {};
+
     const modal = document.getElementById('ui-confirm');
     const backdrop = document.getElementById('ui-backdrop');
     const msg = document.getElementById('ui-confirm-message');
     const ok = document.getElementById('ui-confirm-ok');
     const cancel = document.getElementById('ui-confirm-cancel');
 
-    if (!modal || !backdrop || !msg) return resolve(false);
+    if (!modal || !backdrop || !msg || !ok || !cancel) return resolve(false);
 
     msg.textContent = message;
+    ok.textContent = okText;
+    ok.className = okClass;
+    cancel.textContent = cancelText;
+    cancel.style.display = showCancel ? '' : 'none';
 
     backdrop.className = 'ui-backdrop neutral active';
 
@@ -218,8 +230,8 @@ window.confirmDialog = function (message) {
     }
 
     ok.onclick = () => cleanup(true);
-    cancel.onclick = () => cleanup(false);
-    backdrop.onclick = () => cleanup(false);
+    cancel.onclick = showCancel ? () => cleanup(false) : null;
+    backdrop.onclick = disableBackdropClose ? null : () => cleanup(false);
   });
 };
 

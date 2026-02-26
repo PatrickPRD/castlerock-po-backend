@@ -338,7 +338,11 @@ router.post(
           req
         });
         
-        res.json({ success: true, poNumber });
+        res.status(201).json({
+          success: true,
+          poNumber,
+          id: result.insertId
+        });
       } catch (error) {
         await conn.rollback();
         throw error;

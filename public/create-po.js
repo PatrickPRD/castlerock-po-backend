@@ -350,6 +350,32 @@ async function buildPOPayload() {
   return payload;
 }
 
+async function resolveCreatedPOId(data) {
+  if (!data || typeof data !== 'object') return null;
+
+  const directId = data.id ?? data.poId ?? data.insertId;
+  if (directId) return directId;
+
+  const poNumber = data.poNumber;
+  if (!poNumber) return null;
+
+  try {
+    const res = await fetch('/purchase-orders', {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+
+    if (!res.ok) return null;
+
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return null;
+
+    const match = rows.find(row => row && row.po_number === poNumber);
+    return match ? match.id : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 /* =========================
    Submit PO
    ========================= */
@@ -421,7 +447,11 @@ document.getElementById('saveAndAddInvoicesBtn').addEventListener('click', async
     })
   );
 
-  const poId = data.id;
+  const poId = await resolveCreatedPOId(data);
+  if (!poId) {
+    showToast('Purchase order created but could not open invoice entry', 'error');
+    return;
+  }
   window.location.href = `invoice-entry.html?poId=${poId}`;
 });
 });

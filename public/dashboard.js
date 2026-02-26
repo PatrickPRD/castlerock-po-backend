@@ -17,6 +17,8 @@ const dateFrom = document.getElementById("dateFrom");
 const dateTo = document.getElementById("dateTo");
 const valueMin = document.getElementById("valueMin");
 const valueMax = document.getElementById("valueMax");
+const poSearchInput = document.getElementById("poSearch");
+const poSearchClearBtn = document.getElementById("poSearchClear");
 const totalNetEl = document.getElementById("totalNet");
 const totalGrossEl = document.getElementById("totalGross");
 const poCountEl = document.getElementById("poCount");
@@ -24,12 +26,102 @@ const poCountEl = document.getElementById("poCount");
 let openDetailsRow = null;
 
 let allPOs = [];
-let sortColumn = 'po_date';
+let sortColumn = 'id';
 let sortAscending = false;
 
 let createLineItems = null;
 let editLineItems = null;
 let vatRatesCache = null;
+const poSearchDetailsCache = new Map();
+const poSearchLoadingIds = new Set();
+
+function buildPOSearchText(po, detail = null) {
+  const baseParts = [
+    po.id,
+    po.po_number,
+    po.po_date,
+    po.supplier,
+    po.site,
+    po.site_address,
+    po.location,
+    po.stage,
+    po.description,
+    po.net_amount,
+    po.vat_rate,
+    po.total_amount,
+    po.invoiced_total,
+    po.uninvoiced_total
+  ];
+
+  if (detail) {
+    baseParts.push(
+      detail.description,
+      detail.supplier,
+      detail.site,
+      detail.site_address,
+      detail.location,
+      detail.stage
+    );
+
+    if (Array.isArray(detail.line_items)) {
+      detail.line_items.forEach(item => {
+        baseParts.push(
+          item.line_number,
+          item.description,
+          item.quantity,
+          item.unit,
+          item.unit_price,
+          item.line_total
+        );
+      });
+    }
+  }
+
+  return baseParts
+    .filter(v => v !== null && v !== undefined)
+    .map(v => String(v).toLowerCase())
+    .join(' ');
+}
+
+function getPOTextForSearch(po) {
+  const cachedText = poSearchDetailsCache.get(po.id);
+  if (cachedText) {
+    return `${buildPOSearchText(po)} ${cachedText}`;
+  }
+  return buildPOSearchText(po);
+}
+
+async function ensurePOSearchDetails(po) {
+  if (!po || !po.id) return;
+  if (poSearchDetailsCache.has(po.id) || poSearchLoadingIds.has(po.id)) return;
+
+  poSearchLoadingIds.add(po.id);
+  try {
+    const res = await authenticatedFetch(`/purchase-orders/${po.id}`);
+    if (!res.ok) return;
+
+    const detail = await res.json();
+    poSearchDetailsCache.set(po.id, buildPOSearchText(po, detail));
+
+    if (poSearchInput && poSearchInput.value.trim()) {
+      applyFilters();
+    }
+  } catch (_) {
+  } finally {
+    poSearchLoadingIds.delete(po.id);
+  }
+}
+
+function prefetchPOSearchDetails(rows) {
+  rows.forEach(po => {
+    ensurePOSearchDetails(po);
+  });
+}
+
+function updatePOSearchClearButton() {
+  if (!poSearchInput || !poSearchClearBtn) return;
+  poSearchClearBtn.style.display = poSearchInput.value.trim() ? 'block' : 'none';
+}
 
 async function ensureVatRates() {
   if (vatRatesCache) return vatRatesCache;
@@ -45,6 +137,29 @@ async function ensureVatRates() {
     vatRatesCache = [];
   }
   return vatRatesCache;
+}
+
+async function resolveCreatedPOId(data) {
+  if (!data || typeof data !== 'object') return null;
+
+  const directId = data.id ?? data.poId ?? data.insertId;
+  if (directId) return directId;
+
+  const poNumber = data.poNumber;
+  if (!poNumber) return null;
+
+  try {
+    const res = await authenticatedFetch('/purchase-orders');
+    if (!res.ok) return null;
+
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return null;
+
+    const match = rows.find(row => row && row.po_number === poNumber);
+    return match ? match.id : null;
+  } catch (_) {
+    return null;
+  }
 }
 
 function fillVatSelect(select, rates) {
@@ -470,6 +585,20 @@ function fillSelect(select, values) {
   });
 }
 
+async function showPOCreatedConfirmation(poNumber) {
+  if (typeof confirmDialog === 'function') {
+    await confirmDialog(`Purchase Order ${poNumber} created successfully`, {
+      okText: 'OK',
+      showCancel: false,
+      disableBackdropClose: true,
+      okClass: 'btn btn-primary'
+    });
+    return;
+  }
+
+  showToast(`Purchase Order ${poNumber} created successfully`, 'success');
+}
+
 const storedToast = sessionStorage.getItem('toast');
 if (storedToast) {
   const { message, type } = JSON.parse(storedToast);
@@ -523,12 +652,21 @@ function applyFilters() {
     return true;
   });
 
-  filtered
+  const searchTerm = (poSearchInput?.value || '').trim().toLowerCase();
+  if (searchTerm) {
+    prefetchPOSearchDetails(filtered);
+  }
+
+  const searched = searchTerm
+    ? filtered.filter(po => getPOTextForSearch(po).includes(searchTerm))
+    : filtered;
+
+  searched
     .sort((a, b) => {
       let aVal = a[sortColumn];
       let bVal = b[sortColumn];
 
-      if (['total_amount', 'net_amount'].includes(sortColumn)) {
+      if (['id', 'total_amount', 'net_amount'].includes(sortColumn)) {
         aVal = num(aVal);
         bVal = num(bVal);
       } else if (sortColumn === 'po_date') {
@@ -550,7 +688,7 @@ function applyFilters() {
       renderPO(po);
     });
 
-  poCountEl.textContent = filtered.length;
+  poCountEl.textContent = searched.length;
 
   // Update totals bar
   totalNetEl.textContent = euro(totalNet);
@@ -916,6 +1054,23 @@ async function deletePO(id) {
   valueMin,
   valueMax,
 ].forEach((el) => el.addEventListener("change", applyFilters));
+
+if (poSearchInput) {
+  poSearchInput.addEventListener("input", () => {
+    updatePOSearchClearButton();
+    applyFilters();
+  });
+}
+
+if (poSearchClearBtn) {
+  poSearchClearBtn.addEventListener('click', () => {
+    if (!poSearchInput) return;
+    poSearchInput.value = '';
+    updatePOSearchClearButton();
+    applyFilters();
+    poSearchInput.focus();
+  });
+}
 
 function clearFilters() {
   statusFilter.value = "all";
@@ -1492,7 +1647,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         
         const data = await res.json();
-        showToast(`Purchase Order ${data.poNumber} created successfully`, "success");
+        await showPOCreatedConfirmation(data.poNumber);
         closeCreatePOModal();
         loadPOs(); // Reload the PO list
       } catch (err) {
@@ -1556,7 +1711,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = await res.json();
         showToast(`Purchase Order ${data.poNumber} created successfully`, "success");
         closeCreatePOModal();
-        window.location.href = `invoice-entry.html?poId=${data.id}`;
+        const poId = await resolveCreatedPOId(data);
+        if (!poId) {
+          showToast('Purchase order created but could not open invoice entry', 'error');
+          return;
+        }
+        window.location.href = `invoice-entry.html?poId=${poId}`;
       } catch (err) {
         showToast("Failed to create purchase order", "error");
         console.error(err);
@@ -1838,4 +1998,5 @@ document.addEventListener("DOMContentLoaded", () => {
   setDefaultDateFilter();
   await loadPOs();
   setupSearchableSupplierFilter();
+  updatePOSearchClearButton();
 })();

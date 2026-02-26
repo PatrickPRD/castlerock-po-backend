@@ -67,8 +67,14 @@
   </div>
 
   <div class="card">
-    <div class="dashboard-header">
+    <div class="dashboard-header-title">
       <h3 style="margin: 0;">Purchase Orders</h3>
+    </div>
+    <div class="dashboard-header">
+      <div class="dashboard-search">
+        <input type="text" id="poSearch" class="form-control" placeholder="Search purchase orders, descriptions, line items..." aria-label="Search purchase orders">
+        <button type="button" id="poSearchClear" class="dashboard-search-clear" aria-label="Clear search">&times;</button>
+      </div>
       <div class="dashboard-actions">
         <button class="btn btn-primary" onclick="openCreatePOModal()">
           <i class="bi bi-plus-circle me-1"></i><span class="btn-text">Add PO</span>
