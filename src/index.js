@@ -130,6 +130,10 @@ app.use('/reports', reportRoutes);
 const pdfRoutes = require('./routes/pdfs');
 app.use('/pdfs', pdfRoutes);
 
+// PDF Data (for browser-based PDFKit generation)
+const pdfDataRoutes = require('./routes/pdfData');
+app.use('/pdf-data', pdfDataRoutes);
+
 // Settings
 const settingsRoutes = require('./routes/settings');
 app.use('/settings', settingsRoutes);

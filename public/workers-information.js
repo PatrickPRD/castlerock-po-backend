@@ -172,8 +172,12 @@ async function downloadWorkerPdf(workerId, workerName, button) {
   showToast(`Generating PDF for ${workerName}...`, 'info');
 
   try {
-    const yearParam = Number.isInteger(currentLeaveYear) ? `?year=${encodeURIComponent(currentLeaveYear)}` : '';
-    const res = await fetch(`/pdfs/worker/${encodeURIComponent(workerId)}${yearParam}`, {
+    // Load PDFKit libraries
+    if (typeof loadPDFKitLibraries === 'function') {
+      await loadPDFKitLibraries();
+    }
+
+    const res = await fetch(`/pdf-data/worker/${encodeURIComponent(workerId)}`, {
       headers: { Authorization: 'Bearer ' + token }
     });
 
@@ -182,22 +186,16 @@ async function downloadWorkerPdf(workerId, workerName, button) {
       return;
     }
 
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const safeName = String(workerName || 'worker')
-      .replace(/\s+/g, '-')
-      .replace(/[^a-zA-Z0-9-_]/g, '');
+    const { workerData, leaveSummary, settings } = await res.json();
 
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Worker-${safeName || 'worker'}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    
-    showToast('PDF generated successfully', 'success');
+    if (typeof generateWorkerPDF === 'function') {
+      await generateWorkerPDF(workerData, leaveSummary, settings, 'download');
+      showToast('PDF generated successfully', 'success');
+    } else {
+      throw new Error('PDFKit generator not loaded');
+    }
   } catch (error) {
+    console.error('Error generating worker PDF:', error);
     showToast('Failed to generate worker PDF', 'error');
   }
 }
@@ -206,8 +204,12 @@ async function downloadBlankWorkerPdf() {
   showToast('Generating blank worker PDF...', 'info');
 
   try {
-    const yearParam = Number.isInteger(currentLeaveYear) ? `?year=${encodeURIComponent(currentLeaveYear)}` : '';
-    const res = await fetch(`/pdfs/worker-blank${yearParam}`, {
+    // Load PDFKit libraries
+    if (typeof loadPDFKitLibraries === 'function') {
+      await loadPDFKitLibraries();
+    }
+
+    const res = await fetch('/pdf-data/worker-blank', {
       headers: { Authorization: 'Bearer ' + token }
     });
 
@@ -216,17 +218,19 @@ async function downloadBlankWorkerPdf() {
       return;
     }
 
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const yearSuffix = Number.isInteger(currentLeaveYear) ? `-${currentLeaveYear}` : '';
+    const { workerData, leaveSummary, settings } = await res.json();
 
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Worker-Blank-Form${yearSuffix}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    if (typeof generateWorkerPDF === 'function') {
+      await generateWorkerPDF(workerData || {}, leaveSummary, settings, 'download');
+      showToast('PDF generated successfully', 'success');
+    } else {
+      throw new Error('PDFKit generator not loaded');
+    }
+  } catch (error) {
+    console.error('Error generating blank worker PDF:', error);
+    showToast('Failed to generate blank worker PDF', 'error');
+  }
+}
 
     showToast('Blank worker PDF generated', 'success');
   } catch (error) {

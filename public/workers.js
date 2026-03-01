@@ -482,7 +482,13 @@ async function saveWorker() {
 async function downloadWorkerPDF(workerId, workerName) {
   try {
     showToast('Generating PDF...', 'info');
-    const res = await fetch(`/pdfs/worker/${workerId}`, {
+    
+    // Load PDFKit libraries
+    if (typeof loadPDFKitLibraries === 'function') {
+      await loadPDFKitLibraries();
+    }
+
+    const res = await fetch(`/pdf-data/worker/${workerId}`, {
       headers: { Authorization: 'Bearer ' + token }
     });
 
@@ -491,17 +497,14 @@ async function downloadWorkerPDF(workerId, workerName) {
       return;
     }
 
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Worker-${workerName.replace(/\s+/g, '-')}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const { workerData, leaveSummary, settings } = await res.json();
 
-    showToast('Worker PDF downloaded', 'success');
+    if (typeof generateWorkerPDF === 'function') {
+      await generateWorkerPDF(workerData, leaveSummary, settings, 'download');
+      showToast('Worker PDF downloaded', 'success');
+    } else {
+      throw new Error('PDFKit generator not loaded');
+    }
   } catch (err) {
     console.error('Failed to download worker PDF:', err);
     showToast('Failed to download worker PDF', 'error');

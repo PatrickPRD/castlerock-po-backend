@@ -404,34 +404,28 @@
       floatingBtn.disabled = true;
       floatingBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
       
-      const response = await fetch('/pdfs/gdpr', {
+      // Load PDFKit libraries
+      if (typeof loadPDFKitLibraries === 'function') {
+        await loadPDFKitLibraries();
+      }
+      
+      // Fetch GDPR data from new endpoint
+      const response = await fetch('/pdf-data/gdpr', {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       
       if (!response.ok) {
-        throw new Error('Failed to generate PDF');
+        throw new Error('Failed to fetch GDPR data');
       }
       
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
+      const { settings } = await response.json();
       
-      // Extract filename from Content-Disposition header or use default
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = 'GDPR-Privacy-Notice.pdf';
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/i);
-        if (filenameMatch) {
-          filename = filenameMatch[1];
-        }
+      // Generate PDF using browser-based PDFKit
+      if (typeof generateGDPRPDF === 'function') {
+        await generateGDPRPDF(settings, 'download');
+      } else {
+        throw new Error('PDFKit generator not loaded');
       }
-      
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
       
       // Restore button state
       downloadBtn.disabled = false;
@@ -449,8 +443,10 @@
       floatingBtn.innerHTML = originalFloatingHTML;
     }
   }
+
 </script>
 
+<script src="/pdfkit-generator.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
