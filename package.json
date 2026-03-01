@@ -31,6 +31,8 @@
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
+    "jspdf": "^4.2.0",
+    "jspdf-autotable": "^5.0.7",
     "multer": "^2.0.0",
     "mysql2": "^3.16.0",
     "nodemailer": "^7.0.12",
