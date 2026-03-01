@@ -118,10 +118,10 @@ router.get(
         SELECT
           invoice_number,
           invoice_date,
-          amount,
+          total_amount,
           notes
         FROM invoices
-        WHERE po_id = ?
+        WHERE purchase_order_id = ?
         ORDER BY invoice_date DESC
       `, [poId]);
 

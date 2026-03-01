@@ -260,7 +260,7 @@ async function generatePOPDF(poData, invoices = [], settings = {}, action = 'dow
     const invoicesData = invoices.map(invoice => [
       invoice.invoice_number || 'N/A',
       formatDate(invoice.invoice_date),
-      formatCurrency(invoice.amount, currencySymbol)
+      formatCurrency(invoice.total_amount, currencySymbol)
     ]);
 
     doc.autoTable({
