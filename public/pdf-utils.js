@@ -62,6 +62,16 @@ async function downloadPOPDF(poId, buttonEl) {
 
     const { poData, invoices, settings } = await response.json();
 
+    // Debug: Log received data
+    console.log('PDF Data received:', {
+      poNumber: poData.po_number,
+      subtotal: poData.subtotal,
+      vatAmount: poData.vat_amount,
+      total: poData.total,
+      lineItemCount: poData.line_items?.length || 0,
+      invoiceCount: invoices.length
+    });
+
     // Generate PDF using browser-based PDFKit
     if (typeof generatePOPDF === 'function') {
       await generatePOPDF(poData, invoices, settings, 'download');
@@ -110,6 +120,16 @@ async function viewPOPDF(poId, buttonEl) {
     }
 
     const { poData, invoices, settings } = await response.json();
+
+    // Debug: Log received data
+    console.log('PDF Data received for viewing:', {
+      poNumber: poData.po_number,
+      subtotal: poData.subtotal,
+      vatAmount: poData.vat_amount,
+      total: poData.total,
+      lineItemCount: poData.line_items?.length || 0,
+      invoiceCount: invoices.length
+    });
 
     // Generate and view PDF
     if (typeof generatePOPDF === 'function') {

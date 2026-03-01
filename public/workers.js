@@ -497,10 +497,10 @@ async function downloadWorkerPDF(workerId, workerName) {
       return;
     }
 
-    const { workerData, leaveSummary, settings } = await res.json();
+    const { workerData, leaveSummary, settings, userRole } = await res.json();
 
     if (typeof generateWorkerPDF === 'function') {
-      await generateWorkerPDF(workerData, leaveSummary, settings, 'download');
+      await generateWorkerPDF(workerData, leaveSummary, settings, 'download', false, userRole);
       showToast('Worker PDF downloaded', 'success');
     } else {
       throw new Error('PDFKit generator not loaded');

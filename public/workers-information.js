@@ -186,10 +186,10 @@ async function downloadWorkerPdf(workerId, workerName, button) {
       return;
     }
 
-    const { workerData, leaveSummary, settings } = await res.json();
+    const { workerData, leaveSummary, settings, userRole } = await res.json();
 
     if (typeof generateWorkerPDF === 'function') {
-      await generateWorkerPDF(workerData, leaveSummary, settings, 'download');
+      await generateWorkerPDF(workerData, leaveSummary, settings, 'download', false, userRole);
       showToast('PDF generated successfully', 'success');
     } else {
       throw new Error('PDFKit generator not loaded');
@@ -218,22 +218,16 @@ async function downloadBlankWorkerPdf() {
       return;
     }
 
-    const { workerData, leaveSummary, settings } = await res.json();
+    const { workerData, leaveSummary, settings, isBlank, userRole } = await res.json();
 
     if (typeof generateWorkerPDF === 'function') {
-      await generateWorkerPDF(workerData || {}, leaveSummary, settings, 'download');
+      await generateWorkerPDF(workerData || {}, leaveSummary, settings, 'download', isBlank, userRole);
       showToast('PDF generated successfully', 'success');
     } else {
       throw new Error('PDFKit generator not loaded');
     }
   } catch (error) {
     console.error('Error generating blank worker PDF:', error);
-    showToast('Failed to generate blank worker PDF', 'error');
-  }
-}
-
-    showToast('Blank worker PDF generated', 'success');
-  } catch (error) {
     showToast('Failed to generate blank worker PDF', 'error');
   }
 }

@@ -99,11 +99,22 @@ function hexToRgb(hex) {
 async function generatePOPDF(poData, invoices = [], settings = {}, action = 'download') {
   await loadPDFKitLibraries();
 
+  console.log('Generating PO PDF with data:', { 
+    poNumber: poData.po_number, 
+    subtotal: poData.subtotal, 
+    vatAmount: poData.vat_amount, 
+    total: poData.total,
+    invoiceCount: invoices.length,
+    lineItemCount: poData.line_items?.length || 0
+  });
+
   const doc = new jsPDF();
   
   // Get branding settings
   const headerColor = settings.header_color || '#212529';
+  const logoMode = settings.header_logo_mode || 'text';
   const logoText = settings.header_logo_text || settings.company_name || 'Castlerock Homes';
+  const logoPath = settings.logo_path || '';
   const companyName = settings.company_name || 'Castlerock Homes';
   const companyAddress = settings.company_address || '';
   const companyPhone = settings.company_phone || '';
@@ -116,11 +127,53 @@ async function generatePOPDF(poData, invoices = [], settings = {}, action = 'dow
   doc.setFillColor(headerRGB[0], headerRGB[1], headerRGB[2]);
   doc.rect(0, 0, 210, 35, 'F');
 
-  // Company name/logo
+  // Company logo or text
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(20);
-  doc.setFont('helvetica', 'bold');
-  doc.text(logoText, 15, 15);
+  
+  if (logoMode === 'image' && logoPath) {
+    try {
+      // Try to load and add the logo image
+      const logoUrl = logoPath.startsWith('http') ? logoPath : `${window.location.origin}${logoPath}`;
+      
+      // Load image and convert to data URL for jsPDF
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      
+      await new Promise((resolve, reject) => {
+        img.onload = () => {
+          try {
+            // Add image to PDF (doubled size: 80mm x 50mm)
+            const imgWidth = 80;
+            const imgHeight = (img.height / img.width) * imgWidth;
+            const maxHeight = 50;
+            
+            const finalWidth = imgHeight > maxHeight ? (imgWidth * maxHeight / imgHeight) : imgWidth;
+            const finalHeight = Math.min(imgHeight, maxHeight);
+            
+            doc.addImage(img, 'PNG', 15, 8, finalWidth, finalHeight);
+            resolve();
+          } catch (err) {
+            reject(err);
+          }
+        };
+        img.onerror = reject;
+        img.src = logoUrl;
+      });
+      
+      console.log('Logo image loaded successfully');
+      
+    } catch (err) {
+      console.warn('Could not load logo image, using text fallback:', err);
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      doc.text(logoText, 15, 15);
+    }
+  } else {
+    // Use text logo
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text(logoText, 15, 15);
+  }
 
   // Document title
   doc.setFontSize(12);
@@ -227,7 +280,7 @@ async function generatePOPDF(poData, invoices = [], settings = {}, action = 'dow
       item.quantity || '0',
       item.unit || '',
       formatCurrency(item.unit_price, currencySymbol),
-      formatCurrency(item.total_price, currencySymbol)
+      formatCurrency(item.line_total, currencySymbol)
     ]);
 
     doc.autoTable({
@@ -250,8 +303,55 @@ async function generatePOPDF(poData, invoices = [], settings = {}, action = 'dow
     yPos = doc.lastAutoTable.finalY + 10;
   }
 
+  // Financial Summary - PO Totals (moved before invoices)
+  if (yPos > 240) {
+    doc.addPage();
+    yPos = 20;
+  }
+
+  console.log('Adding financial summary:', { subtotal: poData.subtotal, vat: poData.vat_amount, total: poData.total });
+
+  // Add section header
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('Purchase Order Financial Summary', 15, yPos);
+  yPos += 8;
+
+  // Draw separator line
+  doc.setDrawColor(200, 200, 200);
+  doc.line(15, yPos, 195, yPos);
+  yPos += 8;
+
+  const summaryX = 130;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(0, 0, 0);
+  
+  doc.text('Subtotal:', summaryX, yPos);
+  doc.text(formatCurrency(poData.subtotal, currencySymbol), 195, yPos, { align: 'right' });
+  yPos += 6;
+  
+  doc.text('VAT:', summaryX, yPos);
+  doc.text(formatCurrency(poData.vat_amount, currencySymbol), 195, yPos, { align: 'right' });
+  yPos += 6;
+  
+  doc.setFontSize(12);
+  doc.text('Total:', summaryX, yPos);
+  doc.text(formatCurrency(poData.total, currencySymbol), 195, yPos, { align: 'right' });
+  yPos += 2;
+
+  // Draw line under total
+  doc.setLineWidth(0.5);
+  doc.line(summaryX, yPos, 195, yPos);
+  yPos += 10;
+
   // Invoices Table
   if (invoices && invoices.length > 0) {
+    if (yPos > 240) {
+      doc.addPage();
+      yPos = 20;
+    }
+
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.text('Invoices', 15, yPos);
@@ -278,29 +378,17 @@ async function generatePOPDF(poData, invoices = [], settings = {}, action = 'dow
       margin: { left: 15, right: 15 }
     });
 
-    yPos = doc.lastAutoTable.finalY + 10;
-  }
+    yPos = doc.lastAutoTable.finalY + 6;
 
-  // Financial Summary
-  const summaryX = 130;
-  if (yPos > 250) {
-    doc.addPage();
-    yPos = 20;
+    // Calculate total invoiced amount
+    const totalInvoiced = invoices.reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('Total Invoiced:', 130, yPos);
+    doc.text(formatCurrency(totalInvoiced, currencySymbol), 195, yPos, { align: 'right' });
+    yPos += 10;
   }
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.text('Subtotal:', summaryX, yPos);
-  doc.text(formatCurrency(poData.subtotal, currencySymbol), 195, yPos, { align: 'right' });
-  yPos += 6;
-  
-  doc.text('VAT:', summaryX, yPos);
-  doc.text(formatCurrency(poData.vat_amount, currencySymbol), 195, yPos, { align: 'right' });
-  yPos += 6;
-  
-  doc.setFontSize(12);
-  doc.text('Total:', summaryX, yPos);
-  doc.text(formatCurrency(poData.total, currencySymbol), 195, yPos, { align: 'right' });
 
   // Footer
   doc.setFontSize(8);
@@ -322,12 +410,15 @@ async function generatePOPDF(poData, invoices = [], settings = {}, action = 'dow
 /**
  * Generate Worker PDF
  */
-async function generateWorkerPDF(workerData, leaveSummary = {}, settings = {}, action = 'download') {
+async function generateWorkerPDF(workerData, leaveSummary = {}, settings = {}, action = 'download', isBlank = false, userRole = null) {
   await loadPDFKitLibraries();
 
   const doc = new jsPDF();
   
   const headerColor = settings.header_color || '#212529';
+  const logoMode = settings.header_logo_mode || 'text';
+  const logoText = settings.header_logo_text || settings.company_name || 'Castlerock Homes';
+  const logoPath = settings.logo_path || '';
   const companyName = settings.company_name || 'Castlerock Homes';
   const currencySymbol = settings.currency_symbol || '€';
   const headerRGB = hexToRgb(headerColor);
@@ -336,105 +427,216 @@ async function generateWorkerPDF(workerData, leaveSummary = {}, settings = {}, a
   doc.setFillColor(headerRGB[0], headerRGB[1], headerRGB[2]);
   doc.rect(0, 0, 210, 35, 'F');
 
-  // Company name
+  // Company logo or text
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(20);
-  doc.setFont('helvetica', 'bold');
-  doc.text(companyName, 15, 15);
+  
+  if (logoMode === 'image' && logoPath) {
+    try {
+      const logoUrl = logoPath.startsWith('http') ? logoPath : `${window.location.origin}${logoPath}`;
+      
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      
+      await new Promise((resolve, reject) => {
+        img.onload = () => {
+          try {
+            const imgWidth = 80;
+            const imgHeight = (img.height / img.width) * imgWidth;
+            const maxHeight = 50;
+            
+            const finalWidth = imgHeight > maxHeight ? (imgWidth * maxHeight / imgHeight) : imgWidth;
+            const finalHeight = Math.min(imgHeight, maxHeight);
+            
+            doc.addImage(img, 'PNG', 15, 8, finalWidth, finalHeight);
+            resolve();
+          } catch (err) {
+            reject(err);
+          }
+        };
+        img.onerror = reject;
+        img.src = logoUrl;
+      });
+      
+      console.log('Logo image loaded successfully');
+      
+    } catch (err) {
+      console.warn('Could not load logo image, using text fallback:', err);
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      doc.text(logoText, 15, 15);
+    }
+  } else {
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text(logoText, 15, 15);
+  }
 
-  // Document title
+  // Document title and worker name in header
+  const workerName = `${workerData.first_name || ''} ${workerData.last_name || ''}`.trim();
   doc.setFontSize(12);
-  doc.text('Worker Information', 195, 15, { align: 'right' });
+  doc.text('Worker Information', 195, 12, { align: 'right' });
+  
+  if (isBlank || !workerName) {
+    // For blank forms, show "Name:" with white box
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Name:', 105, 25, { align: 'left' });
+    
+    // Draw white box for name (220% wider = 112mm, adjusted to fit page)
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(255, 255, 255);
+    doc.rect(120, 18, 75, 8, 'FD');
+    
+    // Draw border around the name box
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.rect(120, 18, 75, 8, 'S');
+  } else {
+    // For filled forms, show worker name
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text(workerName, 195, 25, { align: 'right' });
+  }
 
   // Reset text color
   doc.setTextColor(0, 0, 0);
   
   let yPos = 45;
 
-  // Worker Name
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  const workerName = `${workerData.first_name || ''} ${workerData.last_name || ''}`.trim() || 'Worker';
-  doc.text(workerName, 15, yPos);
-  yPos += 10;
+  // Determine what to show for empty fields
+  const emptyValue = isBlank ? '' : 'N/A';
 
-  // Personal Information
-  doc.setFontSize(11);
-  doc.text('Personal Information', 15, yPos);
-  yPos += 6;
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Email: ${workerData.email || 'N/A'}`, 15, yPos);
-  yPos += 5;
-  doc.text(`Phone: ${workerData.mobile_number || 'N/A'}`, 15, yPos);
-  yPos += 5;
-  if (workerData.address) {
-    const addressLines = doc.splitTextToSize(`Address: ${workerData.address}`, 180);
-    doc.text(addressLines, 15, yPos);
-    yPos += addressLines.length * 5;
-  } else {
-    doc.text('Address: N/A', 15, yPos);
-    yPos += 5;
+  // Personal Information Table
+  const personalData = [
+    ['Email', workerData.email || emptyValue],
+    ['Mobile Number', workerData.mobile_number || emptyValue],
+    ['Address', workerData.address || emptyValue],
+    ['PPS Number', workerData.pps_number || emptyValue]
+  ];
+
+  doc.autoTable({
+    startY: yPos,
+    head: [['Personal Information', '']],
+    body: personalData,
+    theme: 'grid',
+    headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 9 },
+    styles: { fontSize: 8, cellPadding: 2.5 },
+    columnStyles: {
+      0: { cellWidth: 60, fontStyle: 'bold', textColor: [80, 80, 80] },
+      1: { cellWidth: 125 }
+    },
+    margin: { left: 15, right: 15 }
+  });
+
+  yPos = doc.lastAutoTable.finalY + 5;
+
+  // Employment Information Table
+  const employmentData = [
+    ['Employee ID', workerData.employee_id || emptyValue],
+    ['Start Date', isBlank ? '' : formatDate(workerData.date_of_employment)],
+    ['Status', isBlank ? '' : (workerData.active ? 'Active' : 'Inactive')],
+    ['Left Date', (isBlank || !workerData.left_at) ? '' : formatDate(workerData.left_at)]
+  ];
+
+  // Only super_admin can see weekly financial info
+  if (userRole === 'super_admin') {
+    employmentData.splice(2, 0,
+      ['Weekly Take Home', workerData.weekly_take_home ? formatCurrency(workerData.weekly_take_home, currencySymbol) : emptyValue],
+      ['Weekly Cost', workerData.weekly_cost ? formatCurrency(workerData.weekly_cost, currencySymbol) : emptyValue]
+    );
   }
-  doc.text(`PPS Number: ${workerData.pps_number || 'N/A'}`, 15, yPos);
-  yPos += 10;
 
-  // Employment Information
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text('Employment', 15, yPos);
-  yPos += 6;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.text(`Employee ID: ${workerData.employee_id || 'N/A'}`, 15, yPos);
-  yPos += 5;
-  doc.text(`Start Date: ${formatDate(workerData.date_of_employment)}`, 15, yPos);
-  yPos += 5;
-  doc.text(`Status: ${workerData.active ? 'Active' : 'Inactive'}`, 15, yPos);
-  yPos += 10;
+  doc.autoTable({
+    startY: yPos,
+    head: [['Employment Details', '']],
+    body: employmentData,
+    theme: 'grid',
+    headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 9 },
+    styles: { fontSize: 8, cellPadding: 2.5 },
+    columnStyles: {
+      0: { cellWidth: 60, fontStyle: 'bold', textColor: [80, 80, 80] },
+      1: { cellWidth: 125 }
+    },
+    margin: { left: 15, right: 15 }
+  });
 
-  // Safety Information
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text('Safety', 15, yPos);
-  yPos += 6;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.text(`Safe Pass #: ${workerData.safe_pass_number || 'N/A'}`, 15, yPos);
-  yPos += 5;
-  doc.text(`Expiry: ${formatDate(workerData.safe_pass_expiry_date)}`, 15, yPos);
-  yPos += 10;
+  yPos = doc.lastAutoTable.finalY + 5;
 
-  // Leave Summary
+  // Safety Information Table
+  const safetyData = [
+    ['Safe Pass Number', workerData.safe_pass_number || emptyValue],
+    ['Safe Pass Expiry', isBlank ? '' : formatDate(workerData.safe_pass_expiry_date)]
+  ];
+
+  doc.autoTable({
+    startY: yPos,
+    head: [['Safety Certifications', '']],
+    body: safetyData,
+    theme: 'grid',
+    headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 9 },
+    styles: { fontSize: 8, cellPadding: 2.5 },
+    columnStyles: {
+      0: { cellWidth: 60, fontStyle: 'bold', textColor: [80, 80, 80] },
+      1: { cellWidth: 125 }
+    },
+    margin: { left: 15, right: 15 }
+  });
+
+  yPos = doc.lastAutoTable.finalY + 5;
+
+  // Leave Summary Table
   if (leaveSummary && leaveSummary.totals) {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('Leave Summary', 15, yPos);
-    yPos += 6;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.text(`Annual Leave Taken: ${leaveSummary.totals.annual_leave || 0} days`, 15, yPos);
-    yPos += 5;
-    doc.text(`Bank Holidays Taken: ${leaveSummary.totals.bank_holiday || 0} days`, 15, yPos);
-    yPos += 5;
-    doc.text(`Sick Days: ${leaveSummary.totals.sick || 0} days`, 15, yPos);
-    yPos += 10;
+    const entitlements = leaveSummary.entitlements || { annual_leave: 20, bank_holiday: 9, sick: 3 };
+    
+    const annualTaken = leaveSummary.totals.annual_leave || 0;
+    const annualRemaining = entitlements.annual_leave - annualTaken;
+    
+    const bankTaken = leaveSummary.totals.bank_holiday || 0;
+    const bankRemaining = entitlements.bank_holiday - bankTaken;
+    
+    const sickTaken = leaveSummary.totals.sick || 0;
+    const sickRemaining = entitlements.sick - sickTaken;
+    
+    const leaveData = [
+      ['Annual Leave', `${annualTaken} days`, annualRemaining >= 0 ? `${annualRemaining} days` : 'Over limit'],
+      ['Bank Holidays', `${bankTaken} days`, bankRemaining >= 0 ? `${bankRemaining} days` : 'Over limit'],
+      ['Paid Sick Days', `${sickTaken} days`, sickRemaining >= 0 ? `${sickRemaining} days` : 'Over limit']
+    ];
+
+    doc.autoTable({
+      startY: yPos,
+      head: [['Leave Summary (Current Year)', 'Taken', 'Remaining']],
+      body: leaveData,
+      theme: 'grid',
+      headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 9 },
+      styles: { fontSize: 8, cellPadding: 2.5 },
+      columnStyles: {
+        0: { cellWidth: 60, fontStyle: 'bold', textColor: [80, 80, 80] },
+        1: { cellWidth: 60, halign: 'center' },
+        2: { cellWidth: 65, halign: 'center' }
+      },
+      margin: { left: 15, right: 15 }
+    });
+
+    yPos = doc.lastAutoTable.finalY + 5;
   }
 
   // Notes
   if (workerData.notes && workerData.notes.trim()) {
-    if (yPos > 250) {
-      doc.addPage();
-      yPos = 20;
-    }
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('Notes', 15, yPos);
-    yPos += 6;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    const notesLines = doc.splitTextToSize(workerData.notes, 180);
-    doc.text(notesLines, 15, yPos);
+    const notesData = [[workerData.notes.trim()]];
+    
+    doc.autoTable({
+      startY: yPos,
+      head: [['Notes']],
+      body: notesData,
+      theme: 'grid',
+      headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 9 },
+      styles: { fontSize: 8, cellPadding: 2.5, overflow: 'linebreak', cellWidth: 'wrap' },
+      columnStyles: {
+        0: { cellWidth: 185 }
+      },
+      margin: { left: 15, right: 15 }
+    });
   }
 
   // Footer

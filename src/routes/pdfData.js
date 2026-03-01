@@ -105,13 +105,19 @@ router.get(
           quantity,
           unit,
           unit_price,
-          (quantity * unit_price) AS total_price
+          line_total
         FROM po_line_items
         WHERE po_id = ?
         ORDER BY id
       `, [poId]);
 
       poData.line_items = lineItems;
+
+      // Debug: Log line items for calculation
+      console.log('Line items fetched:', lineItems.length);
+      lineItems.forEach((item, idx) => {
+        console.log(`  Item ${idx + 1}: qty=${item.quantity}, price=${item.unit_price}, total=${item.line_total}`);
+      });
 
       // Fetch invoices
       const [invoices] = await db.query(`
@@ -125,11 +131,23 @@ router.get(
         ORDER BY invoice_date DESC
       `, [poId]);
 
-      // Calculate totals
-      const subtotal = lineItems.reduce((sum, item) => sum + Number(item.total_price || 0), 0);
-      const vatRate = Number(poData.po_vat_rate || 0);
-      const vatAmount = subtotal * (vatRate / 100);
-      const total = subtotal + vatAmount;
+      // Calculate totals - use line items if available, otherwise use PO stored amounts
+      let subtotal, vatAmount, total;
+      
+      if (lineItems.length > 0) {
+        // Calculate from line items
+        subtotal = lineItems.reduce((sum, item) => sum + Number(item.line_total || 0), 0);
+        const vatRate = Number(poData.po_vat_rate || 0);
+        vatAmount = subtotal * (vatRate / 100);
+        total = subtotal + vatAmount;
+        console.log('Calculated totals from line items:', { subtotal, vatRate, vatAmount, total });
+      } else {
+        // Fallback to PO stored amounts
+        subtotal = Number(poData.po_net_amount || 0);
+        total = Number(poData.po_total_amount || 0);
+        vatAmount = total - subtotal;
+        console.log('Using PO stored amounts:', { subtotal, vatAmount, total });
+      }
 
       poData.subtotal = subtotal;
       poData.vat_amount = vatAmount;
@@ -172,6 +190,7 @@ router.get(
   async (req, res) => {
     try {
       const { workerId } = req.params;
+      console.log('Fetching worker data for ID:', workerId);
 
       const [workers] = await db.query(
         `
@@ -199,6 +218,8 @@ router.get(
         [workerId]
       );
 
+      console.log('Worker query result:', workers.length > 0 ? 'Found' : 'Not found');
+
       if (!workers || workers.length === 0) {
         return res.status(404).json({ error: 'Worker not found' });
       }
@@ -206,17 +227,22 @@ router.get(
       const workerData = workers[0];
 
       // Get leave summary
+      console.log('Fetching settings...');
       const settings = await SettingsService.getSettings();
+      console.log('Settings fetched, leave_year_start:', settings.leave_year_start);
+      
       const leaveYearStart = normalizeLeaveYearStart(settings.leave_year_start || '01-01');
       const anchorDate = new Date();
       const { startDate, endDate } = getLeaveYearBounds(anchorDate, leaveYearStart);
+
+      console.log('Leave year bounds:', { startDate: formatDate(startDate), endDate: formatDate(endDate) });
 
       const [leaveDays] = await db.query(
         `
         SELECT
           leave_type,
-          SUM(days) AS total_days
-        FROM labour_costs
+          COUNT(*) AS total_days
+        FROM timesheet_entries
         WHERE worker_id = ?
           AND work_date >= ?
           AND work_date < ?
@@ -226,11 +252,18 @@ router.get(
         [workerId, formatDate(startDate), formatDate(endDate)]
       );
 
+      console.log('Leave days query result:', leaveDays.length, 'rows');
+
       const leaveSummary = {
         totals: {
           annual_leave: 0,
           bank_holiday: 0,
           sick: 0
+        },
+        entitlements: {
+          annual_leave: Number(settings.annual_leave_days_per_year || 20),
+          bank_holiday: 9, // Standard UK bank holidays
+          sick: Number(settings.sick_days_per_year || 3)
         }
       };
 
@@ -250,7 +283,8 @@ router.get(
       res.json({
         workerData,
         leaveSummary,
-        settings
+        settings,
+        userRole: req.user.role
       });
     } catch (error) {
       console.error('Error fetching worker data:', error);
@@ -278,6 +312,11 @@ router.get(
           annual_leave: 0,
           bank_holiday: 0,
           sick: 0
+        },
+        entitlements: {
+          annual_leave: Number(settings.annual_leave_days_per_year || 20),
+          bank_holiday: 9,
+          sick: Number(settings.sick_days_per_year || 3)
         }
       };
 
@@ -294,7 +333,8 @@ router.get(
         workerData: {},
         leaveSummary,
         settings,
-        isBlank: true
+        isBlank: true,
+        userRole: req.user.role
       });
     } catch (error) {
       console.error('Error fetching blank worker data:', error);
