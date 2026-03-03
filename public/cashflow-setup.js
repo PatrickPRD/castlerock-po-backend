@@ -25,14 +25,16 @@ const wizardLocationSelect = document.getElementById('wizardLocationSelect');
 const wizardTemplateSelect = document.getElementById('wizardTemplateSelect');
 const wizardEstimatedCost = document.getElementById('wizardEstimatedCost');
 const wizardSellingPrice = document.getElementById('wizardSellingPrice');
-const wizardSpendPercent = document.getElementById('wizardSpendPercent');
-const wizardTimescaleMonths = document.getElementById('wizardTimescaleMonths');
-const wizardWeeklySpread = document.getElementById('wizardWeeklySpread');
-const wizardSpreadTotal = document.getElementById('wizardSpreadTotal');
+const wizardStartOnSiteDate = document.getElementById('wizardStartOnSiteDate');
+const wizardCompletionDate = document.getElementById('wizardCompletionDate');
 const wizardReview = document.getElementById('wizardReview');
 const wizardProgress = document.getElementById('wizardProgress');
 const configuredLocationsBody = document.getElementById('configuredLocationsBody');
 const wizardSteps = [...document.querySelectorAll('.wizard-step')];
+const openTemplateDraftModalBtn = document.getElementById('openTemplateDraftModalBtn');
+const templateDraftModal = document.getElementById('templateDraftModal');
+const closeTemplateDraftModalBtn = document.getElementById('closeTemplateDraftModalBtn');
+const closeTemplateDraftCancelBtn = document.getElementById('closeTemplateDraftCancelBtn');
 const templateFormTitle = document.getElementById('templateFormTitle');
 const templateDraftName = document.getElementById('templateDraftName');
 const templateDraftStage = document.getElementById('templateDraftStage');
@@ -48,9 +50,10 @@ const templateAccordionBody = document.getElementById('templateAccordionBody');
 let currentLocations = [];
 let cashflowTemplates = [];
 const configuredLocations = new Map();
+const expandedLocationIds = new Set();
 let editingLocationId = null;
 let wizardCurrentStep = 1;
-const wizardTotalSteps = 8;
+const wizardTotalSteps = 5;
 let templateDraftRows = [];
 let editingTemplateKey = null;
 const expandedTemplateKeys = new Set();
@@ -92,15 +95,23 @@ function formatCurrency(value) {
 
 function rowTemplate(location) {
   const estimatedCost = location.estimated_construction_cost ?? '';
-  const spendPct = location.predicted_spend_percentage ?? '';
   const timescale = location.spend_timescale_months ?? '';
   const sellingPrice = location.selling_price ?? '';
+  const predictedSpend = location.predicted_spend_percentage ?? '';
+  const startOnSiteDate = location.start_on_site_date || '';
+  const completionDate = location.completion_date || '';
+  const spreadTotal = Number((Array.isArray(location.weekly_spread)
+    ? location.weekly_spread.reduce((sum, value) => sum + (Number(value) || 0), 0)
+    : 0).toFixed(2));
+  const isExpanded = expandedLocationIds.has(Number(location.location_id));
 
   return `
     <tr>
       <td>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleConfiguredLocation(${location.location_id})">${isExpanded ? '−' : '+'}</button>
+      </td>
+      <td>
         <span class="location-name">${location.location_name}</span>
-        <small class="text-muted site-name">${location.site_name}</small>
       </td>
       <td>
         ${location.template_name || location.template_key || '-'}
@@ -108,18 +119,22 @@ function rowTemplate(location) {
       <td>
         ${formatCurrency(estimatedCost)}
       </td>
-      <td>
-        ${spendPct === null || spendPct === '' ? '-' : spendPct}
-      </td>
-      <td>
-        ${timescale === null || timescale === '' ? '-' : timescale}
-      </td>
-      <td>
-        ${formatCurrency(sellingPrice)}
-      </td>
-      <td>
-        <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="editConfiguredLocation(${location.location_id})">Edit</button>
-        <button type="button" class="btn btn-sm btn-danger" onclick="removeConfiguredLocation(${location.location_id})">Remove</button>
+    </tr>
+    <tr class="configured-location-details" style="display:${isExpanded ? 'table-row' : 'none'};">
+      <td colspan="4">
+        <div class="configured-location-panel">
+          <div><strong>Site:</strong> ${location.site_name || '-'}</div>
+          <div><strong>Spend Timescale (Weeks):</strong> ${timescale === null || timescale === '' ? '-' : timescale}</div>
+          <div><strong>Location Selling Price:</strong> ${formatCurrency(sellingPrice)}</div>
+          <div><strong>Start on Site Date:</strong> ${startOnSiteDate || '-'}</div>
+          <div><strong>Completion Date:</strong> ${completionDate || '-'}</div>
+          <div><strong>Predicted Spend %:</strong> ${predictedSpend === null || predictedSpend === '' ? '-' : predictedSpend}</div>
+          <div><strong>Weekly Spread Total:</strong> ${spreadTotal}%</div>
+          <div class="d-flex gap-2 pt-1">
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="editConfiguredLocation(${location.location_id})">Edit</button>
+            <button type="button" class="btn btn-sm btn-danger" onclick="removeConfiguredLocation(${location.location_id})">Remove</button>
+          </div>
+        </div>
       </td>
     </tr>
   `;
@@ -137,7 +152,7 @@ function renderConfiguredRows() {
   if (rows.length === 0) {
     configuredLocationsBody.innerHTML = `
       <tr>
-        <td colspan="7" class="text-center text-muted py-4">No configured locations yet. Use the wizard above.</td>
+        <td colspan="4" class="text-center text-muted py-4">No configured locations yet. Use the wizard above.</td>
       </tr>
     `;
     if (wizardProgress) wizardProgress.textContent = '0 locations configured';
@@ -148,6 +163,16 @@ function renderConfiguredRows() {
   if (wizardProgress) {
     wizardProgress.textContent = `${rows.length} location${rows.length === 1 ? '' : 's'} configured`;
   }
+}
+
+function toggleConfiguredLocation(locationId) {
+  const id = Number(locationId);
+  if (expandedLocationIds.has(id)) {
+    expandedLocationIds.delete(id);
+  } else {
+    expandedLocationIds.add(id);
+  }
+  renderConfiguredRows();
 }
 
 function getLocationById(locationId) {
@@ -221,10 +246,8 @@ function resetWizardForm() {
   wizardTemplateSelect.value = '';
   wizardEstimatedCost.value = '';
   wizardSellingPrice.value = '';
-  wizardSpendPercent.value = '';
-  wizardTimescaleMonths.value = '';
-  if (wizardWeeklySpread) wizardWeeklySpread.innerHTML = '';
-  if (wizardSpreadTotal) wizardSpreadTotal.textContent = 'Total: 0%';
+  wizardStartOnSiteDate.value = '';
+  wizardCompletionDate.value = '';
   if (wizardReview) wizardReview.innerHTML = '';
 }
 
@@ -239,10 +262,67 @@ function loadWizardFromConfigured(locationId) {
   wizardLocationSelect.value = String(config.location_id);
   wizardEstimatedCost.value = config.estimated_construction_cost ?? '';
   wizardSellingPrice.value = config.selling_price ?? '';
-  wizardSpendPercent.value = config.predicted_spend_percentage ?? '';
-  wizardTimescaleMonths.value = config.spend_timescale_months ?? '';
+  wizardStartOnSiteDate.value = config.start_on_site_date || '';
   wizardTemplateSelect.value = config.template_key || '';
-  renderWeeklySpreadInputs(config.template_key, config.weekly_spread);
+  updateCompletionDateField();
+}
+
+function normalizeInputDate(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
+}
+
+function getPredictedSpendPercent() {
+  const spreadValues = getTemplateDefaultSpread();
+  if (spreadValues.length) {
+    return Number(spreadValues.reduce((sum, value) => sum + (Number(value) || 0), 0).toFixed(2));
+  }
+
+  const template = selectedTemplate();
+  if (template && Array.isArray(template.default_spread) && template.default_spread.length) {
+    return Number(template.default_spread.reduce((sum, value) => sum + (Number(value) || 0), 0).toFixed(2));
+  }
+
+  return 100;
+}
+
+function getTemplateDefaultSpread(templateKey = null) {
+  const key = templateKey || wizardTemplateSelect?.value || null;
+  if (!key) return [];
+
+  const template = cashflowTemplates.find((entry) => entry.key === key);
+  if (!template || !Array.isArray(template.default_spread) || !template.default_spread.length) {
+    return [];
+  }
+
+  return normalizeSpreadTo100(template.default_spread.map((entry) => Number(entry)));
+}
+
+function getDerivedTimescaleWeeks(templateKey = null) {
+  const key = templateKey || wizardTemplateSelect?.value || null;
+  if (!key) return null;
+
+  const template = cashflowTemplates.find((entry) => entry.key === key);
+  const weeks = Number(template?.week_count || 0);
+  if (!Number.isFinite(weeks) || weeks <= 0) return null;
+
+  return Math.max(1, Math.round(weeks));
+}
+
+function deriveCompletionDate(startDateValue, templateKey = null) {
+  const startDate = normalizeInputDate(startDateValue);
+  const timescaleWeeks = getDerivedTimescaleWeeks(templateKey);
+  if (!startDate || !timescaleWeeks) return null;
+
+  const completion = new Date(`${startDate}T00:00:00`);
+  completion.setDate(completion.getDate() + (timescaleWeeks * 7));
+  return completion.toISOString().slice(0, 10);
+}
+
+function updateCompletionDateField() {
+  if (!wizardCompletionDate) return;
+  wizardCompletionDate.value = deriveCompletionDate(wizardStartOnSiteDate?.value, wizardTemplateSelect?.value) || '';
 }
 
 function openWizardModal(isEdit = false, locationId = null) {
@@ -287,20 +367,23 @@ function validateWizardInput(locationData) {
   if (locationData.selling_price === null || Number.isNaN(locationData.selling_price)) {
     return 'Location selling price is required';
   }
-  if (locationData.predicted_spend_percentage === null || Number.isNaN(locationData.predicted_spend_percentage)) {
-    return 'Predicted spend % is required';
+  if (!locationData.start_on_site_date) {
+    return 'Start on site date is required';
   }
-  if (locationData.spend_timescale_months === null || Number.isNaN(locationData.spend_timescale_months)) {
-    return 'Spend timescale is required';
+  if (!locationData.completion_date) {
+    return 'Completion date could not be calculated. Check start date and template';
   }
 
   if (locationData.estimated_construction_cost < 0) return 'Estimated construction cost cannot be negative';
   if (locationData.selling_price < 0) return 'Location selling price cannot be negative';
-  if (locationData.predicted_spend_percentage < 0 || locationData.predicted_spend_percentage > 100) {
+  if (locationData.predicted_spend_percentage !== null && (locationData.predicted_spend_percentage < 0 || locationData.predicted_spend_percentage > 100)) {
     return 'Predicted spend % must be between 0 and 100';
   }
-  if (!Number.isInteger(locationData.spend_timescale_months) || locationData.spend_timescale_months <= 0) {
+  if (locationData.spend_timescale_months !== null && (!Number.isInteger(locationData.spend_timescale_months) || locationData.spend_timescale_months <= 0)) {
     return 'Spend timescale must be a positive whole number';
+  }
+  if (locationData.completion_date < locationData.start_on_site_date) {
+    return 'Completion date cannot be before start on site date';
   }
 
   return null;
@@ -322,26 +405,12 @@ function validateStep(step) {
     const value = parseNumber(wizardSellingPrice.value);
     if (value === null || Number.isNaN(value)) return 'Location selling price is required';
     if (value < 0) return 'Location selling price cannot be negative';
-  }
 
-  if (step === 5) {
-    const value = parseNumber(wizardSpendPercent.value);
-    if (value === null || Number.isNaN(value)) return 'Predicted spend % is required';
-    if (value < 0 || value > 100) return 'Predicted spend % must be between 0 and 100';
-  }
+    const startOnSite = normalizeInputDate(wizardStartOnSiteDate.value);
+    if (!startOnSite) return 'Start on site date is required';
 
-  if (step === 6) {
-    const value = parseNumber(wizardTimescaleMonths.value);
-    if (value === null || Number.isNaN(value)) return 'Spend timescale is required';
-    if (!Number.isInteger(value) || value <= 0) return 'Spend timescale must be a positive whole number';
-  }
-
-  if (step === 7) {
-    const spreadValues = collectWeeklySpreadValues();
-    if (!spreadValues.length) return 'Weekly spread values are required';
-    if (spreadValues.some((entry) => Number.isNaN(entry) || entry < 0)) return 'Weekly spread values must be valid non-negative numbers';
-    const total = Number(spreadValues.reduce((sum, value) => sum + value, 0).toFixed(2));
-    if (Math.abs(total - 100) > 0.05) return 'Weekly spread must total 100%';
+    const completionDate = deriveCompletionDate(startOnSite, wizardTemplateSelect.value);
+    if (!completionDate) return 'Completion date could not be calculated. Check template and start date';
   }
 
   return null;
@@ -368,50 +437,6 @@ function normalizeSpreadTo100(values) {
   return scaled;
 }
 
-function renderWeeklySpreadInputs(templateKey, existingSpread = null) {
-  if (!wizardWeeklySpread) return;
-  const template = cashflowTemplates.find((item) => item.key === templateKey);
-
-  if (!template) {
-    wizardWeeklySpread.innerHTML = '<div class="text-muted small">Select a template to set weekly spread.</div>';
-    if (wizardSpreadTotal) wizardSpreadTotal.textContent = 'Total: 0%';
-    return;
-  }
-
-  const baseSpread = Array.isArray(existingSpread) && existingSpread.length === Number(template.week_count)
-    ? existingSpread.map((entry) => Number(entry))
-    : (Array.isArray(template.default_spread) ? template.default_spread.map((entry) => Number(entry)) : []);
-  const normalized = normalizeSpreadTo100(baseSpread);
-
-  wizardWeeklySpread.innerHTML = normalized.map((value, idx) => `
-    <div class="weekly-row">
-      <label class="small text-muted">Week ${idx + 1}</label>
-      <input type="number" step="0.01" min="0" class="form-control weekly-spread-input" data-week-index="${idx}" value="${value}">
-    </div>
-  `).join('');
-
-  updateSpreadTotal();
-
-  wizardWeeklySpread.querySelectorAll('.weekly-spread-input').forEach((input) => {
-    input.addEventListener('input', updateSpreadTotal);
-  });
-}
-
-function updateSpreadTotal() {
-  const values = collectWeeklySpreadValues();
-  const total = Number(values.reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0).toFixed(2));
-  if (wizardSpreadTotal) {
-    wizardSpreadTotal.textContent = `Total: ${total}%`;
-    wizardSpreadTotal.classList.toggle('text-danger', Math.abs(total - 100) > 0.05);
-    wizardSpreadTotal.classList.toggle('text-muted', Math.abs(total - 100) <= 0.05);
-  }
-}
-
-function collectWeeklySpreadValues() {
-  if (!wizardWeeklySpread) return [];
-  return [...wizardWeeklySpread.querySelectorAll('.weekly-spread-input')].map((input) => parseNumber(input.value));
-}
-
 function templateNameByKey(key) {
   const template = cashflowTemplates.find((item) => item.key === key);
   return template ? template.name : key;
@@ -432,56 +457,66 @@ function renderTemplateOptions() {
   }
 }
 
-function renderTemplateManagerList() {
-  if (!templateManagerListBody) return;
-
-  if (!cashflowTemplates.length) {
-    templateManagerListBody.innerHTML = `
-      <tr>
-        <td colspan="3" class="text-muted text-center py-3">No templates available</td>
-      </tr>
-    `;
-    return;
+function setTemplateDraftMode(editMode) {
+  if (templateFormTitle) {
+    templateFormTitle.textContent = editMode ? 'Edit Template' : 'Create Template';
   }
-
-  templateManagerListBody.innerHTML = cashflowTemplates
-    .map((template) => {
-      const total = Number((template.default_spread || []).reduce((sum, value) => sum + (Number(value) || 0), 0).toFixed(2));
-      return `
-        <tr>
-          <td>${template.name}</td>
-          <td>${template.week_count}</td>
-          <td>${total}%</td>
-        </tr>
-      `;
-    })
-    .join('');
-}
-
-function updateTemplateRowsTotals() {
-  const totalPercent = Number(templateRows.reduce((sum, row) => sum + (Number(row.percent) || 0), 0).toFixed(2));
-  const totalWeeks = Number(templateRows.reduce((sum, row) => sum + (Number(row.weeks) || 0), 0));
-  if (templateRowsTotals) {
-    templateRowsTotals.textContent = `Total: ${totalPercent}% | ${totalWeeks} weeks`;
-    templateRowsTotals.classList.toggle('text-danger', Math.abs(totalPercent - 100) > 0.05);
-    templateRowsTotals.classList.toggle('text-muted', Math.abs(totalPercent - 100) <= 0.05);
+  if (templateDraftSaveBtn) {
+    templateDraftSaveBtn.textContent = editMode ? 'Update Template' : 'Create Template';
+  }
+  if (templateDraftCancelEditBtn) {
+    templateDraftCancelEditBtn.style.display = editMode ? 'inline-block' : 'none';
   }
 }
 
-function renderTemplateRowsTable() {
-  if (!templateRowsBody) return;
+function resetTemplateDraftForm() {
+  editingTemplateKey = null;
+  templateDraftRows = [];
+  if (templateDraftName) templateDraftName.value = '';
+  if (templateDraftStage) templateDraftStage.value = '';
+  if (templateDraftPercent) templateDraftPercent.value = '';
+  if (templateDraftWeeks) templateDraftWeeks.value = '';
+  setTemplateDraftMode(false);
+  renderTemplateDraftRows();
+}
 
-  if (!templateRows.length) {
-    templateRowsBody.innerHTML = `
+function openTemplateDraftModal() {
+  if (templateDraftModal) {
+    templateDraftModal.style.display = 'flex';
+  }
+}
+
+function closeTemplateDraftModal() {
+  if (templateDraftModal) {
+    templateDraftModal.style.display = 'none';
+  }
+  resetTemplateDraftForm();
+}
+
+function updateTemplateDraftTotals() {
+  const totalPercent = Number(templateDraftRows.reduce((sum, row) => sum + (Number(row.percent) || 0), 0).toFixed(2));
+  const totalWeeks = Number(templateDraftRows.reduce((sum, row) => sum + (Number(row.weeks) || 0), 0));
+  if (templateDraftTotals) {
+    templateDraftTotals.textContent = `Total: ${totalPercent}% | ${totalWeeks} weeks`;
+    templateDraftTotals.classList.toggle('text-danger', Math.abs(totalPercent - 100) > 0.05);
+    templateDraftTotals.classList.toggle('text-muted', Math.abs(totalPercent - 100) <= 0.05);
+  }
+}
+
+function renderTemplateDraftRows() {
+  if (!templateDraftRowsBody) return;
+
+  if (!templateDraftRows.length) {
+    templateDraftRowsBody.innerHTML = `
       <tr>
         <td colspan="4" class="text-muted text-center py-3">No rows added yet.</td>
       </tr>
     `;
-    updateTemplateRowsTotals();
+    updateTemplateDraftTotals();
     return;
   }
 
-  templateRowsBody.innerHTML = templateRows
+  templateDraftRowsBody.innerHTML = templateDraftRows
     .map((row, index) => `
       <tr>
         <td>${row.stage}</td>
@@ -489,179 +524,176 @@ function renderTemplateRowsTable() {
         <td>${row.weeks}</td>
         <td>
           <div class="d-flex gap-1">
-            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="moveTemplateRowUp(${index})" ${index === 0 ? 'disabled' : ''}>↑</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="moveTemplateRowDown(${index})" ${index === templateRows.length - 1 ? 'disabled' : ''}>↓</button>
-            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeTemplateRow(${index})">Remove</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="moveTemplateDraftRowUp(${index})" ${index === 0 ? 'disabled' : ''}>↑</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="moveTemplateDraftRowDown(${index})" ${index === templateDraftRows.length - 1 ? 'disabled' : ''}>↓</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeTemplateDraftRow(${index})">Remove</button>
           </div>
         </td>
       </tr>
     `)
     .join('');
 
-  updateTemplateRowsTotals();
+  updateTemplateDraftTotals();
 }
 
-function addTemplateRow() {
-  const stage = String(templateRowStage?.value || '').trim();
-  const percent = parseNumber(templateRowPercent?.value);
-  const weeks = parseNumber(templateRowWeeks?.value);
+function renderTemplateAccordion() {
+  if (!templateAccordionBody) return;
+
+  if (!cashflowTemplates.length) {
+    templateAccordionBody.innerHTML = `
+      <tr>
+        <td colspan="5" class="text-muted text-center py-3">No templates available.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  templateAccordionBody.innerHTML = cashflowTemplates
+    .map((template) => {
+      const percentTotal = Number((template.rows || []).reduce((sum, row) => sum + (Number(row.percent) || 0), 0).toFixed(2));
+      const isExpanded = expandedTemplateKeys.has(template.key);
+      const rowsHtml = (template.rows || [])
+        .map((row) => `<tr><td>${row.stage}</td><td>${row.percent}</td><td>${row.weeks}</td></tr>`)
+        .join('') || '<tr><td colspan="3" class="text-muted text-center">No rows</td></tr>';
+
+      return `
+        <tr>
+          <td>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleTemplateAccordion('${template.key}')">${isExpanded ? '−' : '+'}</button>
+          </td>
+          <td>${template.name}</td>
+          <td>${template.week_count}</td>
+          <td>${percentTotal}%</td>
+          <td>
+            <div class="d-flex gap-1">
+              <button type="button" class="btn btn-sm btn-outline-primary" onclick="startTemplateEdit('${template.key}')">Edit</button>
+              <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteTemplate('${template.key}')">Delete</button>
+            </div>
+          </td>
+        </tr>
+        <tr style="display:${isExpanded ? 'table-row' : 'none'};">
+          <td colspan="5">
+            <div class="p-2 border rounded bg-white">
+              <div class="fw-semibold mb-2">Template Rows</div>
+              <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                  <thead>
+                    <tr><th>Stage</th><th>Percent</th><th>Weeks</th></tr>
+                  </thead>
+                  <tbody>${rowsHtml}</tbody>
+                </table>
+              </div>
+            </div>
+          </td>
+        </tr>
+      `;
+    })
+    .join('');
+}
+
+function addTemplateDraftRow() {
+  const stage = String(templateDraftStage?.value || '').trim();
+  const percent = parseNumber(templateDraftPercent?.value);
+  const weeks = parseNumber(templateDraftWeeks?.value);
 
   if (!stage) {
     setStatus('Stage is required', true);
     return;
   }
-
   if (percent === null || Number.isNaN(percent) || percent < 0) {
     setStatus('Percent must be a valid non-negative number', true);
     return;
   }
-
   if (weeks === null || Number.isNaN(weeks) || !Number.isInteger(weeks) || weeks <= 0) {
     setStatus('Weeks must be a positive whole number', true);
     return;
   }
 
-  templateRows.push({ stage, percent, weeks });
-  renderTemplateRowsTable();
+  templateDraftRows.push({ stage, percent, weeks });
+  renderTemplateDraftRows();
 
-  if (templateRowStage) templateRowStage.value = '';
-  if (templateRowPercent) templateRowPercent.value = '';
-  if (templateRowWeeks) templateRowWeeks.value = '';
+  if (templateDraftStage) templateDraftStage.value = '';
+  if (templateDraftPercent) templateDraftPercent.value = '';
+  if (templateDraftWeeks) templateDraftWeeks.value = '';
   setStatus('');
 }
 
-function removeTemplateRow(index) {
-  templateRows = templateRows.filter((_, rowIndex) => rowIndex !== Number(index));
-  renderTemplateRowsTable();
+function removeTemplateDraftRow(index) {
+  templateDraftRows = templateDraftRows.filter((_, rowIndex) => rowIndex !== Number(index));
+  renderTemplateDraftRows();
 }
 
-function moveTemplateRowUp(index) {
+function moveTemplateDraftRowUp(index) {
   const rowIndex = Number(index);
-  if (!Number.isInteger(rowIndex) || rowIndex <= 0 || rowIndex >= templateRows.length) return;
+  if (!Number.isInteger(rowIndex) || rowIndex <= 0 || rowIndex >= templateDraftRows.length) return;
 
-  const reordered = [...templateRows];
+  const reordered = [...templateDraftRows];
   const [current] = reordered.splice(rowIndex, 1);
   reordered.splice(rowIndex - 1, 0, current);
-  templateRows = reordered;
-  renderTemplateRowsTable();
+  templateDraftRows = reordered;
+  renderTemplateDraftRows();
 }
 
-function moveTemplateRowDown(index) {
+function moveTemplateDraftRowDown(index) {
   const rowIndex = Number(index);
-  if (!Number.isInteger(rowIndex) || rowIndex < 0 || rowIndex >= templateRows.length - 1) return;
+  if (!Number.isInteger(rowIndex) || rowIndex < 0 || rowIndex >= templateDraftRows.length - 1) return;
 
-  const reordered = [...templateRows];
+  const reordered = [...templateDraftRows];
   const [current] = reordered.splice(rowIndex, 1);
   reordered.splice(rowIndex + 1, 0, current);
-  templateRows = reordered;
-  renderTemplateRowsTable();
+  templateDraftRows = reordered;
+  renderTemplateDraftRows();
 }
 
-function resetTemplateWizard() {
-  templateWizardCurrentStep = 1;
-  templateRows = [];
-  if (templateWizardName) templateWizardName.value = '';
-  if (templateRowStage) templateRowStage.value = '';
-  if (templateRowPercent) templateRowPercent.value = '';
-  if (templateRowWeeks) templateRowWeeks.value = '';
-  if (templateWizardReview) templateWizardReview.innerHTML = '';
-  renderTemplateRowsTable();
-}
-
-function openTemplateManagerModal() {
-  resetTemplateWizard();
-  renderTemplateManagerList();
-  updateTemplateWizardStepUI();
-  if (templateManagerModal) templateManagerModal.style.display = 'flex';
-}
-
-function closeTemplateManagerModal() {
-  if (templateManagerModal) templateManagerModal.style.display = 'none';
-  resetTemplateWizard();
-}
-
-function validateTemplateStep(step) {
-  if (step === 1) {
-    if (!String(templateWizardName?.value || '').trim()) return 'Template name is required';
-  }
-
-  if (step === 2) {
-    if (!templateRows.length) {
-      return 'Add at least one row to the template';
-    }
-
-    if (templateRows.some((row) => !row.stage || Number.isNaN(Number(row.percent)) || Number(row.percent) < 0 || !Number.isInteger(Number(row.weeks)) || Number(row.weeks) <= 0)) {
-      return 'Template rows must have valid Stage, Percent, and Weeks values';
-    }
-
-    const total = Number(templateRows.reduce((sum, row) => sum + Number(row.percent || 0), 0).toFixed(2));
-    if (Math.abs(total - 100) > 0.05) return 'Weekly spread must total 100%';
-  }
-
-  return null;
-}
-
-function updateTemplateWizardReview() {
-  if (!templateWizardReview) return;
-  const name = String(templateWizardName?.value || '').trim();
-  const weekCount = Number(templateRows.reduce((sum, row) => sum + Number(row.weeks || 0), 0));
-  const total = Number(templateRows.reduce((sum, row) => sum + Number(row.percent || 0), 0).toFixed(2));
-
-  templateWizardReview.innerHTML = `
-    <div><strong>Name:</strong> ${name || '-'}</div>
-    <div><strong>Weeks:</strong> ${weekCount || '-'}</div>
-    <div><strong>Rows:</strong> ${templateRows.length}</div>
-    <div><strong>Spread Total:</strong> ${total}%</div>
-  `;
-}
-
-function updateTemplateWizardStepUI() {
-  templateSteps.forEach((stepEl) => {
-    const step = Number(stepEl.getAttribute('data-template-step'));
-    stepEl.style.display = step === templateWizardCurrentStep ? 'block' : 'none';
-  });
-
-  if (templateWizardStepCounter) {
-    templateWizardStepCounter.textContent = `Step ${templateWizardCurrentStep} of ${templateWizardTotalSteps}`;
-  }
-
-  templateWizardBackBtn.disabled = templateWizardCurrentStep === 1;
-  templateWizardNextBtn.style.display = templateWizardCurrentStep === templateWizardTotalSteps ? 'none' : 'inline-block';
-  templateWizardSaveBtn.style.display = templateWizardCurrentStep === templateWizardTotalSteps ? 'inline-block' : 'none';
-
-  if (templateWizardCurrentStep === templateWizardTotalSteps) {
-    updateTemplateWizardReview();
-  }
-}
-
-function nextTemplateWizardStep() {
-  const error = validateTemplateStep(templateWizardCurrentStep);
-  if (error) {
-    setStatus(error, true);
+function startTemplateEdit(templateKey) {
+  const template = cashflowTemplates.find((entry) => entry.key === templateKey);
+  if (!template) {
+    setStatus('Template not found', true);
     return;
   }
 
-  setStatus('');
-  templateWizardCurrentStep = Math.min(templateWizardTotalSteps, templateWizardCurrentStep + 1);
-  updateTemplateWizardStepUI();
+  editingTemplateKey = template.key;
+  templateDraftRows = (template.rows || []).map((row) => ({
+    stage: String(row.stage || ''),
+    percent: Number(row.percent),
+    weeks: Number(row.weeks)
+  }));
+  if (templateDraftName) templateDraftName.value = template.name || '';
+  setTemplateDraftMode(true);
+  renderTemplateDraftRows();
+  openTemplateDraftModal();
+  setStatus('Editing template. Update rows and save when ready.');
 }
 
-function previousTemplateWizardStep() {
-  templateWizardCurrentStep = Math.max(1, templateWizardCurrentStep - 1);
-  setStatus('');
-  updateTemplateWizardStepUI();
+function toggleTemplateAccordion(templateKey) {
+  if (expandedTemplateKeys.has(templateKey)) {
+    expandedTemplateKeys.delete(templateKey);
+  } else {
+    expandedTemplateKeys.add(templateKey);
+  }
+  renderTemplateAccordion();
 }
 
-async function saveTemplateFromWizard() {
-  const validationError = validateTemplateStep(2);
-  if (validationError) {
-    setStatus(validationError, true);
+async function saveTemplateDraft() {
+  const templateName = String(templateDraftName?.value || '').trim();
+  if (!templateName) {
+    setStatus('Template name is required', true);
+    return;
+  }
+  if (!templateDraftRows.length) {
+    setStatus('Add at least one row to the template', true);
+    return;
+  }
+
+  const totalPercent = Number(templateDraftRows.reduce((sum, row) => sum + Number(row.percent || 0), 0).toFixed(2));
+  if (Math.abs(totalPercent - 100) > 0.05) {
+    setStatus('Template rows must total 100%', true);
     return;
   }
 
   const payload = {
-    name: String(templateWizardName?.value || '').trim(),
-    rows: templateRows.map((row) => ({
+    name: templateName,
+    rows: templateDraftRows.map((row) => ({
       stage: row.stage,
       percent: Number(row.percent),
       weeks: Number(row.weeks)
@@ -669,23 +701,61 @@ async function saveTemplateFromWizard() {
   };
 
   try {
-    const response = await api('/cashflow/templates', 'POST', payload);
+    const isEdit = !!editingTemplateKey;
+    const endpoint = editingTemplateKey ? `/cashflow/templates/${editingTemplateKey}` : '/cashflow/templates';
+    const method = editingTemplateKey ? 'PUT' : 'POST';
+    const response = await api(endpoint, method, payload);
+
     if (response?.template) {
-      cashflowTemplates.push(response.template);
+      const idx = cashflowTemplates.findIndex((entry) => entry.key === response.template.key);
+      if (idx >= 0) {
+        cashflowTemplates[idx] = response.template;
+      } else {
+        cashflowTemplates.push(response.template);
+      }
       cashflowTemplates.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base', numeric: true }));
+
       renderTemplateOptions();
-      renderTemplateManagerList();
-      setStatus('Template created successfully.');
-      closeTemplateManagerModal();
+      renderTemplateAccordion();
+      resetTemplateDraftForm();
+      if (templateDraftModal) templateDraftModal.style.display = 'none';
+      setStatus(isEdit ? 'Template updated successfully.' : 'Template created successfully.');
     }
   } catch (error) {
-    setStatus(error.message || 'Failed to create template', true);
+    setStatus(error.message || 'Failed to save template', true);
   }
 }
 
-window.removeTemplateRow = removeTemplateRow;
-window.moveTemplateRowUp = moveTemplateRowUp;
-window.moveTemplateRowDown = moveTemplateRowDown;
+async function deleteTemplate(templateKey) {
+  const template = cashflowTemplates.find((entry) => entry.key === templateKey);
+  if (!template) return;
+
+  const confirmed = window.confirm(`Delete template "${template.name}"?`);
+  if (!confirmed) return;
+
+  try {
+    await api(`/cashflow/templates/${templateKey}`, 'DELETE');
+    cashflowTemplates = cashflowTemplates.filter((entry) => entry.key !== templateKey);
+    expandedTemplateKeys.delete(templateKey);
+
+    if (editingTemplateKey === templateKey) {
+      resetTemplateDraftForm();
+    }
+
+    renderTemplateOptions();
+    renderTemplateAccordion();
+    setStatus('Template deleted successfully.');
+  } catch (error) {
+    setStatus(error.message || 'Failed to delete template', true);
+  }
+}
+
+window.removeTemplateDraftRow = removeTemplateDraftRow;
+window.moveTemplateDraftRowUp = moveTemplateDraftRowUp;
+window.moveTemplateDraftRowDown = moveTemplateDraftRowDown;
+window.startTemplateEdit = startTemplateEdit;
+window.deleteTemplate = deleteTemplate;
+window.toggleTemplateAccordion = toggleTemplateAccordion;
 
 function updateWizardReview() {
   if (!wizardReview) return;
@@ -697,9 +767,11 @@ function updateWizardReview() {
     <div><strong>Template:</strong> ${templateNameByKey(wizardTemplateSelect.value) || '-'}</div>
     <div><strong>Est. Construction Cost:</strong> ${formatCurrency(parseNumber(wizardEstimatedCost.value) || 0)}</div>
     <div><strong>Location Selling Price:</strong> ${formatCurrency(parseNumber(wizardSellingPrice.value) || 0)}</div>
-    <div><strong>Predicted Spend %:</strong> ${parseNumber(wizardSpendPercent.value) ?? '-'}</div>
-    <div><strong>Spend Timescale (Months):</strong> ${parseNumber(wizardTimescaleMonths.value) ?? '-'}</div>
-    <div><strong>Weekly Spread Total:</strong> ${Number(collectWeeklySpreadValues().reduce((sum, value) => sum + (Number(value) || 0), 0).toFixed(2))}%</div>
+    <div><strong>Start on Site Date:</strong> ${normalizeInputDate(wizardStartOnSiteDate.value) || '-'}</div>
+    <div><strong>Completion Date:</strong> ${deriveCompletionDate(wizardStartOnSiteDate.value, wizardTemplateSelect.value) || '-'}</div>
+    <div><strong>Predicted Spend %:</strong> ${getPredictedSpendPercent()}</div>
+    <div><strong>Spend Timescale (Weeks):</strong> ${getDerivedTimescaleWeeks() ?? '-'}</div>
+    <div><strong>Weekly Spread Total:</strong> ${Number(getTemplateDefaultSpread().reduce((sum, value) => sum + (Number(value) || 0), 0).toFixed(2))}%</div>
   `;
 }
 
@@ -754,10 +826,12 @@ function buildWizardLocationData() {
     include_in_cashflow: true,
     template_key: wizardTemplateSelect.value,
     template_name: templateNameByKey(wizardTemplateSelect.value),
-    weekly_spread: collectWeeklySpreadValues(),
+    weekly_spread: getTemplateDefaultSpread(),
     estimated_construction_cost: parseNumber(wizardEstimatedCost.value),
-    predicted_spend_percentage: parseNumber(wizardSpendPercent.value),
-    spend_timescale_months: parseNumber(wizardTimescaleMonths.value),
+    predicted_spend_percentage: getPredictedSpendPercent(),
+    spend_timescale_months: getDerivedTimescaleWeeks(),
+    start_on_site_date: normalizeInputDate(wizardStartOnSiteDate.value),
+    completion_date: deriveCompletionDate(wizardStartOnSiteDate.value, wizardTemplateSelect.value),
     selling_price: parseNumber(wizardSellingPrice.value)
   };
 }
@@ -793,14 +867,19 @@ function collectPayload() {
   const locations = currentLocations.map((location) => {
     const configured = configuredLocations.get(Number(location.location_id));
     if (configured) {
+      const derivedTimescale = configured.spend_timescale_months ?? getDerivedTimescaleWeeks(configured.template_key);
+      const derivedSpread = getTemplateDefaultSpread(configured.template_key);
+      const derivedCompletionDate = deriveCompletionDate(configured.start_on_site_date, configured.template_key) || configured.completion_date || null;
       return {
         location_id: location.location_id,
         include_in_cashflow: true,
         template_key: configured.template_key,
-        weekly_spread: configured.weekly_spread,
+        weekly_spread: derivedSpread,
         estimated_construction_cost: configured.estimated_construction_cost,
         predicted_spend_percentage: configured.predicted_spend_percentage,
-        spend_timescale_months: configured.spend_timescale_months,
+        spend_timescale_months: derivedTimescale,
+        start_on_site_date: configured.start_on_site_date || null,
+        completion_date: derivedCompletionDate,
         selling_price: configured.selling_price
       };
     }
@@ -813,6 +892,8 @@ function collectPayload() {
       estimated_construction_cost: null,
       predicted_spend_percentage: null,
       spend_timescale_months: null,
+      start_on_site_date: null,
+      completion_date: null,
       selling_price: null
     };
   });
@@ -851,6 +932,12 @@ function validatePayload(payload) {
     if (Number.isNaN(location.selling_price)) {
       return 'Location selling price must be a valid number';
     }
+    if (!location.start_on_site_date) {
+      return 'Start on site date is required for each included location';
+    }
+    if (!location.completion_date) {
+      return 'Completion date is required for each included location';
+    }
 
     if (!location.template_key) {
       return 'Template is required for each included location';
@@ -877,6 +964,10 @@ function validatePayload(payload) {
       (!Number.isInteger(location.spend_timescale_months) || location.spend_timescale_months <= 0)
     ) {
       return 'Spend timescale must be a positive whole number';
+    }
+
+    if (location.completion_date < location.start_on_site_date) {
+      return 'Completion date cannot be before start on site date';
     }
   }
 
@@ -917,6 +1008,8 @@ async function loadSettings() {
 
     renderConfiguredRows();
     renderTemplateOptions();
+    renderTemplateAccordion();
+    resetTemplateDraftForm();
     renderSiteOptions();
     renderLocationOptions();
     resetWizardForm();
@@ -952,6 +1045,7 @@ function editConfiguredLocation(locationId) {
 
 function removeConfiguredLocation(locationId) {
   configuredLocations.delete(Number(locationId));
+  expandedLocationIds.delete(Number(locationId));
   renderConfiguredRows();
   if (editingLocationId && Number(editingLocationId) === Number(locationId)) {
     resetWizardForm();
@@ -963,6 +1057,7 @@ function removeConfiguredLocation(locationId) {
 
 window.editConfiguredLocation = editConfiguredLocation;
 window.removeConfiguredLocation = removeConfiguredLocation;
+window.toggleConfiguredLocation = toggleConfiguredLocation;
 
 openWizardModalBtn?.addEventListener('click', () => openWizardModal(false));
 closeWizardModalBtn?.addEventListener('click', closeWizardModal);
@@ -970,15 +1065,29 @@ wizardCancelBtn?.addEventListener('click', closeWizardModal);
 wizardNextBtn?.addEventListener('click', goToNextStep);
 wizardBackBtn?.addEventListener('click', goToPreviousStep);
 wizardSaveLocationBtn?.addEventListener('click', addOrUpdateWizardLocation);
-openTemplateManagerModalBtn?.addEventListener('click', openTemplateManagerModal);
-closeTemplateManagerModalBtn?.addEventListener('click', closeTemplateManagerModal);
-templateWizardCancelBtn?.addEventListener('click', closeTemplateManagerModal);
-templateWizardNextBtn?.addEventListener('click', nextTemplateWizardStep);
-templateWizardBackBtn?.addEventListener('click', previousTemplateWizardStep);
-templateWizardSaveBtn?.addEventListener('click', saveTemplateFromWizard);
-templateAddRowBtn?.addEventListener('click', addTemplateRow);
+openTemplateDraftModalBtn?.addEventListener('click', () => {
+  resetTemplateDraftForm();
+  openTemplateDraftModal();
+});
+closeTemplateDraftModalBtn?.addEventListener('click', closeTemplateDraftModal);
+closeTemplateDraftCancelBtn?.addEventListener('click', closeTemplateDraftModal);
+templateDraftAddRowBtn?.addEventListener('click', addTemplateDraftRow);
+templateDraftSaveBtn?.addEventListener('click', saveTemplateDraft);
+templateDraftCancelEditBtn?.addEventListener('click', () => {
+  resetTemplateDraftForm();
+  setStatus('Template edit cancelled.');
+});
 wizardTemplateSelect?.addEventListener('change', () => {
-  renderWeeklySpreadInputs(wizardTemplateSelect.value);
+  updateCompletionDateField();
+  if (wizardCurrentStep === wizardTotalSteps) {
+    updateWizardReview();
+  }
+});
+wizardStartOnSiteDate?.addEventListener('change', () => {
+  updateCompletionDateField();
+  if (wizardCurrentStep === wizardTotalSteps) {
+    updateWizardReview();
+  }
 });
 wizardSiteSelect?.addEventListener('change', () => {
   wizardLocationSelect.value = '';
@@ -991,9 +1100,9 @@ cashflowWizardModal?.addEventListener('click', (event) => {
   }
 });
 
-templateManagerModal?.addEventListener('click', (event) => {
-  if (event.target === templateManagerModal) {
-    closeTemplateManagerModal();
+templateDraftModal?.addEventListener('click', (event) => {
+  if (event.target === templateDraftModal) {
+    closeTemplateDraftModal();
   }
 });
 

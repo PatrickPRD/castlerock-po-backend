@@ -49,3 +49,16 @@
   display: block;
   font-size: 12px;
 }
+
+#configuredLocationsTable .configured-location-details td {
+  background: #f8f9fa;
+}
+
+.configured-location-panel {
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+}

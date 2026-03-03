@@ -347,6 +347,8 @@ router.get(
           cls.predicted_spend_percentage,
           cls.spend_timescale_months,
           cls.selling_price,
+          cls.start_on_site_date,
+          cls.completion_date,
           cls.template_key,
           cls.weekly_spread_json
          FROM locations l
@@ -371,6 +373,8 @@ router.get(
           predicted_spend_percentage: row.predicted_spend_percentage === null ? null : Number(row.predicted_spend_percentage),
           spend_timescale_months: row.spend_timescale_months === null ? null : Number(row.spend_timescale_months),
           selling_price: row.selling_price === null ? null : Number(row.selling_price),
+          start_on_site_date: row.start_on_site_date || null,
+          completion_date: row.completion_date || null,
           template_key: row.template_key || null,
           weekly_spread: parseWeeklySpread(row.weekly_spread_json)
         }))
@@ -420,6 +424,8 @@ router.put(
         const predictedSpendPercentage = toNullableNumber(item?.predicted_spend_percentage);
         const spendTimescaleMonths = toNullableNumber(item?.spend_timescale_months);
         const sellingPrice = toNullableNumber(item?.selling_price);
+        const startOnSiteDate = normalizeDate(item?.start_on_site_date);
+        const completionDate = normalizeDate(item?.completion_date);
         const templateKey = item?.template_key ? String(item.template_key).trim() : null;
         const normalizedSpread = normalizeWeeklySpread(item?.weekly_spread);
 
@@ -439,6 +445,18 @@ router.put(
           return res.status(400).json({ error: 'selling_price cannot be negative' });
         }
 
+        if (item?.start_on_site_date && !startOnSiteDate) {
+          return res.status(400).json({ error: 'start_on_site_date must be in YYYY-MM-DD format' });
+        }
+
+        if (item?.completion_date && !completionDate) {
+          return res.status(400).json({ error: 'completion_date must be in YYYY-MM-DD format' });
+        }
+
+        if (startOnSiteDate && completionDate && completionDate < startOnSiteDate) {
+          return res.status(400).json({ error: 'completion_date cannot be before start_on_site_date' });
+        }
+
         if (item?.include_in_cashflow) {
           const template = templateMap.get(templateKey);
           if (!template) {
@@ -451,6 +469,10 @@ router.put(
 
           if (!validateSpreadTotal(normalizedSpread)) {
             return res.status(400).json({ error: 'weekly_spread must total 100%' });
+          }
+
+          if (!startOnSiteDate || !completionDate) {
+            return res.status(400).json({ error: 'start_on_site_date and completion_date are required for included locations' });
           }
         }
       }
@@ -478,15 +500,19 @@ router.put(
               predicted_spend_percentage,
               spend_timescale_months,
               selling_price,
+              start_on_site_date,
+              completion_date,
               template_key,
               weekly_spread_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
               include_in_cashflow = VALUES(include_in_cashflow),
               estimated_construction_cost = VALUES(estimated_construction_cost),
               predicted_spend_percentage = VALUES(predicted_spend_percentage),
               spend_timescale_months = VALUES(spend_timescale_months),
               selling_price = VALUES(selling_price),
+              start_on_site_date = VALUES(start_on_site_date),
+              completion_date = VALUES(completion_date),
               template_key = VALUES(template_key),
               weekly_spread_json = VALUES(weekly_spread_json)`,
             [
@@ -496,6 +522,8 @@ router.put(
               toNullableNumber(item.predicted_spend_percentage),
               toNullableNumber(item.spend_timescale_months),
               toNullableNumber(item.selling_price),
+              item.include_in_cashflow ? normalizeDate(item.start_on_site_date) : null,
+              item.include_in_cashflow ? normalizeDate(item.completion_date) : null,
               item.include_in_cashflow ? String(item.template_key || '') : null,
               item.include_in_cashflow && Array.isArray(item.weekly_spread)
                 ? JSON.stringify(item.weekly_spread.map((entry) => Number(entry)))

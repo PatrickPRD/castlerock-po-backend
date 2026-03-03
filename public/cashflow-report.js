@@ -40,16 +40,12 @@ function calculateSpendRates(row, templateMap) {
 
   const template = templateMap.get(String(row.template_key || ''));
   const templateWeeks = toNumber(template?.week_count, 0);
-  const timescaleMonths = toNumber(row.spend_timescale_months, 0);
-  const effectiveWeeks = timescaleMonths > 0
-    ? (timescaleMonths * 52) / 12
-    : templateWeeks;
+  const timescaleWeeks = toNumber(row.spend_timescale_months, 0);
+  const effectiveWeeks = timescaleWeeks > 0 ? timescaleWeeks : templateWeeks;
 
   const spendPerWeek = effectiveWeeks > 0 ? plannedSpend / effectiveWeeks : 0;
   const spendPerDay = spendPerWeek / 7;
-  const spendPerMonth = timescaleMonths > 0
-    ? plannedSpend / timescaleMonths
-    : spendPerWeek * (52 / 12);
+  const spendPerMonth = spendPerWeek * (52 / 12);
 
   return {
     templateName: template?.name || '-',
