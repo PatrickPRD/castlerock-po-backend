@@ -1,0 +1,217 @@
+<%- include('partials/head', { pageTitle: 'Cashflow Setup', styles: ['admin.css', 'cashflow-setup.css'] }) %>
+<%- include('partials/header', { pageTitle: 'Cashflow Setup' }) %>
+
+<main class="container py-4">
+  <div class="card p-4 mb-4">
+    <h3 class="mb-2">Cashflow Setup</h3>
+    <p class="text-muted mb-0">Add locations one-by-one and configure planning assumptions for cashflow forecasting.</p>
+  </div>
+
+  <div class="card p-4">
+    <form id="cashflowSetupForm" class="d-grid gap-3">
+      <div>
+        <label for="overallStartDate" class="form-label">Overall Cashflow Start Date</label>
+        <input id="overallStartDate" type="date" class="form-control" />
+      </div>
+
+      <div>
+        <label for="overallStartValue" class="form-label">Overall Cashflow Start Point (<span data-currency-symbol>€</span>)</label>
+        <input id="overallStartValue" type="number" step="0.01" min="0" class="form-control" placeholder="e.g. 100000" />
+      </div>
+
+      <hr class="my-2">
+
+      <div class="wizard-box">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0">Location Wizard</h5>
+          <span id="wizardProgress" class="text-muted small">0 locations configured</span>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="button" id="openWizardModalBtn" class="btn btn-outline-primary">Add Location</button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-striped align-middle mb-0" id="configuredLocationsTable">
+          <thead>
+            <tr>
+              <th style="min-width: 220px;">Configured Location</th>
+              <th style="min-width: 190px;">Template</th>
+              <th style="min-width: 170px;">Est. Construction Cost (<span data-currency-symbol>€</span>)</th>
+              <th style="min-width: 170px;">Predicted Spend %</th>
+              <th style="min-width: 170px;">Spend Timescale (Months)</th>
+              <th style="min-width: 170px;">Location Selling Price (<span data-currency-symbol>€</span>)</th>
+              <th style="width: 140px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="configuredLocationsBody">
+            <tr>
+              <td colspan="7" class="text-center text-muted py-4">No configured locations yet. Use the wizard above.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="d-flex gap-2 mt-2">
+        <button type="submit" class="btn btn-primary">Save Setup</button>
+        <span id="cashflowSetupStatus" class="align-self-center text-muted small"></span>
+      </div>
+    </form>
+  </div>
+
+  <div id="cashflowWizardModal" class="modal" style="display:none;">
+    <div class="modal-content cashflow-wizard-modal">
+      <div class="modal-header">
+        <h3 id="wizardModalTitle">Add Location to Cashflow</h3>
+        <button class="modal-close" type="button" id="closeWizardModalBtn">×</button>
+      </div>
+
+      <div class="wizard-step-meta">
+        <span id="wizardStepCounter" class="text-muted small">Step 1 of 8</span>
+      </div>
+
+      <div class="wizard-step" data-step="1">
+        <label for="wizardSiteSelect" class="form-label">Select Site</label>
+        <select id="wizardSiteSelect" class="form-select mb-3">
+          <option value="">Select site</option>
+        </select>
+
+        <label for="wizardLocationSelect" class="form-label">Select Location</label>
+        <select id="wizardLocationSelect" class="form-select">
+          <option value="">Select location</option>
+        </select>
+      </div>
+
+      <div class="wizard-step" data-step="2" style="display:none;">
+        <label for="wizardTemplateSelect" class="form-label">Select Template</label>
+        <select id="wizardTemplateSelect" class="form-select">
+          <option value="">Select template</option>
+        </select>
+      </div>
+
+      <div class="wizard-step" data-step="3" style="display:none;">
+        <label for="wizardEstimatedCost" class="form-label">Est. Construction Cost (<span data-currency-symbol>€</span>)</label>
+        <input id="wizardEstimatedCost" type="number" step="0.01" min="0" class="form-control" />
+      </div>
+
+      <div class="wizard-step" data-step="4" style="display:none;">
+        <label for="wizardSellingPrice" class="form-label">Location Selling Price (<span data-currency-symbol>€</span>)</label>
+        <input id="wizardSellingPrice" type="number" step="0.01" min="0" class="form-control" />
+      </div>
+
+      <div class="wizard-step" data-step="5" style="display:none;">
+        <label for="wizardSpendPercent" class="form-label">Predicted Spend %</label>
+        <input id="wizardSpendPercent" type="number" step="0.01" min="0" max="100" class="form-control" />
+      </div>
+
+      <div class="wizard-step" data-step="6" style="display:none;">
+        <label for="wizardTimescaleMonths" class="form-label">Spend Timescale (Months)</label>
+        <input id="wizardTimescaleMonths" type="number" step="1" min="1" class="form-control" />
+      </div>
+
+      <div class="wizard-step" data-step="7" style="display:none;">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <label class="form-label mb-0">Weekly Cost Spread (%)</label>
+          <span id="wizardSpreadTotal" class="text-muted small">Total: 0%</span>
+        </div>
+        <div id="wizardWeeklySpread" class="wizard-weekly-spread"></div>
+      </div>
+
+      <div class="wizard-step" data-step="8" style="display:none;">
+        <div id="wizardReview" class="wizard-review"></div>
+      </div>
+
+      <div class="wizard-actions d-flex justify-content-between gap-2 mt-3">
+        <button type="button" id="wizardBackBtn" class="btn btn-outline-secondary" disabled>Back</button>
+        <div class="d-flex gap-2">
+          <button type="button" id="wizardCancelBtn" class="btn btn-outline-secondary">Cancel</button>
+          <button type="button" id="wizardNextBtn" class="btn btn-primary">Next</button>
+          <button type="button" id="wizardSaveLocationBtn" class="btn btn-primary" style="display:none;">Add Location</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-4 mt-4" id="templateManagerCard">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="mb-0">Template Manager</h5>
+      <span class="text-muted small">Manage template CRUD</span>
+    </div>
+
+    <div class="border rounded p-3 mb-3 bg-light">
+      <h6 class="mb-3" id="templateFormTitle">Create Template</h6>
+
+      <div class="mb-3">
+        <label for="templateDraftName" class="form-label">Template Name</label>
+        <input id="templateDraftName" type="text" class="form-control" maxlength="120" placeholder="e.g. Standard Build 26 Week" />
+      </div>
+
+      <div class="row g-2 align-items-end mb-3">
+        <div class="col-12 col-md-5">
+          <label for="templateDraftStage" class="form-label">Stage</label>
+          <input id="templateDraftStage" type="text" class="form-control" maxlength="120" placeholder="e.g. Sub-Structure" />
+        </div>
+        <div class="col-6 col-md-3">
+          <label for="templateDraftPercent" class="form-label">Percent</label>
+          <input id="templateDraftPercent" type="number" min="0" max="100" step="0.01" class="form-control" placeholder="e.g. 12" />
+        </div>
+        <div class="col-6 col-md-2">
+          <label for="templateDraftWeeks" class="form-label">Weeks</label>
+          <input id="templateDraftWeeks" type="number" min="1" max="104" step="1" class="form-control" placeholder="e.g. 4" />
+        </div>
+        <div class="col-12 col-md-2">
+          <button type="button" id="templateDraftAddRowBtn" class="btn btn-outline-primary w-100">Add Row</button>
+        </div>
+      </div>
+
+      <div class="table-responsive mb-2">
+        <table class="table table-sm table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Stage</th>
+              <th>Percent</th>
+              <th>Weeks</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="templateDraftRowsBody">
+            <tr>
+              <td colspan="4" class="text-muted text-center py-3">No rows added yet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <span id="templateDraftTotals" class="text-muted small">Total: 0% | 0 weeks</span>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="button" id="templateDraftSaveBtn" class="btn btn-primary">Create Template</button>
+        <button type="button" id="templateDraftCancelEditBtn" class="btn btn-outline-secondary" style="display:none;">Cancel Edit</button>
+      </div>
+    </div>
+
+    <h6 class="mb-2">Templates</h6>
+    <div class="table-responsive">
+      <table class="table table-sm table-striped mb-0">
+        <thead>
+          <tr>
+            <th style="width: 40px;"></th>
+            <th>Name</th>
+            <th>Weeks</th>
+            <th>Percent Total</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="templateAccordionBody">
+          <tr>
+            <td colspan="5" class="text-muted text-center py-3">No templates available.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/footer', { scripts: ['cashflow-setup.js'], includeNavScript: true }) %>

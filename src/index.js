@@ -60,6 +60,8 @@ app.get('/invoice-report.html', (req, res) => res.render('invoice-report', { pag
 app.get('/workers-information.html', (req, res) => res.render('workers-information', { pageTitle: 'Workers Information' }));
 app.get('/leave-report.html', (req, res) => res.redirect('/workers-information.html'));
 app.get('/labour-costs.html', (req, res) => res.render('labour-costs', { pageTitle: 'Labour Costs' }));
+app.get('/cashflow-setup.html', (req, res) => res.render('cashflow-setup', { pageTitle: 'Cashflow Setup' }));
+app.get('/cashflow-report.html', (req, res) => res.render('cashflow-report', { pageTitle: 'Cashflow Report' }));
 app.get('/gdpr.html', (req, res) => res.render('gdpr', { pageTitle: 'GDPR Privacy Notice' }));
 app.get('/audit-log.html', (req, res) => res.render('audit-log', { pageTitle: 'Audit Log' }));
 
@@ -141,6 +143,10 @@ app.use('/settings', settingsRoutes);
 // Timesheets
 const timesheetRoutes = require('./routes/timesheets');
 app.use('/timesheets', timesheetRoutes);
+
+// Cashflow
+const cashflowRoutes = require('./routes/cashflow');
+app.use('/cashflow', cashflowRoutes);
 
 // ✅ EXPORTS — THIS IS THE CRITICAL PART
 const exportRoutes = require('./routes/exports');

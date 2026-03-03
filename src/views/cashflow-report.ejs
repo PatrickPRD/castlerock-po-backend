@@ -1,0 +1,39 @@
+<%- include('partials/head', { pageTitle: 'Cashflow Report', styles: ['admin.css'] }) %>
+<%- include('partials/header', { pageTitle: 'Cashflow Report' }) %>
+
+<main class="container py-4">
+  <div class="card p-4 mb-4">
+    <h3 class="mb-2">Cashflow Report</h3>
+    <p class="text-muted mb-0">Overview of included locations and configured cashflow assumptions.</p>
+    <div class="mt-2 text-muted small" id="cashflowReportMeta"></div>
+  </div>
+
+  <div class="card p-4">
+    <div class="table-responsive">
+      <table class="table table-striped mb-0">
+        <thead>
+          <tr>
+            <th>Location</th>
+            <th>Site</th>
+            <th>Template</th>
+            <th class="text-end">Est. Construction Cost (<span data-currency-symbol>€</span>)</th>
+            <th class="text-end">Predicted Spend %</th>
+            <th class="text-end">Timescale (Months)</th>
+            <th class="text-end">Planned Spend (<span data-currency-symbol>€</span>)</th>
+            <th class="text-end">Spend / Day (<span data-currency-symbol>€</span>)</th>
+            <th class="text-end">Spend / Week (<span data-currency-symbol>€</span>)</th>
+            <th class="text-end">Spend / Month (<span data-currency-symbol>€</span>)</th>
+            <th class="text-end">Selling Price (<span data-currency-symbol>€</span>)</th>
+          </tr>
+        </thead>
+        <tbody id="cashflowReportBody">
+          <tr>
+            <td colspan="11" class="text-center text-muted py-4">Loading cashflow data...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/footer', { scripts: ['cashflow-report.js'], includeNavScript: true }) %>
