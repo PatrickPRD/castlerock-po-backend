@@ -36,11 +36,11 @@
           <tr>
             <th style="width: 48px;"></th>
             <th>Month</th>
-            <th class="text-end">Income (<span data-currency-symbol>€</span>)</th>
-            <th class="text-end">Target Spend (<span data-currency-symbol>€</span>)</th>
-            <th class="text-end" id="cashflowReportActualSpendHeader">Actual Spend (<span data-currency-symbol>€</span>)</th>
-            <th class="text-end">Net (<span data-currency-symbol>€</span>)</th>
-            <th class="text-end">Closing Balance (<span data-currency-symbol>€</span>)</th>
+            <th class="text-end">Income ex VAT (<span data-currency-symbol>€</span>)</th>
+            <th class="text-end">Target Spend ex VAT (<span data-currency-symbol>€</span>)</th>
+            <th class="text-end" id="cashflowReportActualSpendHeader">Actual Spend ex VAT (<span data-currency-symbol>€</span>)</th>
+            <th class="text-end" id="cashflowReportVarianceHeader">Variance ex VAT (<span data-currency-symbol>€</span>)</th>
+            <th class="text-end">Closing Balance ex VAT (<span data-currency-symbol>€</span>)</th>
           </tr>
         </thead>
         <tbody id="cashflowReportBody">
@@ -53,4 +53,4 @@
   </div>
 </main>
 
-<%- include('partials/footer', { scripts: ['cashflow-report.js?v=20260304c'], includeNavScript: true }) %>
+<%- include('partials/footer', { scripts: ['cashflow-report.js?v=20260304f'], includeNavScript: true }) %>

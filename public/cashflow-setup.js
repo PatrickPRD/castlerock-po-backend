@@ -49,6 +49,27 @@ const templateDraftTotals = document.getElementById('templateDraftTotals');
 const templateDraftSaveBtn = document.getElementById('templateDraftSaveBtn');
 const templateDraftCancelEditBtn = document.getElementById('templateDraftCancelEditBtn');
 const templateAccordionBody = document.getElementById('templateAccordionBody');
+const openCapitalCostModalBtn = document.getElementById('openCapitalCostModalBtn');
+const capitalCostModal = document.getElementById('capitalCostModal');
+const capitalCostModalTitle = document.getElementById('capitalCostModalTitle');
+const closeCapitalCostModalBtn = document.getElementById('closeCapitalCostModalBtn');
+const capitalCostModalCancelBtn = document.getElementById('capitalCostModalCancelBtn');
+const capitalCostTitleInput = document.getElementById('capitalCostTitle');
+const capitalCostDescriptionInput = document.getElementById('capitalCostDescription');
+const capitalCostCostExVatInput = document.getElementById('capitalCostCostExVat');
+const capitalCostVatRateSelect = document.getElementById('capitalCostVatRate');
+const capitalCostTotalIncVatInput = document.getElementById('capitalCostTotalIncVat');
+const capitalCostDateAppliedInput = document.getElementById('capitalCostDateApplied');
+const capitalCostUseProjectStartInput = document.getElementById('capitalCostUseProjectStart');
+const capitalCostSaveBtn = document.getElementById('capitalCostSaveBtn');
+const capitalCostDeleteModal = document.getElementById('capitalCostDeleteModal');
+const capitalCostDeleteTitle = document.getElementById('capitalCostDeleteTitle');
+const closeCapitalCostDeleteModalBtn = document.getElementById('closeCapitalCostDeleteModalBtn');
+const capitalCostDeleteCancelBtn = document.getElementById('capitalCostDeleteCancelBtn');
+const capitalCostDeleteConfirmBtn = document.getElementById('capitalCostDeleteConfirmBtn');
+const capitalCostsBody = document.getElementById('capitalCostsBody');
+const capitalCostsStatusEl = document.getElementById('capitalCostsStatus');
+const capitalCostsSummary = document.getElementById('capitalCostsSummary');
 
 let currentLocations = [];
 let cashflowTemplates = [];
@@ -64,12 +85,24 @@ let isLoadingSettings = false;
 let autoSaveTimer = null;
 let availableVatRates = [0, 13.5, 23];
 let lastAutoHandoverDate = null;
+let capitalCosts = [];
+let editingCapitalCostId = null;
+let deletingCapitalCostId = null;
+let projectStartDate = null;
+const expandedCapitalCostIds = new Set();
 
 function setStatus(message, isError = false) {
   if (!statusEl) return;
   statusEl.textContent = message || '';
   statusEl.classList.toggle('text-danger', !!isError);
   statusEl.classList.toggle('text-muted', !isError);
+}
+
+function setCapitalCostsStatus(message, isError = false) {
+  if (!capitalCostsStatusEl) return;
+  capitalCostsStatusEl.textContent = message || '';
+  capitalCostsStatusEl.classList.toggle('text-danger', !!isError);
+  capitalCostsStatusEl.classList.toggle('text-muted', !isError);
 }
 
 async function api(url, method = 'GET', body) {
@@ -107,6 +140,22 @@ function toRateKey(value) {
 
 function roundMoney(value) {
   return Number((Number(value) || 0).toFixed(2));
+}
+
+function calculateCapitalCostTotal(costExVatInput, vatRateInput) {
+  const costExVat = Number.isFinite(Number(costExVatInput)) ? Number(costExVatInput) : 0;
+  const vatRate = Number.isFinite(Number(vatRateInput)) ? Number(vatRateInput) : 0;
+  const clampedVatRate = Math.max(0, Math.min(100, vatRate));
+  return roundMoney(costExVat * (1 + (clampedVatRate / 100)));
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function deriveHouseHandoverDate(completionDateValue) {
@@ -175,6 +224,62 @@ function renderRemoveVatOptions(selectedRate = null) {
   }
 }
 
+function renderCapitalVatRateOptions(selectedRate = null) {
+  if (!capitalCostVatRateSelect) return;
+
+  const previousValue = selectedRate !== null && selectedRate !== undefined
+    ? String(selectedRate)
+    : capitalCostVatRateSelect.value;
+  capitalCostVatRateSelect.innerHTML = '<option value="">Select VAT rate</option>';
+
+  const sortedRates = [...availableVatRates].sort((a, b) => a - b);
+  sortedRates.forEach((rate) => {
+    const option = document.createElement('option');
+    option.value = String(rate);
+    option.textContent = `${rate}%`;
+    capitalCostVatRateSelect.appendChild(option);
+  });
+
+  const hasPrevious = previousValue && [...capitalCostVatRateSelect.options].some((option) => option.value === previousValue);
+  if (hasPrevious) {
+    capitalCostVatRateSelect.value = previousValue;
+  } else if (sortedRates.length > 0) {
+    capitalCostVatRateSelect.value = String(sortedRates[0]);
+  }
+}
+
+function updateCapitalCostTotalField() {
+  if (!capitalCostTotalIncVatInput) return;
+
+  const costExVat = parseNumber(capitalCostCostExVatInput?.value);
+  const vatRate = parseNumber(capitalCostVatRateSelect?.value);
+  const normalizedCostExVat = costExVat === null || Number.isNaN(costExVat) ? 0 : costExVat;
+  const normalizedVatRate = vatRate === null || Number.isNaN(vatRate) ? 0 : vatRate;
+  const totalIncVat = calculateCapitalCostTotal(normalizedCostExVat, normalizedVatRate);
+
+  capitalCostTotalIncVatInput.value = formatCurrency(totalIncVat);
+}
+
+function syncCapitalCostDateWithProjectStart() {
+  if (!capitalCostDateAppliedInput || !capitalCostUseProjectStartInput) return;
+
+  const useProjectStartDate = !!capitalCostUseProjectStartInput.checked;
+  capitalCostDateAppliedInput.readOnly = useProjectStartDate;
+
+  if (!useProjectStartDate) {
+    return;
+  }
+
+  const normalizedProjectStartDate = normalizeInputDate(projectStartDate);
+  if (normalizedProjectStartDate) {
+    capitalCostDateAppliedInput.value = normalizedProjectStartDate;
+    return;
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  capitalCostDateAppliedInput.value = today;
+}
+
 function updateHouseHandoverDateField() {
   if (!wizardHouseHandoverDate) return;
 
@@ -213,16 +318,12 @@ function rowTemplate(location) {
   const estimatedCost = location.estimated_construction_cost ?? '';
   const timescale = location.spend_timescale_months ?? '';
   const sellingPrice = location.selling_price ?? '';
-  const predictedSpend = location.predicted_spend_percentage ?? '';
   const startOnSiteDate = location.start_on_site_date || '';
   const completionDate = location.completion_date || '';
   const houseHandoverDate = location.house_handover_date || '';
   const removeFeesPercentage = location.remove_fees_percentage ?? 0;
   const removeVatRate = location.remove_vat_rate ?? 0;
   const calculatedIncome = location.calculated_income ?? calculateIncomeBreakdown(sellingPrice, removeVatRate, removeFeesPercentage).calculatedIncome;
-  const spreadTotal = Number((Array.isArray(location.weekly_spread)
-    ? location.weekly_spread.reduce((sum, value) => sum + (Number(value) || 0), 0)
-    : 0).toFixed(2));
   const isExpanded = expandedLocationIds.has(Number(location.location_id));
 
   return `
@@ -269,20 +370,12 @@ function rowTemplate(location) {
               <span class="configured-value">${houseHandoverDate || '-'}</span>
             </div>
             <div class="configured-stat">
-              <span class="configured-label">Predicted Spend %</span>
-              <span class="configured-value">${predictedSpend === null || predictedSpend === '' ? '-' : predictedSpend}</span>
-            </div>
-            <div class="configured-stat">
-              <span class="configured-label">Remove Fees (%)</span>
+              <span class="configured-label">Prof. Fees (%)</span>
               <span class="configured-value">${removeFeesPercentage === null || removeFeesPercentage === '' ? '-' : removeFeesPercentage}</span>
             </div>
             <div class="configured-stat">
-              <span class="configured-label">Remove VAT (%)</span>
+              <span class="configured-label">VAT (%)</span>
               <span class="configured-value">${removeVatRate === null || removeVatRate === '' ? '-' : removeVatRate}</span>
-            </div>
-            <div class="configured-stat">
-              <span class="configured-label">Weekly Spread Total</span>
-              <span class="configured-value">${spreadTotal}%</span>
             </div>
             <div class="configured-stat">
               <span class="configured-label">Calculated Income</span>
@@ -323,6 +416,290 @@ function renderConfiguredRows() {
     wizardProgress.textContent = `${rows.length} location${rows.length === 1 ? '' : 's'} configured`;
   }
 }
+
+function sortedCapitalCosts() {
+  return [...capitalCosts].sort((a, b) => {
+    const dateSort = String(a.date_applied || '').localeCompare(String(b.date_applied || ''));
+    if (dateSort !== 0) return dateSort;
+    return Number(a.id || 0) - Number(b.id || 0);
+  });
+}
+
+function updateCapitalCostsSummary() {
+  if (!capitalCostsSummary) return;
+  const totalIncVat = roundMoney(capitalCosts.reduce((sum, row) => sum + (Number(row.total_inc_vat) || 0), 0));
+  capitalCostsSummary.textContent = `Total (inc VAT): ${formatCurrency(totalIncVat)}`;
+}
+
+function resetCapitalCostForm() {
+  editingCapitalCostId = null;
+  if (capitalCostTitleInput) capitalCostTitleInput.value = '';
+  if (capitalCostDescriptionInput) capitalCostDescriptionInput.value = '';
+  if (capitalCostCostExVatInput) capitalCostCostExVatInput.value = '';
+  if (capitalCostUseProjectStartInput) capitalCostUseProjectStartInput.checked = true;
+  renderCapitalVatRateOptions();
+  syncCapitalCostDateWithProjectStart();
+  updateCapitalCostTotalField();
+
+  if (capitalCostModalTitle) {
+    capitalCostModalTitle.textContent = 'Add Capital Cost';
+  }
+  if (capitalCostSaveBtn) {
+    capitalCostSaveBtn.textContent = 'Add Capital Cost';
+  }
+}
+
+function openCapitalCostModal() {
+  if (capitalCostModal) {
+    capitalCostModal.style.display = 'flex';
+  }
+}
+
+function closeCapitalCostModal() {
+  if (capitalCostModal) {
+    capitalCostModal.style.display = 'none';
+  }
+  resetCapitalCostForm();
+}
+
+function toggleCapitalCost(costId) {
+  const id = Number(costId);
+  if (!Number.isInteger(id) || id <= 0) return;
+
+  if (expandedCapitalCostIds.has(id)) {
+    expandedCapitalCostIds.delete(id);
+  } else {
+    expandedCapitalCostIds.add(id);
+  }
+
+  renderCapitalCosts();
+}
+
+function renderCapitalCosts() {
+  if (!capitalCostsBody) return;
+
+  const rows = sortedCapitalCosts();
+  updateCapitalCostsSummary();
+
+  if (!rows.length) {
+    expandedCapitalCostIds.clear();
+    capitalCostsBody.innerHTML = `
+      <tr>
+        <td colspan="4" class="text-center text-muted py-3">No capital costs added.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  capitalCostsBody.innerHTML = rows.map((cost) => {
+    const costId = Number(cost.id);
+    const isExpanded = expandedCapitalCostIds.has(costId);
+
+    return `
+      <tr>
+        <td>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleCapitalCost(${costId})">${isExpanded ? '−' : '+'}</button>
+        </td>
+        <td>${escapeHtml(cost.title)}</td>
+        <td class="text-end">${formatCurrency(cost.total_inc_vat)}</td>
+        <td>${escapeHtml(cost.date_applied || '-')}</td>
+      </tr>
+      <tr class="capital-cost-details" style="display:${isExpanded ? 'table-row' : 'none'};">
+        <td colspan="4">
+          <div class="capital-cost-panel">
+            <div class="capital-cost-grid">
+              <div class="configured-stat">
+                <span class="configured-label">Description</span>
+                <span class="configured-value">${escapeHtml(cost.description || '-')}</span>
+              </div>
+              <div class="configured-stat">
+                <span class="configured-label">Cost ex VAT</span>
+                <span class="configured-value">${formatCurrency(cost.cost_ex_vat)}</span>
+              </div>
+              <div class="configured-stat">
+                <span class="configured-label">VAT Rate</span>
+                <span class="configured-value">${Number(cost.vat_rate || 0)}%</span>
+              </div>
+              <div class="configured-stat">
+                <span class="configured-label">Total inc VAT</span>
+                <span class="configured-value">${formatCurrency(cost.total_inc_vat)}</span>
+              </div>
+              <div class="configured-stat">
+                <span class="configured-label">Date Applied</span>
+                <span class="configured-value">${escapeHtml(cost.date_applied || '-')}</span>
+              </div>
+            </div>
+            <div class="configured-location-actions">
+              <button type="button" class="btn btn-sm btn-outline-primary" onclick="startCapitalCostEdit(${costId})">Edit</button>
+              <button type="button" class="btn btn-sm btn-danger" onclick="openCapitalCostDeleteModal(${costId})">Delete</button>
+            </div>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function buildCapitalCostPayload() {
+  const useProjectStartDate = !!capitalCostUseProjectStartInput?.checked;
+  const normalizedProjectStartDate = normalizeInputDate(projectStartDate);
+  const selectedDate = normalizeInputDate(capitalCostDateAppliedInput?.value);
+
+  return {
+    title: String(capitalCostTitleInput?.value || '').trim(),
+    description: String(capitalCostDescriptionInput?.value || '').trim(),
+    cost_ex_vat: parseNumber(capitalCostCostExVatInput?.value),
+    vat_rate: parseNumber(capitalCostVatRateSelect?.value),
+    date_applied: useProjectStartDate
+      ? (normalizedProjectStartDate || selectedDate)
+      : selectedDate
+  };
+}
+
+function validateCapitalCostPayload(payload) {
+  if (!payload.title) return 'Title is required';
+  if (payload.cost_ex_vat === null || Number.isNaN(payload.cost_ex_vat)) return 'Cost ex VAT must be a valid number';
+  if (payload.cost_ex_vat < 0) return 'Cost ex VAT cannot be negative';
+  if (payload.vat_rate === null || Number.isNaN(payload.vat_rate)) return 'VAT rate is required';
+  if (payload.vat_rate < 0 || payload.vat_rate > 100) return 'VAT rate must be between 0 and 100';
+
+  const availableVatRateKeys = new Set(
+    availableVatRates
+      .map((rate) => toRateKey(rate))
+      .filter((rate) => rate !== null)
+  );
+  const vatRateKey = toRateKey(payload.vat_rate);
+  if (vatRateKey === null || !availableVatRateKeys.has(vatRateKey)) {
+    return 'VAT rate must match one of the configured VAT rates';
+  }
+
+  if (!payload.date_applied) return 'Date applied is required';
+  return null;
+}
+
+async function saveCapitalCost() {
+  const payload = buildCapitalCostPayload();
+  const validationError = validateCapitalCostPayload(payload);
+  if (validationError) {
+    setCapitalCostsStatus(validationError, true);
+    return;
+  }
+
+  try {
+    const wasEditing = !!editingCapitalCostId;
+    setCapitalCostsStatus('Saving...');
+    const endpoint = editingCapitalCostId
+      ? `/cashflow/capital-costs/${editingCapitalCostId}`
+      : '/cashflow/capital-costs';
+    const method = editingCapitalCostId ? 'PUT' : 'POST';
+    const response = await api(endpoint, method, payload);
+    const capitalCost = response?.capital_cost;
+
+    if (!capitalCost) {
+      throw new Error('Failed to save capital cost');
+    }
+
+    const costId = Number(capitalCost.id);
+
+    const existingIndex = capitalCosts.findIndex((row) => Number(row.id) === Number(capitalCost.id));
+    if (existingIndex >= 0) {
+      capitalCosts[existingIndex] = capitalCost;
+    } else {
+      capitalCosts.push(capitalCost);
+    }
+
+    if (costId > 0) {
+      expandedCapitalCostIds.add(costId);
+    }
+
+    renderCapitalCosts();
+    closeCapitalCostModal();
+    setCapitalCostsStatus(wasEditing ? 'Capital cost updated.' : 'Capital cost added.');
+  } catch (error) {
+    setCapitalCostsStatus(error.message || 'Failed to save capital cost', true);
+  }
+}
+
+function startCapitalCostEdit(capitalCostId) {
+  const selected = capitalCosts.find((row) => Number(row.id) === Number(capitalCostId));
+  if (!selected) {
+    setCapitalCostsStatus('Capital cost not found', true);
+    return;
+  }
+
+  editingCapitalCostId = Number(selected.id);
+  if (capitalCostTitleInput) capitalCostTitleInput.value = selected.title || '';
+  if (capitalCostDescriptionInput) capitalCostDescriptionInput.value = selected.description || '';
+  if (capitalCostCostExVatInput) capitalCostCostExVatInput.value = selected.cost_ex_vat ?? '';
+  if (capitalCostDateAppliedInput) capitalCostDateAppliedInput.value = selected.date_applied || '';
+  if (capitalCostUseProjectStartInput) capitalCostUseProjectStartInput.checked = false;
+
+  renderCapitalVatRateOptions(selected.vat_rate);
+  syncCapitalCostDateWithProjectStart();
+  updateCapitalCostTotalField();
+
+  if (capitalCostModalTitle) {
+    capitalCostModalTitle.textContent = 'Edit Capital Cost';
+  }
+  if (capitalCostSaveBtn) {
+    capitalCostSaveBtn.textContent = 'Update Capital Cost';
+  }
+
+  openCapitalCostModal();
+  setCapitalCostsStatus('Editing capital cost.');
+}
+
+function closeCapitalCostDeleteModal() {
+  deletingCapitalCostId = null;
+  if (capitalCostDeleteModal) {
+    capitalCostDeleteModal.style.display = 'none';
+  }
+  if (capitalCostDeleteTitle) {
+    capitalCostDeleteTitle.textContent = 'this capital cost';
+  }
+}
+
+function openCapitalCostDeleteModal(capitalCostId) {
+  const selected = capitalCosts.find((row) => Number(row.id) === Number(capitalCostId));
+  if (!selected) {
+    setCapitalCostsStatus('Capital cost not found', true);
+    return;
+  }
+
+  deletingCapitalCostId = Number(selected.id);
+  if (capitalCostDeleteTitle) {
+    capitalCostDeleteTitle.textContent = selected.title || 'this capital cost';
+  }
+  if (capitalCostDeleteModal) {
+    capitalCostDeleteModal.style.display = 'flex';
+  }
+}
+
+async function confirmCapitalCostDelete() {
+  const capitalCostId = Number(deletingCapitalCostId);
+  if (!Number.isInteger(capitalCostId) || capitalCostId <= 0) {
+    closeCapitalCostDeleteModal();
+    return;
+  }
+
+  try {
+    await api(`/cashflow/capital-costs/${Number(capitalCostId)}`, 'DELETE');
+    capitalCosts = capitalCosts.filter((row) => Number(row.id) !== Number(capitalCostId));
+    expandedCapitalCostIds.delete(Number(capitalCostId));
+    if (editingCapitalCostId && Number(editingCapitalCostId) === Number(capitalCostId)) {
+      closeCapitalCostModal();
+    }
+    closeCapitalCostDeleteModal();
+    renderCapitalCosts();
+    setCapitalCostsStatus('Capital cost deleted.');
+  } catch (error) {
+    setCapitalCostsStatus(error.message || 'Failed to delete capital cost', true);
+  }
+}
+
+window.toggleCapitalCost = toggleCapitalCost;
+window.startCapitalCostEdit = startCapitalCostEdit;
+window.openCapitalCostDeleteModal = openCapitalCostDeleteModal;
 
 function toggleConfiguredLocation(locationId) {
   const id = Number(locationId);
@@ -574,13 +951,13 @@ function validateWizardInput(locationData) {
     return 'House handover date cannot be before completion date';
   }
   if (locationData.remove_fees_percentage !== null && (locationData.remove_fees_percentage < 0 || locationData.remove_fees_percentage > 100)) {
-    return 'Remove fees % must be between 0 and 100';
+    return 'Prof. fees % must be between 0 and 100';
   }
   if (locationData.remove_vat_rate === null || Number.isNaN(locationData.remove_vat_rate)) {
-    return 'Remove VAT rate is required';
+    return 'VAT rate is required';
   }
   if (locationData.remove_vat_rate < 0 || locationData.remove_vat_rate > 100) {
-    return 'Remove VAT rate must be between 0 and 100';
+    return 'VAT rate must be between 0 and 100';
   }
 
   return null;
@@ -612,12 +989,12 @@ function validateStep(step) {
   if (handoverDate < completionDate) return 'House handover date cannot be before completion date';
 
   const fees = parseNumber(wizardRemoveFeesPercentage?.value);
-  if (fees !== null && Number.isNaN(fees)) return 'Remove fees % must be a valid number';
-  if (fees !== null && (fees < 0 || fees > 100)) return 'Remove fees % must be between 0 and 100';
+  if (fees !== null && Number.isNaN(fees)) return 'Prof. fees % must be a valid number';
+  if (fees !== null && (fees < 0 || fees > 100)) return 'Prof. fees % must be between 0 and 100';
 
   const removeVat = parseNumber(wizardRemoveVatRate?.value);
-  if (removeVat === null || Number.isNaN(removeVat)) return 'Remove VAT rate is required';
-  if (removeVat < 0 || removeVat > 100) return 'Remove VAT rate must be between 0 and 100';
+  if (removeVat === null || Number.isNaN(removeVat)) return 'VAT rate is required';
+  if (removeVat < 0 || removeVat > 100) return 'VAT rate must be between 0 and 100';
 
   return null;
 }
@@ -983,12 +1360,10 @@ function updateWizardReview() {
     <div><strong>Start on Site Date:</strong> ${normalizeInputDate(wizardStartOnSiteDate.value) || '-'}</div>
     <div><strong>Completion Date:</strong> ${deriveCompletionDate(wizardStartOnSiteDate.value, wizardTemplateSelect.value) || '-'}</div>
     <div><strong>House Handover Date:</strong> ${(normalizeInputDate(wizardHouseHandoverDate?.value) || deriveHouseHandoverDate(deriveCompletionDate(wizardStartOnSiteDate.value, wizardTemplateSelect.value))) || '-'}</div>
-    <div><strong>Remove Fees %:</strong> ${normalizedRemoveFees}</div>
-    <div><strong>Remove VAT %:</strong> ${normalizedRemoveVat}</div>
+    <div><strong>Prof. Fees %:</strong> ${normalizedRemoveFees}</div>
+    <div><strong>VAT %:</strong> ${normalizedRemoveVat}</div>
     <div><strong>Calculated Income:</strong> ${formatCurrency(incomeBreakdown.calculatedIncome)}</div>
-    <div><strong>Predicted Spend %:</strong> ${getPredictedSpendPercent()}</div>
     <div><strong>Spend Timescale (Weeks):</strong> ${getDerivedTimescaleWeeks() ?? '-'}</div>
-    <div><strong>Weekly Spread Total:</strong> ${Number(getTemplateDefaultSpread().reduce((sum, value) => sum + (Number(value) || 0), 0).toFixed(2))}%</div>
   `;
 }
 
@@ -1062,7 +1437,7 @@ function buildWizardLocationData() {
     template_name: templateNameByKey(wizardTemplateSelect.value),
     weekly_spread: getTemplateDefaultSpread(),
     estimated_construction_cost: parseNumber(wizardEstimatedCost.value),
-    predicted_spend_percentage: getPredictedSpendPercent(),
+    predicted_spend_percentage: null,
     spend_timescale_months: getDerivedTimescaleWeeks(),
     start_on_site_date: normalizeInputDate(wizardStartOnSiteDate.value),
     completion_date: completionDate,
@@ -1139,7 +1514,7 @@ function collectPayload() {
         template_key: configured.template_key,
         weekly_spread: derivedSpread,
         estimated_construction_cost: configured.estimated_construction_cost,
-        predicted_spend_percentage: configured.predicted_spend_percentage,
+        predicted_spend_percentage: null,
         spend_timescale_months: derivedTimescale,
         start_on_site_date: configured.start_on_site_date || null,
         completion_date: derivedCompletionDate,
@@ -1203,10 +1578,10 @@ function validatePayload(payload) {
       return 'Location selling price must be a valid number';
     }
     if (Number.isNaN(location.remove_fees_percentage)) {
-      return 'Remove fees % must be a valid number';
+      return 'Prof. fees % must be a valid number';
     }
     if (location.remove_vat_rate === null || Number.isNaN(location.remove_vat_rate)) {
-      return 'Remove VAT rate is required for each included location';
+      return 'VAT rate is required for each included location';
     }
     if (!location.start_on_site_date) {
       return 'Start on site date is required for each included location';
@@ -1249,16 +1624,16 @@ function validatePayload(payload) {
       location.remove_fees_percentage !== null &&
       (location.remove_fees_percentage < 0 || location.remove_fees_percentage > 100)
     ) {
-      return 'Remove fees % must be between 0 and 100';
+      return 'Prof. fees % must be between 0 and 100';
     }
 
     if (location.remove_vat_rate < 0 || location.remove_vat_rate > 100) {
-      return 'Remove VAT rate must be between 0 and 100';
+      return 'VAT rate must be between 0 and 100';
     }
 
     const removeVatRateKey = toRateKey(location.remove_vat_rate);
     if (removeVatRateKey === null || !availableVatRateKeys.has(removeVatRateKey)) {
-      return 'Remove VAT rate must match one of the configured VAT rates';
+      return 'VAT rate must match one of the configured VAT rates';
     }
 
     if (location.completion_date < location.start_on_site_date) {
@@ -1273,6 +1648,18 @@ function validatePayload(payload) {
   return null;
 }
 
+function deriveProjectStartDateFromPayloadLocations(locations) {
+  if (!Array.isArray(locations)) return null;
+
+  const startDates = locations
+    .filter((location) => location?.include_in_cashflow)
+    .map((location) => normalizeInputDate(location?.start_on_site_date))
+    .filter((value) => !!value)
+    .sort((a, b) => String(a).localeCompare(String(b)));
+
+  return startDates[0] || null;
+}
+
 async function persistSettings(successMessage = 'Saved successfully.') {
   const payload = collectPayload();
   const validationError = validatePayload(payload);
@@ -1285,6 +1672,13 @@ async function persistSettings(successMessage = 'Saved successfully.') {
   setStatus('Saving...');
   try {
     await api('/cashflow/settings', 'PUT', payload);
+    const derivedProjectStartDate = deriveProjectStartDateFromPayloadLocations(payload.locations);
+    if (derivedProjectStartDate) {
+      projectStartDate = derivedProjectStartDate;
+      if (capitalCostUseProjectStartInput?.checked) {
+        syncCapitalCostDateWithProjectStart();
+      }
+    }
     setStatus(successMessage);
   } catch (error) {
     setStatus(error.message || 'Failed to save cashflow settings', true);
@@ -1313,6 +1707,9 @@ async function loadSettings() {
       ? data.vat_rates.map((entry) => Number(entry)).filter((entry) => Number.isFinite(entry) && entry >= 0 && entry <= 100)
       : [];
     availableVatRates = vatRates.length ? vatRates : [0, 13.5, 23];
+    projectStartDate = normalizeInputDate(data.overall_start_date) || null;
+    capitalCosts = Array.isArray(data.capital_costs) ? data.capital_costs : [];
+    expandedCapitalCostIds.clear();
 
     if (typeof window.loadCurrencySettings === 'function') {
       await window.loadCurrencySettings();
@@ -1342,6 +1739,9 @@ async function loadSettings() {
     renderTemplateOptions();
     renderTemplateAccordion();
     resetTemplateDraftForm();
+    renderCapitalCosts();
+    resetCapitalCostForm();
+    setCapitalCostsStatus('');
     renderSiteOptions();
     renderLocationOptions();
     resetWizardForm();
@@ -1403,6 +1803,19 @@ templateDraftCancelEditBtn?.addEventListener('click', () => {
   resetTemplateDraftForm();
   setStatus('Template edit cancelled.');
 });
+openCapitalCostModalBtn?.addEventListener('click', () => {
+  resetCapitalCostForm();
+  openCapitalCostModal();
+});
+closeCapitalCostModalBtn?.addEventListener('click', closeCapitalCostModal);
+capitalCostModalCancelBtn?.addEventListener('click', closeCapitalCostModal);
+capitalCostCostExVatInput?.addEventListener('input', updateCapitalCostTotalField);
+capitalCostVatRateSelect?.addEventListener('change', updateCapitalCostTotalField);
+capitalCostUseProjectStartInput?.addEventListener('change', syncCapitalCostDateWithProjectStart);
+capitalCostSaveBtn?.addEventListener('click', saveCapitalCost);
+closeCapitalCostDeleteModalBtn?.addEventListener('click', closeCapitalCostDeleteModal);
+capitalCostDeleteCancelBtn?.addEventListener('click', closeCapitalCostDeleteModal);
+capitalCostDeleteConfirmBtn?.addEventListener('click', confirmCapitalCostDelete);
 wizardTemplateSelect?.addEventListener('change', () => {
   updateCompletionDateField();
   if (wizardCurrentStep === wizardTotalSteps) {
@@ -1452,6 +1865,18 @@ cashflowWizardModal?.addEventListener('click', (event) => {
 templateDraftModal?.addEventListener('click', (event) => {
   if (event.target === templateDraftModal) {
     closeTemplateDraftModal();
+  }
+});
+
+capitalCostModal?.addEventListener('click', (event) => {
+  if (event.target === capitalCostModal) {
+    closeCapitalCostModal();
+  }
+});
+
+capitalCostDeleteModal?.addEventListener('click', (event) => {
+  if (event.target === capitalCostDeleteModal) {
+    closeCapitalCostDeleteModal();
   }
 });
 

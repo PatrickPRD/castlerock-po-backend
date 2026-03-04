@@ -5,6 +5,7 @@ const path = require('path');
 const pool = require('./db');
 const { setupDatabase } = require('../database/setup');
 const { ensureLeaveDefaults } = require('./services/leaveService');
+const { runStartupMigrations } = require('./services/dbMigrations');
 const { checkSetupRequired } = require('./middleware/setupCheck');
 const dynamicTitle = require('./middleware/dynamicTitle');
 
@@ -219,6 +220,7 @@ const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
 async function startServer() {
   console.log('🔧 Starting server initialization...');
   await ensureSchemaReady();
+  await runStartupMigrations();
   await ensureInvoiceUniquenessPerPO();
   console.log('✅ Schema ready, starting HTTP listener...');
 

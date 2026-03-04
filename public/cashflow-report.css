@@ -34,6 +34,18 @@
   vertical-align: middle;
 }
 
+.variance-savings {
+  color: #198754;
+}
+
+.variance-overspend {
+  color: #dc3545;
+}
+
+.variance-neutral {
+  color: #6c757d;
+}
+
 @media (max-width: 768px) {
   .cashflow-calendar-table {
     min-width: 720px;

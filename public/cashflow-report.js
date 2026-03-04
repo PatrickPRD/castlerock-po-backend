@@ -13,6 +13,7 @@ const siteFilter = document.getElementById('cashflowReportSiteFilter');
 const locationFilter = document.getElementById('cashflowReportLocationFilter');
 const actualSpendToggle = document.getElementById('cashflowReportActualSpendToggle');
 const actualSpendHeader = document.getElementById('cashflowReportActualSpendHeader');
+const varianceHeader = document.getElementById('cashflowReportVarianceHeader');
 const expandedMonths = new Set();
 let monthCalendarRows = [];
 let reportData = null;
@@ -39,16 +40,47 @@ function round2(value) {
 }
 
 function getMainColumnCount() {
-  return showActualSpendColumn ? 7 : 6;
+  return showActualSpendColumn ? 7 : 5;
 }
 
 function getWeekColumnCount() {
-  return showActualSpendColumn ? 6 : 5;
+  return showActualSpendColumn ? 6 : 4;
+}
+
+function getVariance(targetSpend, actualSpend) {
+  const target = toNumber(targetSpend, 0);
+  const actual = toNumber(actualSpend, 0);
+  const diff = round2(actual - target);
+
+  if (Math.abs(diff) < 0.005) {
+    return {
+      value: 0,
+      cssClass: 'variance-neutral'
+    };
+  }
+
+  return {
+    value: round2(Math.abs(diff)),
+    cssClass: diff < 0 ? 'variance-savings' : 'variance-overspend'
+  };
+}
+
+function renderVarianceBadge(variance) {
+  const badgeClass = variance?.cssClass === 'variance-savings'
+    ? 'bg-success'
+    : variance?.cssClass === 'variance-overspend'
+      ? 'bg-danger'
+      : 'bg-secondary';
+
+  return `<span class="badge ${badgeClass}">${formatCurrency(variance?.value || 0)}</span>`;
 }
 
 function applyActualSpendVisibility() {
   if (actualSpendHeader) {
     actualSpendHeader.style.display = showActualSpendColumn ? '' : 'none';
+  }
+  if (varianceHeader) {
+    varianceHeader.style.display = showActualSpendColumn ? '' : 'none';
   }
 }
 
@@ -220,7 +252,7 @@ function addEventToBuckets(monthMap, event) {
   }
 }
 
-function buildCalendarRows(data, includedLocations, templateMap, actualSpendByLocation = new Map()) {
+function buildCalendarRows(data, includedLocations, templateMap, actualSpendByLocation = new Map(), capitalCosts = []) {
   const overallStartDate = parseDate(data.overall_start_date);
   if (!overallStartDate) {
     return {
@@ -242,6 +274,31 @@ function buildCalendarRows(data, includedLocations, templateMap, actualSpendByLo
       note: 'Overall start point'
     });
   }
+
+  const normalizedCapitalCosts = Array.isArray(capitalCosts) ? capitalCosts : [];
+  normalizedCapitalCosts.forEach((row) => {
+    const date = parseDate(row?.date_applied);
+    if (!date || date < overallStartDate) return;
+
+    const amount = round2(toNumber(row?.cost_ex_vat, 0));
+
+    if (amount <= 0) return;
+
+    const title = String(row?.title || 'Capital cost').trim() || 'Capital cost';
+    events.push({
+      date,
+      type: 'spend',
+      amount,
+      note: `${title} capital cost target spend`
+    });
+
+    events.push({
+      date,
+      type: 'actual_spend',
+      amount,
+      note: `${title} capital cost actual spend`
+    });
+  });
 
   includedLocations.forEach((row) => {
     const startDate = parseDate(row.start_on_site_date);
@@ -349,7 +406,6 @@ function buildCalendarRows(data, includedLocations, templateMap, actualSpendByLo
           income: round2(week.income),
           spend: round2(week.spend),
           actual_spend: round2(week.actualSpend),
-          net: round2(week.income - week.spend),
           notes: [...week.notes]
         }));
 
@@ -359,7 +415,6 @@ function buildCalendarRows(data, includedLocations, templateMap, actualSpendByLo
         income: round2(month.income),
         spend: round2(month.spend),
         actual_spend: round2(month.actualSpend),
-        net: round2(month.income - month.spend),
         weeks: weekRows
       };
     });
@@ -493,10 +548,12 @@ function renderCalendarFromFilters() {
   if (!reportBody || !reportData) return;
 
   const filteredLocations = getFilteredLocations(includedLocationsCache);
-  if (filteredLocations.length === 0) {
+  const capitalCosts = Array.isArray(reportData.capital_costs) ? reportData.capital_costs : [];
+
+  if (filteredLocations.length === 0 && capitalCosts.length === 0) {
     reportBody.innerHTML = `
       <tr>
-        <td colspan="${getMainColumnCount()}" class="text-center text-muted py-4">No included locations match the selected filters.</td>
+        <td colspan="${getMainColumnCount()}" class="text-center text-muted py-4">No included locations or capital costs match the selected filters.</td>
       </tr>
     `;
     monthCalendarRows = [];
@@ -505,7 +562,7 @@ function renderCalendarFromFilters() {
   }
 
   const templateMap = new Map(reportTemplates.map((template) => [String(template.key), template]));
-  const calendar = buildCalendarRows(reportData, filteredLocations, templateMap, actualSpendByLocationCache);
+  const calendar = buildCalendarRows(reportData, filteredLocations, templateMap, actualSpendByLocationCache, capitalCosts);
   if (calendar.error) {
     reportBody.innerHTML = `
       <tr>
@@ -521,7 +578,7 @@ function renderCalendarFromFilters() {
   if (monthCalendarRows.length === 0) {
     reportBody.innerHTML = `
       <tr>
-        <td colspan="${getMainColumnCount()}" class="text-center text-muted py-4">No spending, actual spend, or income found from the overall start date.</td>
+        <td colspan="${getMainColumnCount()}" class="text-center text-muted py-4">No spending, actual spend, income, or capital costs found from the overall start date.</td>
       </tr>
     `;
     expandedMonths.clear();
@@ -536,20 +593,26 @@ function renderRows(rows) {
   let closingBalance = 0;
 
   const monthRowsHtml = rows.map((month) => {
-    closingBalance = round2(closingBalance + month.net);
+    const periodSpend = showActualSpendColumn ? toNumber(month.actual_spend, 0) : toNumber(month.spend, 0);
+    const periodBalance = round2(toNumber(month.income, 0) - periodSpend);
+    closingBalance = round2(closingBalance + periodBalance);
     const isExpanded = expandedMonths.has(month.key);
+    const monthVariance = getVariance(month.spend, month.actual_spend);
 
     const weekRowsHtml = month.weeks.length
-      ? month.weeks.map((week) => `
+      ? month.weeks.map((week) => {
+        const weekVariance = getVariance(week.spend, week.actual_spend);
+        return `
           <tr>
             <td>${escapeHtml(week.label)}</td>
             <td class="text-end">${formatCurrency(week.income)}</td>
             <td class="text-end">${formatCurrency(week.spend)}</td>
             ${showActualSpendColumn ? `<td class="text-end">${formatCurrency(week.actual_spend)}</td>` : ''}
-            <td class="text-end">${formatCurrency(week.net)}</td>
+            ${showActualSpendColumn ? `<td class="text-end">${renderVarianceBadge(weekVariance)}</td>` : ''}
             <td>${escapeHtml(week.notes.join(' • ') || '-')}</td>
           </tr>
-        `).join('')
+        `;
+      }).join('')
       : `
         <tr>
           <td colspan="${getWeekColumnCount()}" class="text-center text-muted py-3">No weekly activity in this month.</td>
@@ -565,7 +628,7 @@ function renderRows(rows) {
         <td class="text-end">${formatCurrency(month.income)}</td>
         <td class="text-end">${formatCurrency(month.spend)}</td>
         ${showActualSpendColumn ? `<td class="text-end">${formatCurrency(month.actual_spend)}</td>` : ''}
-        <td class="text-end">${formatCurrency(month.net)}</td>
+        ${showActualSpendColumn ? `<td class="text-end">${renderVarianceBadge(monthVariance)}</td>` : ''}
         <td class="text-end">${formatCurrency(closingBalance)}</td>
       </tr>
       <tr class="calendar-month-details" style="display:${isExpanded ? 'table-row' : 'none'};">
@@ -575,10 +638,10 @@ function renderRows(rows) {
               <thead>
                 <tr>
                   <th>Week</th>
-                  <th class="text-end">Income (<span data-currency-symbol>€</span>)</th>
-                  <th class="text-end">Target Spend (<span data-currency-symbol>€</span>)</th>
-                  ${showActualSpendColumn ? '<th class="text-end">Actual Spend (<span data-currency-symbol>€</span>)</th>' : ''}
-                  <th class="text-end">Net (<span data-currency-symbol>€</span>)</th>
+                  <th class="text-end">Income ex VAT (<span data-currency-symbol>€</span>)</th>
+                  <th class="text-end">Target Spend ex VAT (<span data-currency-symbol>€</span>)</th>
+                  ${showActualSpendColumn ? '<th class="text-end">Actual Spend ex VAT (<span data-currency-symbol>€</span>)</th>' : ''}
+                  ${showActualSpendColumn ? '<th class="text-end">Variance ex VAT (<span data-currency-symbol>€</span>)</th>' : ''}
                   <th>Notes</th>
                 </tr>
               </thead>
@@ -595,14 +658,13 @@ function renderRows(rows) {
   const totals = rows.reduce((accumulator, month) => ({
     income: round2(accumulator.income + toNumber(month.income, 0)),
     spend: round2(accumulator.spend + toNumber(month.spend, 0)),
-    actual_spend: round2(accumulator.actual_spend + toNumber(month.actual_spend, 0)),
-    net: round2(accumulator.net + toNumber(month.net, 0))
+    actual_spend: round2(accumulator.actual_spend + toNumber(month.actual_spend, 0))
   }), {
     income: 0,
     spend: 0,
-    actual_spend: 0,
-    net: 0
+    actual_spend: 0
   });
+  const totalsVariance = getVariance(totals.spend, totals.actual_spend);
 
   const totalsRowHtml = `
     <tr class="table-secondary fw-semibold calendar-total-row">
@@ -611,7 +673,7 @@ function renderRows(rows) {
       <td class="text-end">${formatCurrency(totals.income)}</td>
       <td class="text-end">${formatCurrency(totals.spend)}</td>
       ${showActualSpendColumn ? `<td class="text-end">${formatCurrency(totals.actual_spend)}</td>` : ''}
-      <td class="text-end">${formatCurrency(totals.net)}</td>
+      ${showActualSpendColumn ? `<td class="text-end">${renderVarianceBadge(totalsVariance)}</td>` : ''}
       <td class="text-end">${formatCurrency(closingBalance)}</td>
     </tr>
   `;
@@ -646,6 +708,7 @@ async function loadReport() {
       loadActualSpendByLocation()
     ]);
     const includedLocations = (data.locations || []).filter((row) => row.include_in_cashflow);
+    const capitalCosts = Array.isArray(data.capital_costs) ? data.capital_costs : [];
     const templates = Array.isArray(data.templates) ? data.templates : [];
 
     reportData = data;
@@ -660,14 +723,18 @@ async function loadReport() {
       const startValueText = data.overall_start_value !== null && data.overall_start_value !== undefined
         ? `Overall start point: ${formatCurrency(data.overall_start_value)}`
         : 'Overall start point not set';
+      const totalCapitalCostsExVat = round2(capitalCosts.reduce((sum, row) => (
+        sum + toNumber(row?.cost_ex_vat, 0)
+      ), 0));
+      const capitalCostsText = `Capital costs (ex VAT): ${formatCurrency(totalCapitalCostsExVat)}`;
 
-      reportMeta.textContent = `${startDateText} | ${startValueText}.`;
+      reportMeta.textContent = `${startDateText} | ${startValueText} | ${capitalCostsText}.`;
     }
 
-    if (includedLocations.length === 0) {
+    if (includedLocations.length === 0 && capitalCosts.length === 0) {
       reportBody.innerHTML = `
         <tr>
-          <td colspan="${getMainColumnCount()}" class="text-center text-muted py-4">No included locations. Configure Cashflow Setup first.</td>
+          <td colspan="${getMainColumnCount()}" class="text-center text-muted py-4">No included locations or capital costs. Configure Cashflow Setup first.</td>
         </tr>
       `;
       return;

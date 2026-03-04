@@ -74,6 +74,13 @@ function roundMoney(value) {
   return Number((Number(value) || 0).toFixed(2));
 }
 
+function calculateCapitalCostTotal(costExVatInput, vatRateInput) {
+  const costExVat = Number.isFinite(Number(costExVatInput)) ? Number(costExVatInput) : 0;
+  const vatRate = Number.isFinite(Number(vatRateInput)) ? Number(vatRateInput) : 0;
+  const clampedVatRate = Math.max(0, Math.min(100, vatRate));
+  return roundMoney(costExVat * (1 + (clampedVatRate / 100)));
+}
+
 function calculateIncomeBreakdown(sellingPriceInput, removeVatRateInput, removeFeesInput) {
   const sellingPrice = Number.isFinite(Number(sellingPriceInput)) ? Number(sellingPriceInput) : 0;
   const removeVatRate = Number.isFinite(Number(removeVatRateInput)) ? Number(removeVatRateInput) : 0;
@@ -201,7 +208,6 @@ async function ensureCashflowLocationDateColumns(connectionOrDb = db) {
     const [rows] = await connectionOrDb.query(
       'SHOW COLUMNS FROM cashflow_location_settings'
     );
-
     const existingColumns = new Set(rows.map((row) => String(row.Field || '').toLowerCase()));
     return {
       startOnSiteDate: existingColumns.has('start_on_site_date'),
@@ -281,6 +287,302 @@ async function ensureCashflowLocationDateColumns(connectionOrDb = db) {
     return support;
   }
 }
+
+async function ensureCashflowCapitalCostsTable(connectionOrDb = db) {
+  await connectionOrDb.query(
+    `CREATE TABLE IF NOT EXISTS cashflow_capital_costs (
+      id INT NOT NULL AUTO_INCREMENT,
+      title VARCHAR(200) NOT NULL,
+      description TEXT NULL,
+      cost_ex_vat DECIMAL(15,2) NOT NULL,
+      vat_rate DECIMAL(5,3) NOT NULL,
+      total_inc_vat DECIMAL(15,2) NOT NULL,
+      date_applied DATE NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      INDEX idx_cashflow_capital_costs_date_applied (date_applied)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+  );
+}
+
+function toCapitalCostDto(row) {
+  return {
+    id: Number(row.id),
+    title: String(row.title || ''),
+    description: row.description === null || row.description === undefined ? '' : String(row.description),
+    cost_ex_vat: row.cost_ex_vat === null || row.cost_ex_vat === undefined ? 0 : Number(row.cost_ex_vat),
+    vat_rate: row.vat_rate === null || row.vat_rate === undefined ? 0 : Number(row.vat_rate),
+    total_inc_vat: row.total_inc_vat === null || row.total_inc_vat === undefined ? 0 : Number(row.total_inc_vat),
+    date_applied: normalizeDate(row.date_applied)
+  };
+}
+
+async function loadCapitalCosts(connectionOrDb = db) {
+  await ensureCashflowCapitalCostsTable(connectionOrDb);
+  const [rows] = await connectionOrDb.query(
+    `SELECT id, title, description, cost_ex_vat, vat_rate, total_inc_vat, date_applied
+     FROM cashflow_capital_costs
+     ORDER BY date_applied ASC, id ASC`
+  );
+  return rows.map(toCapitalCostDto);
+}
+
+async function resolveProjectStartDate(connectionOrDb = db) {
+  const [[overall]] = await connectionOrDb.query(
+    `SELECT overall_start_date
+     FROM cashflow_settings
+     WHERE id = 1`
+  );
+
+  const normalizedOverallStartDate = normalizeDate(overall?.overall_start_date);
+  if (normalizedOverallStartDate) {
+    return normalizedOverallStartDate;
+  }
+
+  const [[earliest]] = await connectionOrDb.query(
+    `SELECT MIN(start_on_site_date) AS earliest_start_date
+     FROM cashflow_location_settings
+     WHERE include_in_cashflow = 1
+       AND start_on_site_date IS NOT NULL`
+  );
+
+  return normalizeDate(earliest?.earliest_start_date);
+}
+
+async function getAvailableVatRates() {
+  const settings = await SettingsService.getSettings();
+  const configuredVatRates = parseVatRates(settings?.vat_rates);
+  return configuredVatRates.length ? configuredVatRates : [0, 13.5, 23];
+}
+
+function validateCapitalCostPayload(body, vatRateKeys) {
+  const title = String(body?.title || '').trim();
+  const descriptionRaw = body?.description;
+  const description = descriptionRaw === null || descriptionRaw === undefined
+    ? ''
+    : String(descriptionRaw).trim();
+  const costExVat = toNullableNumber(body?.cost_ex_vat);
+  const vatRate = toNullableNumber(body?.vat_rate);
+  const dateApplied = normalizeDate(body?.date_applied);
+
+  if (!title) {
+    return { error: 'title is required' };
+  }
+
+  if (costExVat === null) {
+    return { error: 'cost_ex_vat must be a valid number' };
+  }
+
+  if (costExVat < 0) {
+    return { error: 'cost_ex_vat cannot be negative' };
+  }
+
+  if (vatRate === null) {
+    return { error: 'vat_rate must be a valid number' };
+  }
+
+  if (vatRate < 0 || vatRate > 100) {
+    return { error: 'vat_rate must be between 0 and 100' };
+  }
+
+  const vatRateKey = Number(Number(vatRate).toFixed(3));
+  if (!vatRateKeys.has(vatRateKey)) {
+    return { error: 'vat_rate must match one of the configured Financial Settings VAT rates' };
+  }
+
+  if (body?.date_applied && !dateApplied) {
+    return { error: 'date_applied must be in YYYY-MM-DD format' };
+  }
+
+  return {
+    value: {
+      title,
+      description,
+      cost_ex_vat: costExVat,
+      vat_rate: vatRate,
+      date_applied: dateApplied
+    }
+  };
+}
+
+router.get(
+  '/capital-costs',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      const [capitalCosts, projectStartDate] = await Promise.all([
+        loadCapitalCosts(),
+        resolveProjectStartDate()
+      ]);
+
+      res.json({
+        project_start_date: projectStartDate,
+        capital_costs: capitalCosts
+      });
+    } catch (error) {
+      console.error('Error loading cashflow capital costs:', error);
+      res.status(500).json({ error: 'Failed to load cashflow capital costs' });
+    }
+  }
+);
+
+router.post(
+  '/capital-costs',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      await ensureCashflowCapitalCostsTable();
+      const availableVatRates = await getAvailableVatRates();
+      const vatRateKeys = new Set(availableVatRates.map((rate) => Number(Number(rate).toFixed(3))));
+      const validated = validateCapitalCostPayload(req.body, vatRateKeys);
+      if (validated.error) {
+        return res.status(400).json({ error: validated.error });
+      }
+
+      const projectStartDate = await resolveProjectStartDate();
+      const fallbackToday = normalizeDate(new Date());
+      const normalizedDateApplied = validated.value.date_applied || projectStartDate || fallbackToday;
+      const totalIncVat = calculateCapitalCostTotal(validated.value.cost_ex_vat, validated.value.vat_rate);
+
+      const [result] = await db.query(
+        `INSERT INTO cashflow_capital_costs (
+          title,
+          description,
+          cost_ex_vat,
+          vat_rate,
+          total_inc_vat,
+          date_applied
+        ) VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          validated.value.title,
+          validated.value.description || null,
+          validated.value.cost_ex_vat,
+          validated.value.vat_rate,
+          totalIncVat,
+          normalizedDateApplied
+        ]
+      );
+
+      res.json({
+        success: true,
+        capital_cost: {
+          id: Number(result.insertId),
+          title: validated.value.title,
+          description: validated.value.description,
+          cost_ex_vat: validated.value.cost_ex_vat,
+          vat_rate: validated.value.vat_rate,
+          total_inc_vat: totalIncVat,
+          date_applied: normalizedDateApplied
+        }
+      });
+    } catch (error) {
+      console.error('Error creating cashflow capital cost:', error);
+      res.status(500).json({ error: 'Failed to create cashflow capital cost' });
+    }
+  }
+);
+
+router.put(
+  '/capital-costs/:id',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const capitalCostId = Number(req.params.id);
+
+    if (!Number.isInteger(capitalCostId) || capitalCostId <= 0) {
+      return res.status(400).json({ error: 'A valid capital cost id is required' });
+    }
+
+    try {
+      await ensureCashflowCapitalCostsTable();
+      const availableVatRates = await getAvailableVatRates();
+      const vatRateKeys = new Set(availableVatRates.map((rate) => Number(Number(rate).toFixed(3))));
+      const validated = validateCapitalCostPayload(req.body, vatRateKeys);
+      if (validated.error) {
+        return res.status(400).json({ error: validated.error });
+      }
+
+      const projectStartDate = await resolveProjectStartDate();
+      const fallbackToday = normalizeDate(new Date());
+      const normalizedDateApplied = validated.value.date_applied || projectStartDate || fallbackToday;
+      const totalIncVat = calculateCapitalCostTotal(validated.value.cost_ex_vat, validated.value.vat_rate);
+
+      const [result] = await db.query(
+        `UPDATE cashflow_capital_costs
+         SET
+           title = ?,
+           description = ?,
+           cost_ex_vat = ?,
+           vat_rate = ?,
+           total_inc_vat = ?,
+           date_applied = ?
+         WHERE id = ?`,
+        [
+          validated.value.title,
+          validated.value.description || null,
+          validated.value.cost_ex_vat,
+          validated.value.vat_rate,
+          totalIncVat,
+          normalizedDateApplied,
+          capitalCostId
+        ]
+      );
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: 'Capital cost not found' });
+      }
+
+      res.json({
+        success: true,
+        capital_cost: {
+          id: capitalCostId,
+          title: validated.value.title,
+          description: validated.value.description,
+          cost_ex_vat: validated.value.cost_ex_vat,
+          vat_rate: validated.value.vat_rate,
+          total_inc_vat: totalIncVat,
+          date_applied: normalizedDateApplied
+        }
+      });
+    } catch (error) {
+      console.error('Error updating cashflow capital cost:', error);
+      res.status(500).json({ error: 'Failed to update cashflow capital cost' });
+    }
+  }
+);
+
+router.delete(
+  '/capital-costs/:id',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const capitalCostId = Number(req.params.id);
+
+    if (!Number.isInteger(capitalCostId) || capitalCostId <= 0) {
+      return res.status(400).json({ error: 'A valid capital cost id is required' });
+    }
+
+    try {
+      await ensureCashflowCapitalCostsTable();
+      const [result] = await db.query(
+        'DELETE FROM cashflow_capital_costs WHERE id = ? LIMIT 1',
+        [capitalCostId]
+      );
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: 'Capital cost not found' });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting cashflow capital cost:', error);
+      res.status(500).json({ error: 'Failed to delete cashflow capital cost' });
+    }
+  }
+);
 
 router.get(
   '/templates',
@@ -493,6 +795,7 @@ router.get(
   async (req, res) => {
     try {
       const dateColumnSupport = await ensureCashflowLocationDateColumns();
+      await ensureCashflowCapitalCostsTable();
       const startOnSiteSelect = dateColumnSupport.startOnSiteDate
         ? 'cls.start_on_site_date'
         : 'NULL AS start_on_site_date';
@@ -509,10 +812,11 @@ router.get(
         ? 'cls.remove_vat_rate'
         : 'NULL AS remove_vat_rate';
 
-      const templates = await loadTemplates();
-      const settings = await SettingsService.getSettings();
-      const configuredVatRates = parseVatRates(settings?.vat_rates);
-      const availableVatRates = configuredVatRates.length ? configuredVatRates : [0, 13.5, 23];
+      const [templates, availableVatRates, capitalCosts] = await Promise.all([
+        loadTemplates(),
+        getAvailableVatRates(),
+        loadCapitalCosts()
+      ]);
       const defaultVatRate = availableVatRates[0];
 
       const [[overall]] = await db.query(
@@ -568,6 +872,8 @@ router.get(
         .filter((row) => row.include_in_cashflow && row.start_on_site_date)
         .map((row) => row.start_on_site_date)
         .sort((a, b) => a.localeCompare(b))[0] || null;
+      const persistedOverallStartDate = normalizeDate(overall?.overall_start_date);
+      const resolvedProjectStartDate = earliestIncludedStartDate || persistedOverallStartDate || null;
 
       const locationsWithIncome = mappedLocations.map((row) => {
         const removeVatRate = row.remove_vat_rate === null || row.remove_vat_rate === undefined
@@ -592,12 +898,14 @@ router.get(
       });
 
       res.json({
-        overall_start_date: earliestIncludedStartDate,
+        overall_start_date: resolvedProjectStartDate,
         overall_start_value: overall?.overall_start_value === null || overall?.overall_start_value === undefined
           ? null
           : Number(overall.overall_start_value),
         vat_rates: availableVatRates,
         templates,
+        capital_costs: capitalCosts,
+        capital_costs_total_inc_vat: roundMoney(capitalCosts.reduce((sum, item) => sum + (Number(item.total_inc_vat) || 0), 0)),
         locations: locationsWithIncome
       });
     } catch (error) {
@@ -704,14 +1012,14 @@ router.put(
           removeFeesPercentageRaw !== null &&
           (removeFeesPercentageRaw < 0 || removeFeesPercentageRaw > 100)
         ) {
-          return res.status(400).json({ error: 'remove_fees_percentage must be between 0 and 100' });
+          return res.status(400).json({ error: 'Prof. fees % must be between 0 and 100' });
         }
 
         if (
           removeVatRateRaw !== null &&
           (removeVatRateRaw < 0 || removeVatRateRaw > 100)
         ) {
-          return res.status(400).json({ error: 'remove_vat_rate must be between 0 and 100' });
+          return res.status(400).json({ error: 'VAT rate must be between 0 and 100' });
         }
 
         const includeInCashflow = !!item?.include_in_cashflow;
@@ -747,7 +1055,7 @@ router.put(
 
           const removeVatKey = Number(Number(removeVatRate).toFixed(3));
           if (!availableVatRateKeys.has(removeVatKey)) {
-            return res.status(400).json({ error: 'remove_vat_rate must match one of the configured Financial Settings VAT rates' });
+            return res.status(400).json({ error: 'VAT rate must match one of the configured Financial Settings VAT rates' });
           }
 
           if (!earliestIncludedStartDate || startOnSiteDate < earliestIncludedStartDate) {
