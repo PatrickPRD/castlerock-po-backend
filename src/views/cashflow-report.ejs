@@ -1,34 +1,51 @@
-<%- include('partials/head', { pageTitle: 'Cashflow Report', styles: ['admin.css'] }) %>
+<%- include('partials/head', { pageTitle: 'Cashflow Report', styles: ['admin.css', 'cashflow-report.css'] }) %>
 <%- include('partials/header', { pageTitle: 'Cashflow Report' }) %>
 
 <main class="container py-4">
   <div class="card p-4 mb-4">
     <h3 class="mb-2">Cashflow Report</h3>
-    <p class="text-muted mb-0">Overview of included locations and configured cashflow assumptions.</p>
+    <p class="text-muted mb-0">Vertical cashflow calendar by month with expandable weekly detail.</p>
     <div class="mt-2 text-muted small" id="cashflowReportMeta"></div>
   </div>
 
   <div class="card p-4">
+    <div class="row g-2 mb-3">
+      <div class="col-12 col-md-4">
+        <label for="cashflowReportSiteFilter" class="form-label mb-1">Site</label>
+        <select id="cashflowReportSiteFilter" class="form-select">
+          <option value="">All Sites</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-5">
+        <label for="cashflowReportLocationFilter" class="form-label mb-1">Location</label>
+        <select id="cashflowReportLocationFilter" class="form-select">
+          <option value="">All Locations</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-3 d-flex align-items-end">
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" role="switch" id="cashflowReportActualSpendToggle">
+          <label class="form-check-label" for="cashflowReportActualSpendToggle">Show Actual Spend</label>
+        </div>
+      </div>
+    </div>
+
     <div class="table-responsive">
-      <table class="table table-striped mb-0">
+      <table class="table table-striped mb-0 cashflow-calendar-table">
         <thead>
           <tr>
-            <th>Location</th>
-            <th>Site</th>
-            <th>Template</th>
-            <th class="text-end">Est. Construction Cost (<span data-currency-symbol>€</span>)</th>
-            <th class="text-end">Predicted Spend %</th>
-            <th class="text-end">Timescale (Weeks)</th>
-            <th class="text-end">Planned Spend (<span data-currency-symbol>€</span>)</th>
-            <th class="text-end">Spend / Day (<span data-currency-symbol>€</span>)</th>
-            <th class="text-end">Spend / Week (<span data-currency-symbol>€</span>)</th>
-            <th class="text-end">Spend / Month (<span data-currency-symbol>€</span>)</th>
-            <th class="text-end">Selling Price (<span data-currency-symbol>€</span>)</th>
+            <th style="width: 48px;"></th>
+            <th>Month</th>
+            <th class="text-end">Income (<span data-currency-symbol>€</span>)</th>
+            <th class="text-end">Target Spend (<span data-currency-symbol>€</span>)</th>
+            <th class="text-end" id="cashflowReportActualSpendHeader">Actual Spend (<span data-currency-symbol>€</span>)</th>
+            <th class="text-end">Net (<span data-currency-symbol>€</span>)</th>
+            <th class="text-end">Closing Balance (<span data-currency-symbol>€</span>)</th>
           </tr>
         </thead>
         <tbody id="cashflowReportBody">
           <tr>
-            <td colspan="11" class="text-center text-muted py-4">Loading cashflow data...</td>
+            <td colspan="7" class="text-center text-muted py-4">Loading cashflow data...</td>
           </tr>
         </tbody>
       </table>
@@ -36,4 +53,4 @@
   </div>
 </main>
 
-<%- include('partials/footer', { scripts: ['cashflow-report.js'], includeNavScript: true }) %>
+<%- include('partials/footer', { scripts: ['cashflow-report.js?v=20260304c'], includeNavScript: true }) %>

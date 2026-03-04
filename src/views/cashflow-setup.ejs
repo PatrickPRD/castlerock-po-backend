@@ -1,19 +1,14 @@
-<%- include('partials/head', { pageTitle: 'Cashflow Setup', styles: ['admin.css', 'cashflow-setup.css'] }) %>
+<%- include('partials/head', { pageTitle: 'Cashflow Setup', styles: ['admin.css', 'cashflow-setup.css?v=20260304c'] }) %>
 <%- include('partials/header', { pageTitle: 'Cashflow Setup' }) %>
 
 <main class="container py-4">
   <div class="card p-4 mb-4">
     <h3 class="mb-2">Cashflow Setup</h3>
-    <p class="text-muted mb-0">Add locations one-by-one and configure planning assumptions for cashflow forecasting.</p>
+    <p class="text-muted mb-0">Configure locations and planning assumptions for cashflow forecasting.</p>
   </div>
 
   <div class="card p-4">
     <form id="cashflowSetupForm" class="d-grid gap-3">
-      <div>
-        <label for="overallStartDate" class="form-label">Overall Cashflow Start Date</label>
-        <input id="overallStartDate" type="date" class="form-control" />
-      </div>
-
       <div>
         <label for="overallStartValue" class="form-label">Overall Cashflow Start Point (<span data-currency-symbol>€</span>)</label>
         <input id="overallStartValue" type="number" step="0.01" min="0" class="form-control" placeholder="e.g. 100000" />
@@ -23,7 +18,7 @@
 
       <div class="wizard-box">
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="mb-0">Location Wizard</h5>
+          <h5 class="mb-0">Locations</h5>
           <span id="wizardProgress" class="text-muted small">0 locations configured</span>
         </div>
         <div class="d-flex gap-2">
@@ -43,15 +38,14 @@
           </thead>
           <tbody id="configuredLocationsBody">
             <tr>
-              <td colspan="4" class="text-center text-muted py-4">No configured locations yet. Use the wizard above.</td>
+              <td colspan="4" class="text-center text-muted py-4">No configured locations yet. Use Add Location above.</td>
             </tr>
           </tbody>
         </table>
       </div>
 
       <div class="d-flex gap-2 mt-2">
-        <button type="submit" class="btn btn-primary">Save Setup</button>
-        <span id="cashflowSetupStatus" class="align-self-center text-muted small"></span>
+        <span id="cashflowSetupStatus" class="align-self-center text-muted small">Changes save automatically.</span>
       </div>
     </form>
   </div>
@@ -59,12 +53,8 @@
   <div id="cashflowWizardModal" class="modal" style="display:none;">
     <div class="modal-content cashflow-wizard-modal">
       <div class="modal-header">
-        <h3 id="wizardModalTitle">Add Location to Cashflow</h3>
+        <h3 id="wizardModalTitle">Add Location</h3>
         <button class="modal-close" type="button" id="closeWizardModalBtn">×</button>
-      </div>
-
-      <div class="wizard-step-meta">
-        <span id="wizardStepCounter" class="text-muted small">Step 1 of 5</span>
       </div>
 
       <div class="wizard-step" data-step="1">
@@ -74,45 +64,47 @@
         </select>
 
         <label for="wizardLocationSelect" class="form-label">Select Location</label>
-        <select id="wizardLocationSelect" class="form-select">
+        <select id="wizardLocationSelect" class="form-select mb-3">
           <option value="">Select location</option>
         </select>
-      </div>
 
-      <div class="wizard-step" data-step="2" style="display:none;">
         <label for="wizardTemplateSelect" class="form-label">Select Template</label>
-        <select id="wizardTemplateSelect" class="form-select">
+        <select id="wizardTemplateSelect" class="form-select mb-3">
           <option value="">Select template</option>
         </select>
-      </div>
 
-      <div class="wizard-step" data-step="3" style="display:none;">
         <label for="wizardEstimatedCost" class="form-label">Est. Construction Cost (<span data-currency-symbol>€</span>)</label>
-        <input id="wizardEstimatedCost" type="number" step="0.01" min="0" class="form-control" />
-      </div>
+        <input id="wizardEstimatedCost" type="number" step="0.01" min="0" class="form-control mb-3" />
 
-      <div class="wizard-step" data-step="4" style="display:none;">
         <label for="wizardSellingPrice" class="form-label">Location Selling Price (<span data-currency-symbol>€</span>)</label>
-        <input id="wizardSellingPrice" type="number" step="0.01" min="0" class="form-control" />
+        <input id="wizardSellingPrice" type="number" step="0.01" min="0" class="form-control mb-3" />
 
-        <label for="wizardStartOnSiteDate" class="form-label mt-3">Start on Site Date</label>
-        <input id="wizardStartOnSiteDate" type="date" class="form-control" />
+        <label for="wizardStartOnSiteDate" class="form-label">Start on Site Date</label>
+        <input id="wizardStartOnSiteDate" type="date" class="form-control mb-3" />
 
-        <label for="wizardCompletionDate" class="form-label mt-3">Completion Date (Auto)</label>
-        <input id="wizardCompletionDate" type="date" class="form-control" readonly />
+        <label for="wizardCompletionDate" class="form-label">Completion Date (Auto)</label>
+        <input id="wizardCompletionDate" type="date" class="form-control mb-3" readonly />
+
+        <label for="wizardHouseHandoverDate" class="form-label">House Handover Date</label>
+        <input id="wizardHouseHandoverDate" type="date" class="form-control mb-3" />
+        <div class="text-muted small mb-3">Defaults to 7 days after Completion Date (editable).</div>
+
+        <label for="wizardRemoveFeesPercentage" class="form-label">Remove Fees (%)</label>
+        <input id="wizardRemoveFeesPercentage" type="number" step="0.01" min="0" max="100" class="form-control mb-3" placeholder="e.g. 2.50" />
+
+        <label for="wizardRemoveVatRate" class="form-label">Remove VAT (%)</label>
+        <select id="wizardRemoveVatRate" class="form-select mb-3">
+          <option value="">Select VAT rate</option>
+        </select>
+
+        <label for="wizardCalculatedIncome" class="form-label">Calculated Income (<span data-currency-symbol>€</span>)</label>
+        <input id="wizardCalculatedIncome" type="text" class="form-control" readonly />
+        <div class="text-muted small mt-1">Income = Selling Price − VAT amount − Fees (Fees are calculated on selling price before VAT).</div>
       </div>
 
-      <div class="wizard-step" data-step="5" style="display:none;">
-        <div id="wizardReview" class="wizard-review"></div>
-      </div>
-
-      <div class="wizard-actions d-flex justify-content-between gap-2 mt-3">
-        <button type="button" id="wizardBackBtn" class="btn btn-outline-secondary" disabled>Back</button>
-        <div class="d-flex gap-2">
-          <button type="button" id="wizardCancelBtn" class="btn btn-outline-secondary">Cancel</button>
-          <button type="button" id="wizardNextBtn" class="btn btn-primary">Next</button>
-          <button type="button" id="wizardSaveLocationBtn" class="btn btn-primary" style="display:none;">Add Location</button>
-        </div>
+      <div class="wizard-actions d-flex justify-content-end gap-2 mt-3">
+        <button type="button" id="wizardCancelBtn" class="btn btn-outline-secondary">Cancel</button>
+        <button type="button" id="wizardSaveLocationBtn" class="btn btn-primary">Add Location</button>
       </div>
     </div>
   </div>
@@ -208,4 +200,4 @@
   </div>
 </main>
 
-<%- include('partials/footer', { scripts: ['cashflow-setup.js'], includeNavScript: true }) %>
+<%- include('partials/footer', { scripts: ['cashflow-setup.js?v=20260304c'], includeNavScript: true }) %>

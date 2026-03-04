@@ -58,7 +58,111 @@
   border: 1px solid #dee2e6;
   border-radius: 8px;
   background: #fff;
-  padding: 10px 12px;
+  padding: 12px;
   display: grid;
-  gap: 6px;
+  gap: 10px;
+}
+
+.configured-location-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.configured-stat {
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  background: #f8f9fa;
+  padding: 8px 10px;
+  display: grid;
+  gap: 2px;
+}
+
+.configured-label {
+  font-size: 12px;
+  color: #6c757d;
+  font-weight: 600;
+}
+
+.configured-value {
+  font-size: 14px;
+  color: #212529;
+  font-weight: 600;
+}
+
+.configured-location-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e9ecef;
+}
+
+@media (max-width: 992px) {
+  .cashflow-wizard-modal,
+  .cashflow-template-modal {
+    width: min(900px, calc(100vw - 2rem));
+  }
+}
+
+@media (max-width: 768px) {
+  .wizard-box {
+    padding: 12px;
+  }
+
+  .wizard-box .d-flex {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 8px;
+  }
+
+  .wizard-box .btn {
+    width: 100%;
+  }
+
+  .cashflow-wizard-modal,
+  .cashflow-template-modal {
+    width: calc(100vw - 1rem);
+    max-width: none;
+    max-height: 92vh;
+    padding: 16px;
+  }
+
+  #configuredLocationsTable,
+  #templateManagerCard table {
+    min-width: 640px;
+  }
+
+  #cashflowSetupForm .d-flex.gap-2.mt-2 {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #cashflowSetupForm .d-flex.gap-2.mt-2 .btn {
+    width: 100%;
+  }
+
+  .configured-location-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .configured-location-actions {
+    justify-content: stretch;
+    flex-direction: column;
+  }
+
+  .configured-location-actions .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 576px) {
+  .wizard-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .wizard-actions .btn {
+    width: 100%;
+  }
 }

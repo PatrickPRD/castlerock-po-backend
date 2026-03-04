@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const SettingsService = require('../services/settingsService');
 const { authenticate } = require('../middleware/auth');
 const authorizeRoles = require('../middleware/authorizeRoles');
 
@@ -11,11 +12,88 @@ function toNullableNumber(value) {
 }
 
 function normalizeDate(value) {
-  if (!value) return null;
+  if (value === null || value === undefined || value === '') return null;
+
+  const toYmd = (year, month, day) => `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    return toYmd(value.getFullYear(), value.getMonth() + 1, value.getDate());
+  }
+
   const raw = String(value).trim();
   if (!raw) return null;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
-  return raw;
+
+  const candidate = raw.slice(0, 10);
+  const match = candidate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(year, month - 1, day);
+
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() + 1 !== month ||
+    parsed.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return candidate;
+}
+
+function addDaysToDateString(dateValue, days) {
+  const normalized = normalizeDate(dateValue);
+  if (!normalized) return null;
+
+  const [year, month, day] = normalized.split('-').map((entry) => Number(entry));
+  const shifted = new Date(year, month - 1, day);
+  shifted.setDate(shifted.getDate() + Number(days || 0));
+
+  const nextYear = shifted.getFullYear();
+  const nextMonth = String(shifted.getMonth() + 1).padStart(2, '0');
+  const nextDay = String(shifted.getDate()).padStart(2, '0');
+  return `${nextYear}-${nextMonth}-${nextDay}`;
+}
+
+function parseVatRates(rawValue) {
+  if (!rawValue) return [];
+  try {
+    const parsed = JSON.parse(rawValue);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((entry) => Number(entry)).filter((entry) => Number.isFinite(entry) && entry >= 0 && entry <= 100);
+  } catch (_) {
+    return [];
+  }
+}
+
+function roundMoney(value) {
+  return Number((Number(value) || 0).toFixed(2));
+}
+
+function calculateIncomeBreakdown(sellingPriceInput, removeVatRateInput, removeFeesInput) {
+  const sellingPrice = Number.isFinite(Number(sellingPriceInput)) ? Number(sellingPriceInput) : 0;
+  const removeVatRate = Number.isFinite(Number(removeVatRateInput)) ? Number(removeVatRateInput) : 0;
+  const removeFeesPercentage = Number.isFinite(Number(removeFeesInput)) ? Number(removeFeesInput) : 0;
+
+  const clampedVatRate = Math.max(0, Math.min(100, removeVatRate));
+  const clampedFeesPercentage = Math.max(0, Math.min(100, removeFeesPercentage));
+
+  const vatAmount = clampedVatRate > 0
+    ? roundMoney(sellingPrice * (clampedVatRate / (100 + clampedVatRate)))
+    : 0;
+  const sellingPriceBeforeVat = roundMoney(sellingPrice - vatAmount);
+  const feesAmount = roundMoney(sellingPriceBeforeVat * (clampedFeesPercentage / 100));
+  const calculatedIncome = roundMoney(sellingPrice - vatAmount - feesAmount);
+
+  return {
+    vat_amount: vatAmount,
+    fees_amount: feesAmount,
+    calculated_income: calculatedIncome
+  };
 }
 
 function parseWeeklySpread(rawValue) {
@@ -116,6 +194,92 @@ async function loadTemplates(connectionOrDb = db) {
      ORDER BY name`
   );
   return rows.map(toTemplateDto);
+}
+
+async function ensureCashflowLocationDateColumns(connectionOrDb = db) {
+  async function readColumns() {
+    const [rows] = await connectionOrDb.query(
+      'SHOW COLUMNS FROM cashflow_location_settings'
+    );
+
+    const existingColumns = new Set(rows.map((row) => String(row.Field || '').toLowerCase()));
+    return {
+      startOnSiteDate: existingColumns.has('start_on_site_date'),
+      completionDate: existingColumns.has('completion_date'),
+      houseHandoverDate: existingColumns.has('house_handover_date'),
+      removeFeesPercentage: existingColumns.has('remove_fees_percentage'),
+      removeVatRate: existingColumns.has('remove_vat_rate')
+    };
+  }
+
+  function isRecoverableSchemaError(error) {
+    return [
+      'ER_DUP_FIELDNAME',
+      'ER_TABLEACCESS_DENIED_ERROR',
+      'ER_DBACCESS_DENIED_ERROR',
+      'ER_SPECIFIC_ACCESS_DENIED_ERROR'
+    ].includes(error?.code);
+  }
+
+  let support = await readColumns();
+
+  const columnDefinitions = [
+    {
+      key: 'startOnSiteDate',
+      columnName: 'start_on_site_date',
+      sql: 'ALTER TABLE cashflow_location_settings ADD COLUMN start_on_site_date DATE NULL AFTER selling_price'
+    },
+    {
+      key: 'completionDate',
+      columnName: 'completion_date',
+      sql: 'ALTER TABLE cashflow_location_settings ADD COLUMN completion_date DATE NULL AFTER start_on_site_date'
+    },
+    {
+      key: 'houseHandoverDate',
+      columnName: 'house_handover_date',
+      sql: 'ALTER TABLE cashflow_location_settings ADD COLUMN house_handover_date DATE NULL AFTER completion_date'
+    },
+    {
+      key: 'removeFeesPercentage',
+      columnName: 'remove_fees_percentage',
+      sql: 'ALTER TABLE cashflow_location_settings ADD COLUMN remove_fees_percentage DECIMAL(5,2) NULL AFTER house_handover_date'
+    },
+    {
+      key: 'removeVatRate',
+      columnName: 'remove_vat_rate',
+      sql: 'ALTER TABLE cashflow_location_settings ADD COLUMN remove_vat_rate DECIMAL(5,3) NULL AFTER remove_fees_percentage'
+    }
+  ];
+
+  for (const definition of columnDefinitions) {
+    if (support[definition.key]) continue;
+
+    try {
+      await connectionOrDb.query(definition.sql);
+      support[definition.key] = true;
+    } catch (error) {
+      if (error?.code === 'ER_DUP_FIELDNAME') {
+        support[definition.key] = true;
+      } else if (!isRecoverableSchemaError(error)) {
+        throw error;
+      } else {
+        console.warn(`Cashflow schema check: unable to auto-add ${definition.columnName} column:`, error.code || error.message);
+      }
+    }
+  }
+
+  try {
+    const finalSupport = await readColumns();
+    return {
+      startOnSiteDate: support.startOnSiteDate || finalSupport.startOnSiteDate,
+      completionDate: support.completionDate || finalSupport.completionDate,
+      houseHandoverDate: support.houseHandoverDate || finalSupport.houseHandoverDate,
+      removeFeesPercentage: support.removeFeesPercentage || finalSupport.removeFeesPercentage,
+      removeVatRate: support.removeVatRate || finalSupport.removeVatRate
+    };
+  } catch (_) {
+    return support;
+  }
 }
 
 router.get(
@@ -328,7 +492,28 @@ router.get(
   authorizeRoles('super_admin'),
   async (req, res) => {
     try {
+      const dateColumnSupport = await ensureCashflowLocationDateColumns();
+      const startOnSiteSelect = dateColumnSupport.startOnSiteDate
+        ? 'cls.start_on_site_date'
+        : 'NULL AS start_on_site_date';
+      const completionDateSelect = dateColumnSupport.completionDate
+        ? 'cls.completion_date'
+        : 'NULL AS completion_date';
+      const houseHandoverSelect = dateColumnSupport.houseHandoverDate
+        ? 'cls.house_handover_date'
+        : 'NULL AS house_handover_date';
+      const removeFeesSelect = dateColumnSupport.removeFeesPercentage
+        ? 'cls.remove_fees_percentage'
+        : 'NULL AS remove_fees_percentage';
+      const removeVatSelect = dateColumnSupport.removeVatRate
+        ? 'cls.remove_vat_rate'
+        : 'NULL AS remove_vat_rate';
+
       const templates = await loadTemplates();
+      const settings = await SettingsService.getSettings();
+      const configuredVatRates = parseVatRates(settings?.vat_rates);
+      const availableVatRates = configuredVatRates.length ? configuredVatRates : [0, 13.5, 23];
+      const defaultVatRate = availableVatRates[0];
 
       const [[overall]] = await db.query(
         `SELECT overall_start_date, overall_start_value
@@ -347,8 +532,11 @@ router.get(
           cls.predicted_spend_percentage,
           cls.spend_timescale_months,
           cls.selling_price,
-          cls.start_on_site_date,
-          cls.completion_date,
+          ${startOnSiteSelect},
+          ${completionDateSelect},
+          ${houseHandoverSelect},
+          ${removeFeesSelect},
+          ${removeVatSelect},
           cls.template_key,
           cls.weekly_spread_json
          FROM locations l
@@ -357,27 +545,60 @@ router.get(
          ORDER BY s.name, l.name`
       );
 
+      const mappedLocations = rows.map((row) => ({
+        location_id: row.location_id,
+        location_name: row.location_name,
+        site_id: row.site_id,
+        site_name: row.site_name,
+        include_in_cashflow: Number(row.include_in_cashflow) === 1,
+        estimated_construction_cost: row.estimated_construction_cost === null ? null : Number(row.estimated_construction_cost),
+        predicted_spend_percentage: row.predicted_spend_percentage === null ? null : Number(row.predicted_spend_percentage),
+        spend_timescale_months: row.spend_timescale_months === null ? null : Number(row.spend_timescale_months),
+        selling_price: row.selling_price === null ? null : Number(row.selling_price),
+        start_on_site_date: normalizeDate(row.start_on_site_date),
+        completion_date: normalizeDate(row.completion_date),
+        house_handover_date: normalizeDate(row.house_handover_date),
+        remove_fees_percentage: row.remove_fees_percentage === null ? null : Number(row.remove_fees_percentage),
+        remove_vat_rate: row.remove_vat_rate === null ? null : Number(row.remove_vat_rate),
+        template_key: row.template_key || null,
+        weekly_spread: parseWeeklySpread(row.weekly_spread_json)
+      }));
+
+      const earliestIncludedStartDate = mappedLocations
+        .filter((row) => row.include_in_cashflow && row.start_on_site_date)
+        .map((row) => row.start_on_site_date)
+        .sort((a, b) => a.localeCompare(b))[0] || null;
+
+      const locationsWithIncome = mappedLocations.map((row) => {
+        const removeVatRate = row.remove_vat_rate === null || row.remove_vat_rate === undefined
+          ? defaultVatRate
+          : Number(row.remove_vat_rate);
+        const removeFeesPercentage = row.remove_fees_percentage === null || row.remove_fees_percentage === undefined
+          ? 0
+          : Number(row.remove_fees_percentage);
+        const income = calculateIncomeBreakdown(row.selling_price, removeVatRate, removeFeesPercentage);
+
+        return {
+          ...row,
+          house_handover_date: normalizeDate(row.house_handover_date),
+          remove_fees_percentage: row.remove_fees_percentage === null || row.remove_fees_percentage === undefined
+            ? 0
+            : Number(row.remove_fees_percentage),
+          remove_vat_rate: Number.isFinite(removeVatRate) ? removeVatRate : defaultVatRate,
+          vat_amount: income.vat_amount,
+          fees_amount: income.fees_amount,
+          calculated_income: income.calculated_income
+        };
+      });
+
       res.json({
-        overall_start_date: overall?.overall_start_date || null,
+        overall_start_date: earliestIncludedStartDate,
         overall_start_value: overall?.overall_start_value === null || overall?.overall_start_value === undefined
           ? null
           : Number(overall.overall_start_value),
+        vat_rates: availableVatRates,
         templates,
-        locations: rows.map((row) => ({
-          location_id: row.location_id,
-          location_name: row.location_name,
-          site_id: row.site_id,
-          site_name: row.site_name,
-          include_in_cashflow: Number(row.include_in_cashflow) === 1,
-          estimated_construction_cost: row.estimated_construction_cost === null ? null : Number(row.estimated_construction_cost),
-          predicted_spend_percentage: row.predicted_spend_percentage === null ? null : Number(row.predicted_spend_percentage),
-          spend_timescale_months: row.spend_timescale_months === null ? null : Number(row.spend_timescale_months),
-          selling_price: row.selling_price === null ? null : Number(row.selling_price),
-          start_on_site_date: row.start_on_site_date || null,
-          completion_date: row.completion_date || null,
-          template_key: row.template_key || null,
-          weekly_spread: parseWeeklySpread(row.weekly_spread_json)
-        }))
+        locations: locationsWithIncome
       });
     } catch (error) {
       console.error('Error fetching cashflow settings:', error);
@@ -391,12 +612,7 @@ router.put(
   authenticate,
   authorizeRoles('super_admin'),
   async (req, res) => {
-    const { overallStartDate, overallStartValue, locations } = req.body || {};
-
-    const normalizedStartDate = normalizeDate(overallStartDate);
-    if (overallStartDate && !normalizedStartDate) {
-      return res.status(400).json({ error: 'overallStartDate must be in YYYY-MM-DD format' });
-    }
+    const { overallStartValue, locations } = req.body || {};
 
     const normalizedStartValue = toNullableNumber(overallStartValue);
     if (overallStartValue !== null && overallStartValue !== undefined && overallStartValue !== '' && normalizedStartValue === null) {
@@ -411,8 +627,28 @@ router.put(
     }
 
     try {
+      const dateColumnSupport = await ensureCashflowLocationDateColumns();
+      if (
+        !dateColumnSupport.startOnSiteDate ||
+        !dateColumnSupport.completionDate ||
+        !dateColumnSupport.houseHandoverDate ||
+        !dateColumnSupport.removeFeesPercentage ||
+        !dateColumnSupport.removeVatRate
+      ) {
+        return res.status(500).json({
+          error: 'Database schema is missing required cashflow settings columns. Run database migrations and try again.'
+        });
+      }
+
       const templates = await loadTemplates();
       const templateMap = new Map(templates.map((template) => [template.key, template]));
+      const settings = await SettingsService.getSettings();
+      const configuredVatRates = parseVatRates(settings?.vat_rates);
+      const availableVatRates = configuredVatRates.length ? configuredVatRates : [0, 13.5, 23];
+      const defaultVatRate = availableVatRates[0];
+      const availableVatRateKeys = new Set(availableVatRates.map((rate) => Number(Number(rate).toFixed(3))));
+      let earliestIncludedStartDate = null;
+      const normalizedLocations = [];
 
       for (const item of locations) {
         const locationId = Number(item?.location_id);
@@ -426,6 +662,9 @@ router.put(
         const sellingPrice = toNullableNumber(item?.selling_price);
         const startOnSiteDate = normalizeDate(item?.start_on_site_date);
         const completionDate = normalizeDate(item?.completion_date);
+        const providedHandoverDate = normalizeDate(item?.house_handover_date);
+        const removeFeesPercentageRaw = toNullableNumber(item?.remove_fees_percentage);
+        const removeVatRateRaw = toNullableNumber(item?.remove_vat_rate);
         const templateKey = item?.template_key ? String(item.template_key).trim() : null;
         const normalizedSpread = normalizeWeeklySpread(item?.weekly_spread);
 
@@ -453,11 +692,34 @@ router.put(
           return res.status(400).json({ error: 'completion_date must be in YYYY-MM-DD format' });
         }
 
+        if (item?.house_handover_date && !providedHandoverDate) {
+          return res.status(400).json({ error: 'house_handover_date must be in YYYY-MM-DD format' });
+        }
+
         if (startOnSiteDate && completionDate && completionDate < startOnSiteDate) {
           return res.status(400).json({ error: 'completion_date cannot be before start_on_site_date' });
         }
 
-        if (item?.include_in_cashflow) {
+        if (
+          removeFeesPercentageRaw !== null &&
+          (removeFeesPercentageRaw < 0 || removeFeesPercentageRaw > 100)
+        ) {
+          return res.status(400).json({ error: 'remove_fees_percentage must be between 0 and 100' });
+        }
+
+        if (
+          removeVatRateRaw !== null &&
+          (removeVatRateRaw < 0 || removeVatRateRaw > 100)
+        ) {
+          return res.status(400).json({ error: 'remove_vat_rate must be between 0 and 100' });
+        }
+
+        const includeInCashflow = !!item?.include_in_cashflow;
+        let houseHandoverDate = null;
+        let removeFeesPercentage = null;
+        let removeVatRate = null;
+
+        if (includeInCashflow) {
           const template = templateMap.get(templateKey);
           if (!template) {
             return res.status(400).json({ error: 'A valid template_key is required for included locations' });
@@ -474,7 +736,42 @@ router.put(
           if (!startOnSiteDate || !completionDate) {
             return res.status(400).json({ error: 'start_on_site_date and completion_date are required for included locations' });
           }
+
+          houseHandoverDate = providedHandoverDate || addDaysToDateString(completionDate, 7);
+          if (houseHandoverDate < completionDate) {
+            return res.status(400).json({ error: 'house_handover_date cannot be before completion_date' });
+          }
+
+          removeFeesPercentage = removeFeesPercentageRaw === null ? 0 : removeFeesPercentageRaw;
+          removeVatRate = removeVatRateRaw === null ? defaultVatRate : removeVatRateRaw;
+
+          const removeVatKey = Number(Number(removeVatRate).toFixed(3));
+          if (!availableVatRateKeys.has(removeVatKey)) {
+            return res.status(400).json({ error: 'remove_vat_rate must match one of the configured Financial Settings VAT rates' });
+          }
+
+          if (!earliestIncludedStartDate || startOnSiteDate < earliestIncludedStartDate) {
+            earliestIncludedStartDate = startOnSiteDate;
+          }
         }
+
+        normalizedLocations.push({
+          location_id: locationId,
+          include_in_cashflow: includeInCashflow,
+          estimated_construction_cost: estimatedConstructionCost,
+          predicted_spend_percentage: predictedSpendPercentage,
+          spend_timescale_months: spendTimescaleMonths,
+          selling_price: sellingPrice,
+          start_on_site_date: includeInCashflow ? startOnSiteDate : null,
+          completion_date: includeInCashflow ? completionDate : null,
+          house_handover_date: includeInCashflow ? houseHandoverDate : null,
+          remove_fees_percentage: includeInCashflow ? removeFeesPercentage : null,
+          remove_vat_rate: includeInCashflow ? removeVatRate : null,
+          template_key: includeInCashflow ? templateKey : null,
+          weekly_spread_json: includeInCashflow && Array.isArray(normalizedSpread)
+            ? JSON.stringify(normalizedSpread.map((entry) => Number(entry)))
+            : null
+        });
       }
 
       let connection;
@@ -488,10 +785,10 @@ router.put(
            ON DUPLICATE KEY UPDATE
              overall_start_date = VALUES(overall_start_date),
              overall_start_value = VALUES(overall_start_value)`,
-          [normalizedStartDate, normalizedStartValue]
+          [earliestIncludedStartDate, normalizedStartValue]
         );
 
-        for (const item of locations) {
+        for (const item of normalizedLocations) {
           await connection.query(
             `INSERT INTO cashflow_location_settings (
               location_id,
@@ -502,9 +799,12 @@ router.put(
               selling_price,
               start_on_site_date,
               completion_date,
+              house_handover_date,
+              remove_fees_percentage,
+              remove_vat_rate,
               template_key,
               weekly_spread_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
               include_in_cashflow = VALUES(include_in_cashflow),
               estimated_construction_cost = VALUES(estimated_construction_cost),
@@ -513,27 +813,35 @@ router.put(
               selling_price = VALUES(selling_price),
               start_on_site_date = VALUES(start_on_site_date),
               completion_date = VALUES(completion_date),
+              house_handover_date = VALUES(house_handover_date),
+              remove_fees_percentage = VALUES(remove_fees_percentage),
+              remove_vat_rate = VALUES(remove_vat_rate),
               template_key = VALUES(template_key),
               weekly_spread_json = VALUES(weekly_spread_json)`,
             [
-              Number(item.location_id),
+              item.location_id,
               item.include_in_cashflow ? 1 : 0,
-              toNullableNumber(item.estimated_construction_cost),
-              toNullableNumber(item.predicted_spend_percentage),
-              toNullableNumber(item.spend_timescale_months),
-              toNullableNumber(item.selling_price),
-              item.include_in_cashflow ? normalizeDate(item.start_on_site_date) : null,
-              item.include_in_cashflow ? normalizeDate(item.completion_date) : null,
-              item.include_in_cashflow ? String(item.template_key || '') : null,
-              item.include_in_cashflow && Array.isArray(item.weekly_spread)
-                ? JSON.stringify(item.weekly_spread.map((entry) => Number(entry)))
-                : null
+              item.estimated_construction_cost,
+              item.predicted_spend_percentage,
+              item.spend_timescale_months,
+              item.selling_price,
+              item.start_on_site_date,
+              item.completion_date,
+              item.house_handover_date,
+              item.remove_fees_percentage,
+              item.remove_vat_rate,
+              item.template_key,
+              item.weekly_spread_json
             ]
           );
         }
 
         await connection.commit();
-        res.json({ success: true });
+        res.json({
+          success: true,
+          overall_start_date: earliestIncludedStartDate,
+          overall_start_value: normalizedStartValue
+        });
       } catch (error) {
         if (connection) await connection.rollback();
         console.error('Error updating cashflow settings:', error);

@@ -459,6 +459,9 @@ Act like a senior engineer joining an established production team:
 ## File Storage
 All final storage must work both locally and on AWS S3 with only changes to the .env
 
+## Backup
+All new systems must work with previously created backup system and must follow its principles
+
 ## Thinking Process
 Before generating code:
 1. Understand existing patterns

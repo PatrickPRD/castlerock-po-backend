@@ -9,7 +9,6 @@ if (role !== 'super_admin') {
 
 const setupForm = document.getElementById('cashflowSetupForm');
 const statusEl = document.getElementById('cashflowSetupStatus');
-const overallStartDateInput = document.getElementById('overallStartDate');
 const overallStartValueInput = document.getElementById('overallStartValue');
 const openWizardModalBtn = document.getElementById('openWizardModalBtn');
 const cashflowWizardModal = document.getElementById('cashflowWizardModal');
@@ -27,6 +26,10 @@ const wizardEstimatedCost = document.getElementById('wizardEstimatedCost');
 const wizardSellingPrice = document.getElementById('wizardSellingPrice');
 const wizardStartOnSiteDate = document.getElementById('wizardStartOnSiteDate');
 const wizardCompletionDate = document.getElementById('wizardCompletionDate');
+const wizardHouseHandoverDate = document.getElementById('wizardHouseHandoverDate');
+const wizardRemoveFeesPercentage = document.getElementById('wizardRemoveFeesPercentage');
+const wizardRemoveVatRate = document.getElementById('wizardRemoveVatRate');
+const wizardCalculatedIncome = document.getElementById('wizardCalculatedIncome');
 const wizardReview = document.getElementById('wizardReview');
 const wizardProgress = document.getElementById('wizardProgress');
 const configuredLocationsBody = document.getElementById('configuredLocationsBody');
@@ -53,10 +56,14 @@ const configuredLocations = new Map();
 const expandedLocationIds = new Set();
 let editingLocationId = null;
 let wizardCurrentStep = 1;
-const wizardTotalSteps = 5;
+const wizardTotalSteps = 1;
 let templateDraftRows = [];
 let editingTemplateKey = null;
 const expandedTemplateKeys = new Set();
+let isLoadingSettings = false;
+let autoSaveTimer = null;
+let availableVatRates = [0, 13.5, 23];
+let lastAutoHandoverDate = null;
 
 function setStatus(message, isError = false) {
   if (!statusEl) return;
@@ -93,6 +100,115 @@ function formatCurrency(value) {
   return Number.isFinite(n) ? n.toFixed(2) : '0.00';
 }
 
+function toRateKey(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Number(numeric.toFixed(3)) : null;
+}
+
+function roundMoney(value) {
+  return Number((Number(value) || 0).toFixed(2));
+}
+
+function deriveHouseHandoverDate(completionDateValue) {
+  const completionDate = normalizeInputDate(completionDateValue);
+  if (!completionDate) return null;
+  const date = new Date(`${completionDate}T00:00:00`);
+  date.setDate(date.getDate() + 7);
+  return date.toISOString().slice(0, 10);
+}
+
+function calculateIncomeBreakdown(sellingPriceInput, removeVatRateInput, removeFeesInput) {
+  const sellingPrice = Number.isFinite(Number(sellingPriceInput)) ? Number(sellingPriceInput) : 0;
+  const removeVatRate = Number.isFinite(Number(removeVatRateInput)) ? Number(removeVatRateInput) : 0;
+  const removeFeesPercentage = Number.isFinite(Number(removeFeesInput)) ? Number(removeFeesInput) : 0;
+
+  const clampedVatRate = Math.max(0, Math.min(100, removeVatRate));
+  const clampedFeesPercentage = Math.max(0, Math.min(100, removeFeesPercentage));
+
+  const vatAmount = clampedVatRate > 0
+    ? roundMoney(sellingPrice * (clampedVatRate / (100 + clampedVatRate)))
+    : 0;
+  const sellingPriceBeforeVat = roundMoney(sellingPrice - vatAmount);
+  const feesAmount = roundMoney(sellingPriceBeforeVat * (clampedFeesPercentage / 100));
+  const calculatedIncome = roundMoney(sellingPrice - vatAmount - feesAmount);
+
+  return {
+    vatAmount,
+    feesAmount,
+    calculatedIncome
+  };
+}
+
+async function loadFinancialVatRates() {
+  try {
+    const financial = await api('/settings/financial');
+    const rates = Array.isArray(financial?.vat_rates)
+      ? financial.vat_rates.map((entry) => Number(entry)).filter((entry) => Number.isFinite(entry) && entry >= 0 && entry <= 100)
+      : [];
+    availableVatRates = rates.length ? rates : [0, 13.5, 23];
+  } catch (_) {
+    availableVatRates = [0, 13.5, 23];
+  }
+}
+
+function renderRemoveVatOptions(selectedRate = null) {
+  if (!wizardRemoveVatRate) return;
+
+  const previousValue = selectedRate !== null && selectedRate !== undefined
+    ? String(selectedRate)
+    : wizardRemoveVatRate.value;
+  wizardRemoveVatRate.innerHTML = '<option value="">Select VAT rate</option>';
+
+  const sortedRates = [...availableVatRates].sort((a, b) => a - b);
+  sortedRates.forEach((rate) => {
+    const option = document.createElement('option');
+    option.value = String(rate);
+    option.textContent = `${rate}%`;
+    wizardRemoveVatRate.appendChild(option);
+  });
+
+  const hasPrevious = previousValue && [...wizardRemoveVatRate.options].some((option) => option.value === previousValue);
+  if (hasPrevious) {
+    wizardRemoveVatRate.value = previousValue;
+  } else if (sortedRates.length > 0) {
+    wizardRemoveVatRate.value = String(sortedRates[0]);
+  }
+}
+
+function updateHouseHandoverDateField() {
+  if (!wizardHouseHandoverDate) return;
+
+  const autoDate = deriveHouseHandoverDate(wizardCompletionDate?.value);
+  if (!autoDate) {
+    wizardHouseHandoverDate.value = '';
+    lastAutoHandoverDate = null;
+    return;
+  }
+
+  const currentValue = normalizeInputDate(wizardHouseHandoverDate.value);
+  const shouldAutofill = !currentValue || (lastAutoHandoverDate && currentValue === lastAutoHandoverDate);
+  if (shouldAutofill) {
+    wizardHouseHandoverDate.value = autoDate;
+  }
+  lastAutoHandoverDate = autoDate;
+}
+
+function updateCalculatedIncomeField() {
+  if (!wizardCalculatedIncome) return;
+
+  const sellingPrice = parseNumber(wizardSellingPrice?.value);
+  const removeFees = parseNumber(wizardRemoveFeesPercentage?.value);
+  const removeVatRate = parseNumber(wizardRemoveVatRate?.value);
+
+  const breakdown = calculateIncomeBreakdown(
+    sellingPrice === null || Number.isNaN(sellingPrice) ? 0 : sellingPrice,
+    removeVatRate === null || Number.isNaN(removeVatRate) ? 0 : removeVatRate,
+    removeFees === null || Number.isNaN(removeFees) ? 0 : removeFees
+  );
+
+  wizardCalculatedIncome.value = formatCurrency(breakdown.calculatedIncome);
+}
+
 function rowTemplate(location) {
   const estimatedCost = location.estimated_construction_cost ?? '';
   const timescale = location.spend_timescale_months ?? '';
@@ -100,6 +216,10 @@ function rowTemplate(location) {
   const predictedSpend = location.predicted_spend_percentage ?? '';
   const startOnSiteDate = location.start_on_site_date || '';
   const completionDate = location.completion_date || '';
+  const houseHandoverDate = location.house_handover_date || '';
+  const removeFeesPercentage = location.remove_fees_percentage ?? 0;
+  const removeVatRate = location.remove_vat_rate ?? 0;
+  const calculatedIncome = location.calculated_income ?? calculateIncomeBreakdown(sellingPrice, removeVatRate, removeFeesPercentage).calculatedIncome;
   const spreadTotal = Number((Array.isArray(location.weekly_spread)
     ? location.weekly_spread.reduce((sum, value) => sum + (Number(value) || 0), 0)
     : 0).toFixed(2));
@@ -123,14 +243,53 @@ function rowTemplate(location) {
     <tr class="configured-location-details" style="display:${isExpanded ? 'table-row' : 'none'};">
       <td colspan="4">
         <div class="configured-location-panel">
-          <div><strong>Site:</strong> ${location.site_name || '-'}</div>
-          <div><strong>Spend Timescale (Weeks):</strong> ${timescale === null || timescale === '' ? '-' : timescale}</div>
-          <div><strong>Location Selling Price:</strong> ${formatCurrency(sellingPrice)}</div>
-          <div><strong>Start on Site Date:</strong> ${startOnSiteDate || '-'}</div>
-          <div><strong>Completion Date:</strong> ${completionDate || '-'}</div>
-          <div><strong>Predicted Spend %:</strong> ${predictedSpend === null || predictedSpend === '' ? '-' : predictedSpend}</div>
-          <div><strong>Weekly Spread Total:</strong> ${spreadTotal}%</div>
-          <div class="d-flex gap-2 pt-1">
+          <div class="configured-location-grid">
+            <div class="configured-stat">
+              <span class="configured-label">Site</span>
+              <span class="configured-value">${location.site_name || '-'}</span>
+            </div>
+            <div class="configured-stat">
+              <span class="configured-label">Spend Timescale (Weeks)</span>
+              <span class="configured-value">${timescale === null || timescale === '' ? '-' : timescale}</span>
+            </div>
+            <div class="configured-stat">
+              <span class="configured-label">Location Selling Price</span>
+              <span class="configured-value">${formatCurrency(sellingPrice)}</span>
+            </div>
+            <div class="configured-stat">
+              <span class="configured-label">Start on Site Date</span>
+              <span class="configured-value">${startOnSiteDate || '-'}</span>
+            </div>
+            <div class="configured-stat">
+              <span class="configured-label">Completion Date</span>
+              <span class="configured-value">${completionDate || '-'}</span>
+            </div>
+            <div class="configured-stat">
+              <span class="configured-label">House Handover Date</span>
+              <span class="configured-value">${houseHandoverDate || '-'}</span>
+            </div>
+            <div class="configured-stat">
+              <span class="configured-label">Predicted Spend %</span>
+              <span class="configured-value">${predictedSpend === null || predictedSpend === '' ? '-' : predictedSpend}</span>
+            </div>
+            <div class="configured-stat">
+              <span class="configured-label">Remove Fees (%)</span>
+              <span class="configured-value">${removeFeesPercentage === null || removeFeesPercentage === '' ? '-' : removeFeesPercentage}</span>
+            </div>
+            <div class="configured-stat">
+              <span class="configured-label">Remove VAT (%)</span>
+              <span class="configured-value">${removeVatRate === null || removeVatRate === '' ? '-' : removeVatRate}</span>
+            </div>
+            <div class="configured-stat">
+              <span class="configured-label">Weekly Spread Total</span>
+              <span class="configured-value">${spreadTotal}%</span>
+            </div>
+            <div class="configured-stat">
+              <span class="configured-label">Calculated Income</span>
+              <span class="configured-value">${formatCurrency(calculatedIncome)}</span>
+            </div>
+          </div>
+          <div class="configured-location-actions">
             <button type="button" class="btn btn-sm btn-outline-primary" onclick="editConfiguredLocation(${location.location_id})">Edit</button>
             <button type="button" class="btn btn-sm btn-danger" onclick="removeConfiguredLocation(${location.location_id})">Remove</button>
           </div>
@@ -152,7 +311,7 @@ function renderConfiguredRows() {
   if (rows.length === 0) {
     configuredLocationsBody.innerHTML = `
       <tr>
-        <td colspan="4" class="text-center text-muted py-4">No configured locations yet. Use the wizard above.</td>
+        <td colspan="4" class="text-center text-muted py-4">No configured locations yet. Use Add Location above.</td>
       </tr>
     `;
     if (wizardProgress) wizardProgress.textContent = '0 locations configured';
@@ -248,6 +407,11 @@ function resetWizardForm() {
   wizardSellingPrice.value = '';
   wizardStartOnSiteDate.value = '';
   wizardCompletionDate.value = '';
+  if (wizardHouseHandoverDate) wizardHouseHandoverDate.value = '';
+  if (wizardRemoveFeesPercentage) wizardRemoveFeesPercentage.value = '0';
+  renderRemoveVatOptions();
+  lastAutoHandoverDate = null;
+  updateCalculatedIncomeField();
   if (wizardReview) wizardReview.innerHTML = '';
 }
 
@@ -265,6 +429,15 @@ function loadWizardFromConfigured(locationId) {
   wizardStartOnSiteDate.value = config.start_on_site_date || '';
   wizardTemplateSelect.value = config.template_key || '';
   updateCompletionDateField();
+  renderRemoveVatOptions(config.remove_vat_rate);
+  if (wizardRemoveFeesPercentage) {
+    wizardRemoveFeesPercentage.value = config.remove_fees_percentage ?? 0;
+  }
+  if (wizardHouseHandoverDate) {
+    wizardHouseHandoverDate.value = config.house_handover_date || deriveHouseHandoverDate(wizardCompletionDate.value) || '';
+  }
+  lastAutoHandoverDate = deriveHouseHandoverDate(wizardCompletionDate.value);
+  updateCalculatedIncomeField();
 }
 
 function normalizeInputDate(value) {
@@ -323,17 +496,24 @@ function deriveCompletionDate(startDateValue, templateKey = null) {
 function updateCompletionDateField() {
   if (!wizardCompletionDate) return;
   wizardCompletionDate.value = deriveCompletionDate(wizardStartOnSiteDate?.value, wizardTemplateSelect?.value) || '';
+  updateHouseHandoverDateField();
+  updateCalculatedIncomeField();
 }
 
 function openWizardModal(isEdit = false, locationId = null) {
   if (isEdit) {
     renderSiteOptions();
     loadWizardFromConfigured(locationId);
+    wizardSiteSelect.disabled = true;
+    wizardLocationSelect.disabled = true;
   } else {
     editingLocationId = null;
     renderSiteOptions();
     renderLocationOptions();
+    renderRemoveVatOptions();
     resetWizardForm();
+    wizardSiteSelect.disabled = false;
+    wizardLocationSelect.disabled = false;
   }
 
   wizardCurrentStep = 1;
@@ -353,6 +533,8 @@ function closeWizardModal() {
     cashflowWizardModal.style.display = 'none';
   }
   editingLocationId = null;
+  wizardSiteSelect.disabled = false;
+  wizardLocationSelect.disabled = false;
   resetWizardForm();
   renderLocationOptions();
   wizardCurrentStep = 1;
@@ -373,6 +555,9 @@ function validateWizardInput(locationData) {
   if (!locationData.completion_date) {
     return 'Completion date could not be calculated. Check start date and template';
   }
+  if (!locationData.house_handover_date) {
+    return 'House handover date is required';
+  }
 
   if (locationData.estimated_construction_cost < 0) return 'Estimated construction cost cannot be negative';
   if (locationData.selling_price < 0) return 'Location selling price cannot be negative';
@@ -385,33 +570,54 @@ function validateWizardInput(locationData) {
   if (locationData.completion_date < locationData.start_on_site_date) {
     return 'Completion date cannot be before start on site date';
   }
+  if (locationData.house_handover_date < locationData.completion_date) {
+    return 'House handover date cannot be before completion date';
+  }
+  if (locationData.remove_fees_percentage !== null && (locationData.remove_fees_percentage < 0 || locationData.remove_fees_percentage > 100)) {
+    return 'Remove fees % must be between 0 and 100';
+  }
+  if (locationData.remove_vat_rate === null || Number.isNaN(locationData.remove_vat_rate)) {
+    return 'Remove VAT rate is required';
+  }
+  if (locationData.remove_vat_rate < 0 || locationData.remove_vat_rate > 100) {
+    return 'Remove VAT rate must be between 0 and 100';
+  }
 
   return null;
 }
 
 function validateStep(step) {
-  if (step === 1 && !wizardSiteSelect.value) return 'Please select a site';
-  if (step === 1 && !wizardLocationSelect.value) return 'Please select a location';
+  if (step !== 1) return null;
 
-  if (step === 2 && !wizardTemplateSelect.value) return 'Please select a template';
+  if (!wizardSiteSelect.value) return 'Please select a site';
+  if (!wizardLocationSelect.value) return 'Please select a location';
+  if (!wizardTemplateSelect.value) return 'Please select a template';
 
-  if (step === 3) {
-    const value = parseNumber(wizardEstimatedCost.value);
-    if (value === null || Number.isNaN(value)) return 'Estimated construction cost is required';
-    if (value < 0) return 'Estimated construction cost cannot be negative';
-  }
+  const estimatedCost = parseNumber(wizardEstimatedCost.value);
+  if (estimatedCost === null || Number.isNaN(estimatedCost)) return 'Estimated construction cost is required';
+  if (estimatedCost < 0) return 'Estimated construction cost cannot be negative';
 
-  if (step === 4) {
-    const value = parseNumber(wizardSellingPrice.value);
-    if (value === null || Number.isNaN(value)) return 'Location selling price is required';
-    if (value < 0) return 'Location selling price cannot be negative';
+  const sellingPrice = parseNumber(wizardSellingPrice.value);
+  if (sellingPrice === null || Number.isNaN(sellingPrice)) return 'Location selling price is required';
+  if (sellingPrice < 0) return 'Location selling price cannot be negative';
 
-    const startOnSite = normalizeInputDate(wizardStartOnSiteDate.value);
-    if (!startOnSite) return 'Start on site date is required';
+  const startOnSite = normalizeInputDate(wizardStartOnSiteDate.value);
+  if (!startOnSite) return 'Start on site date is required';
 
-    const completionDate = deriveCompletionDate(startOnSite, wizardTemplateSelect.value);
-    if (!completionDate) return 'Completion date could not be calculated. Check template and start date';
-  }
+  const completionDate = deriveCompletionDate(startOnSite, wizardTemplateSelect.value);
+  if (!completionDate) return 'Completion date could not be calculated. Check template and start date';
+
+  const handoverDate = normalizeInputDate(wizardHouseHandoverDate?.value) || deriveHouseHandoverDate(completionDate);
+  if (!handoverDate) return 'House handover date is required';
+  if (handoverDate < completionDate) return 'House handover date cannot be before completion date';
+
+  const fees = parseNumber(wizardRemoveFeesPercentage?.value);
+  if (fees !== null && Number.isNaN(fees)) return 'Remove fees % must be a valid number';
+  if (fees !== null && (fees < 0 || fees > 100)) return 'Remove fees % must be between 0 and 100';
+
+  const removeVat = parseNumber(wizardRemoveVatRate?.value);
+  if (removeVat === null || Number.isNaN(removeVat)) return 'Remove VAT rate is required';
+  if (removeVat < 0 || removeVat > 100) return 'Remove VAT rate must be between 0 and 100';
 
   return null;
 }
@@ -761,14 +967,25 @@ function updateWizardReview() {
   if (!wizardReview) return;
   const selectedId = Number(wizardLocationSelect.value || 0);
   const sourceLocation = getLocationById(selectedId);
+  const sellingPriceValue = parseNumber(wizardSellingPrice.value);
+  const removeFeesValue = parseNumber(wizardRemoveFeesPercentage?.value);
+  const removeVatValue = parseNumber(wizardRemoveVatRate?.value);
+  const normalizedSellingPrice = sellingPriceValue === null || Number.isNaN(sellingPriceValue) ? 0 : sellingPriceValue;
+  const normalizedRemoveFees = removeFeesValue === null || Number.isNaN(removeFeesValue) ? 0 : removeFeesValue;
+  const normalizedRemoveVat = removeVatValue === null || Number.isNaN(removeVatValue) ? 0 : removeVatValue;
+  const incomeBreakdown = calculateIncomeBreakdown(normalizedSellingPrice, normalizedRemoveVat, normalizedRemoveFees);
 
   wizardReview.innerHTML = `
     <div><strong>Location:</strong> ${sourceLocation ? `${sourceLocation.site_name} — ${sourceLocation.location_name}` : '-'}</div>
     <div><strong>Template:</strong> ${templateNameByKey(wizardTemplateSelect.value) || '-'}</div>
     <div><strong>Est. Construction Cost:</strong> ${formatCurrency(parseNumber(wizardEstimatedCost.value) || 0)}</div>
-    <div><strong>Location Selling Price:</strong> ${formatCurrency(parseNumber(wizardSellingPrice.value) || 0)}</div>
+    <div><strong>Location Selling Price:</strong> ${formatCurrency(normalizedSellingPrice)}</div>
     <div><strong>Start on Site Date:</strong> ${normalizeInputDate(wizardStartOnSiteDate.value) || '-'}</div>
     <div><strong>Completion Date:</strong> ${deriveCompletionDate(wizardStartOnSiteDate.value, wizardTemplateSelect.value) || '-'}</div>
+    <div><strong>House Handover Date:</strong> ${(normalizeInputDate(wizardHouseHandoverDate?.value) || deriveHouseHandoverDate(deriveCompletionDate(wizardStartOnSiteDate.value, wizardTemplateSelect.value))) || '-'}</div>
+    <div><strong>Remove Fees %:</strong> ${normalizedRemoveFees}</div>
+    <div><strong>Remove VAT %:</strong> ${normalizedRemoveVat}</div>
+    <div><strong>Calculated Income:</strong> ${formatCurrency(incomeBreakdown.calculatedIncome)}</div>
     <div><strong>Predicted Spend %:</strong> ${getPredictedSpendPercent()}</div>
     <div><strong>Spend Timescale (Weeks):</strong> ${getDerivedTimescaleWeeks() ?? '-'}</div>
     <div><strong>Weekly Spread Total:</strong> ${Number(getTemplateDefaultSpread().reduce((sum, value) => sum + (Number(value) || 0), 0).toFixed(2))}%</div>
@@ -785,10 +1002,17 @@ function updateWizardStepUI() {
     wizardStepCounter.textContent = `Step ${wizardCurrentStep} of ${wizardTotalSteps}`;
   }
 
-  wizardBackBtn.disabled = wizardCurrentStep === 1;
-  wizardNextBtn.style.display = wizardCurrentStep === wizardTotalSteps ? 'none' : 'inline-block';
-  wizardSaveLocationBtn.style.display = wizardCurrentStep === wizardTotalSteps ? 'inline-block' : 'none';
-  wizardSaveLocationBtn.textContent = editingLocationId ? 'Update Location' : 'Add Location';
+  if (wizardBackBtn) {
+    wizardBackBtn.disabled = wizardCurrentStep === 1;
+    wizardBackBtn.style.display = wizardTotalSteps > 1 ? 'inline-block' : 'none';
+  }
+  if (wizardNextBtn) {
+    wizardNextBtn.style.display = wizardCurrentStep === wizardTotalSteps ? 'none' : 'inline-block';
+  }
+  if (wizardSaveLocationBtn) {
+    wizardSaveLocationBtn.style.display = wizardCurrentStep === wizardTotalSteps ? 'inline-block' : 'none';
+    wizardSaveLocationBtn.textContent = editingLocationId ? 'Update Location' : 'Add Location';
+  }
 
   if (wizardCurrentStep === wizardTotalSteps) {
     updateWizardReview();
@@ -818,6 +1042,16 @@ function buildWizardLocationData() {
   const sourceLocation = getLocationById(selectedId);
   if (!sourceLocation) return null;
 
+  const completionDate = deriveCompletionDate(wizardStartOnSiteDate.value, wizardTemplateSelect.value);
+  const houseHandoverDate = normalizeInputDate(wizardHouseHandoverDate?.value) || deriveHouseHandoverDate(completionDate);
+  const removeFeesPercentage = parseNumber(wizardRemoveFeesPercentage?.value);
+  const removeVatRate = parseNumber(wizardRemoveVatRate?.value);
+  const incomeBreakdown = calculateIncomeBreakdown(
+    parseNumber(wizardSellingPrice.value),
+    removeVatRate === null || Number.isNaN(removeVatRate) ? 0 : removeVatRate,
+    removeFeesPercentage === null || Number.isNaN(removeFeesPercentage) ? 0 : removeFeesPercentage
+  );
+
   return {
     location_id: sourceLocation.location_id,
     location_name: sourceLocation.location_name,
@@ -831,12 +1065,18 @@ function buildWizardLocationData() {
     predicted_spend_percentage: getPredictedSpendPercent(),
     spend_timescale_months: getDerivedTimescaleWeeks(),
     start_on_site_date: normalizeInputDate(wizardStartOnSiteDate.value),
-    completion_date: deriveCompletionDate(wizardStartOnSiteDate.value, wizardTemplateSelect.value),
-    selling_price: parseNumber(wizardSellingPrice.value)
+    completion_date: completionDate,
+    house_handover_date: houseHandoverDate,
+    remove_fees_percentage: removeFeesPercentage === null ? 0 : removeFeesPercentage,
+    remove_vat_rate: removeVatRate,
+    selling_price: parseNumber(wizardSellingPrice.value),
+    vat_amount: incomeBreakdown.vatAmount,
+    fees_amount: incomeBreakdown.feesAmount,
+    calculated_income: incomeBreakdown.calculatedIncome
   };
 }
 
-function addOrUpdateWizardLocation() {
+async function addOrUpdateWizardLocation() {
   const locationData = buildWizardLocationData();
   if (!locationData) {
     setStatus('Please select a location', true);
@@ -850,10 +1090,23 @@ function addOrUpdateWizardLocation() {
   }
 
   const wasEditing = !!editingLocationId;
-  configuredLocations.set(Number(locationData.location_id), locationData);
+  const locationId = Number(locationData.location_id);
+  const previousValue = configuredLocations.get(locationId);
+
+  configuredLocations.set(locationId, locationData);
   renderConfiguredRows();
-  closeWizardModal();
-  setStatus(wasEditing ? 'Location updated in cashflow plan.' : 'Location added to cashflow plan.');
+
+  try {
+    await persistSettings(wasEditing ? 'Location updated in cashflow plan.' : 'Location added to cashflow plan.');
+    closeWizardModal();
+  } catch (_) {
+    if (previousValue) {
+      configuredLocations.set(locationId, previousValue);
+    } else {
+      configuredLocations.delete(locationId);
+    }
+    renderConfiguredRows();
+  }
 }
 
 function parseNumber(value) {
@@ -870,6 +1123,16 @@ function collectPayload() {
       const derivedTimescale = configured.spend_timescale_months ?? getDerivedTimescaleWeeks(configured.template_key);
       const derivedSpread = getTemplateDefaultSpread(configured.template_key);
       const derivedCompletionDate = deriveCompletionDate(configured.start_on_site_date, configured.template_key) || configured.completion_date || null;
+      const derivedHandoverDate = normalizeInputDate(configured.house_handover_date) || deriveHouseHandoverDate(derivedCompletionDate) || null;
+      const removeFeesPercentage = configured.remove_fees_percentage === null || configured.remove_fees_percentage === undefined
+        ? 0
+        : Number(configured.remove_fees_percentage);
+      const fallbackVatRate = Number(availableVatRates[0] ?? 0);
+      const removeVatRateRaw = configured.remove_vat_rate === null || configured.remove_vat_rate === undefined || configured.remove_vat_rate === ''
+        ? fallbackVatRate
+        : Number(configured.remove_vat_rate);
+      const removeVatRate = Number.isFinite(removeVatRateRaw) ? removeVatRateRaw : fallbackVatRate;
+
       return {
         location_id: location.location_id,
         include_in_cashflow: true,
@@ -880,6 +1143,9 @@ function collectPayload() {
         spend_timescale_months: derivedTimescale,
         start_on_site_date: configured.start_on_site_date || null,
         completion_date: derivedCompletionDate,
+        house_handover_date: derivedHandoverDate,
+        remove_fees_percentage: removeFeesPercentage,
+        remove_vat_rate: removeVatRate,
         selling_price: configured.selling_price
       };
     }
@@ -894,12 +1160,14 @@ function collectPayload() {
       spend_timescale_months: null,
       start_on_site_date: null,
       completion_date: null,
+      house_handover_date: null,
+      remove_fees_percentage: null,
+      remove_vat_rate: null,
       selling_price: null
     };
   });
 
   return {
-    overallStartDate: overallStartDateInput?.value || null,
     overallStartValue: parseNumber(overallStartValueInput?.value),
     locations
   };
@@ -913,9 +1181,11 @@ function validatePayload(payload) {
     return 'Overall cashflow start point cannot be negative';
   }
 
-  if (!payload.locations.some((location) => location.include_in_cashflow)) {
-    return 'Add at least one location in the wizard before saving';
-  }
+  const availableVatRateKeys = new Set(
+    availableVatRates
+      .map((rate) => toRateKey(rate))
+      .filter((rate) => rate !== null)
+  );
 
   for (const location of payload.locations) {
     if (!location.include_in_cashflow) continue;
@@ -932,11 +1202,20 @@ function validatePayload(payload) {
     if (Number.isNaN(location.selling_price)) {
       return 'Location selling price must be a valid number';
     }
+    if (Number.isNaN(location.remove_fees_percentage)) {
+      return 'Remove fees % must be a valid number';
+    }
+    if (location.remove_vat_rate === null || Number.isNaN(location.remove_vat_rate)) {
+      return 'Remove VAT rate is required for each included location';
+    }
     if (!location.start_on_site_date) {
       return 'Start on site date is required for each included location';
     }
     if (!location.completion_date) {
       return 'Completion date is required for each included location';
+    }
+    if (!location.house_handover_date) {
+      return 'House handover date is required for each included location';
     }
 
     if (!location.template_key) {
@@ -966,18 +1245,74 @@ function validatePayload(payload) {
       return 'Spend timescale must be a positive whole number';
     }
 
+    if (
+      location.remove_fees_percentage !== null &&
+      (location.remove_fees_percentage < 0 || location.remove_fees_percentage > 100)
+    ) {
+      return 'Remove fees % must be between 0 and 100';
+    }
+
+    if (location.remove_vat_rate < 0 || location.remove_vat_rate > 100) {
+      return 'Remove VAT rate must be between 0 and 100';
+    }
+
+    const removeVatRateKey = toRateKey(location.remove_vat_rate);
+    if (removeVatRateKey === null || !availableVatRateKeys.has(removeVatRateKey)) {
+      return 'Remove VAT rate must match one of the configured VAT rates';
+    }
+
     if (location.completion_date < location.start_on_site_date) {
       return 'Completion date cannot be before start on site date';
+    }
+
+    if (location.house_handover_date < location.completion_date) {
+      return 'House handover date cannot be before completion date';
     }
   }
 
   return null;
 }
 
+async function persistSettings(successMessage = 'Saved successfully.') {
+  const payload = collectPayload();
+  const validationError = validatePayload(payload);
+
+  if (validationError) {
+    setStatus(validationError, true);
+    throw new Error(validationError);
+  }
+
+  setStatus('Saving...');
+  try {
+    await api('/cashflow/settings', 'PUT', payload);
+    setStatus(successMessage);
+  } catch (error) {
+    setStatus(error.message || 'Failed to save cashflow settings', true);
+    throw error;
+  }
+}
+
+function queueAutoSaveOverall() {
+  if (isLoadingSettings) return;
+
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(async () => {
+    try {
+      await persistSettings('Overall settings saved.');
+    } catch (_) {}
+  }, 500);
+}
+
 async function loadSettings() {
   try {
+    isLoadingSettings = true;
     setStatus('Loading...');
     const data = await api('/cashflow/settings');
+
+    const vatRates = Array.isArray(data.vat_rates)
+      ? data.vat_rates.map((entry) => Number(entry)).filter((entry) => Number.isFinite(entry) && entry >= 0 && entry <= 100)
+      : [];
+    availableVatRates = vatRates.length ? vatRates : [0, 13.5, 23];
 
     if (typeof window.loadCurrencySettings === 'function') {
       await window.loadCurrencySettings();
@@ -988,9 +1323,6 @@ async function loadSettings() {
 
     currentLocations = Array.isArray(data.locations) ? data.locations : [];
     cashflowTemplates = Array.isArray(data.templates) ? data.templates : [];
-    if (overallStartDateInput) {
-      overallStartDateInput.value = data.overall_start_date || '';
-    }
     if (overallStartValueInput) {
       overallStartValueInput.value = data.overall_start_value ?? '';
     }
@@ -1013,29 +1345,11 @@ async function loadSettings() {
     renderSiteOptions();
     renderLocationOptions();
     resetWizardForm();
-    setStatus('');
+    setStatus('Changes save automatically.');
   } catch (error) {
     setStatus(error.message || 'Failed to load cashflow settings', true);
-  }
-}
-
-async function handleSave(event) {
-  event.preventDefault();
-
-  const payload = collectPayload();
-  const validationError = validatePayload(payload);
-
-  if (validationError) {
-    setStatus(validationError, true);
-    return;
-  }
-
-  try {
-    setStatus('Saving...');
-    await api('/cashflow/settings', 'PUT', payload);
-    setStatus('Saved successfully.');
-  } catch (error) {
-    setStatus(error.message || 'Failed to save cashflow settings', true);
+  } finally {
+    isLoadingSettings = false;
   }
 }
 
@@ -1043,16 +1357,28 @@ function editConfiguredLocation(locationId) {
   openWizardModal(true, locationId);
 }
 
-function removeConfiguredLocation(locationId) {
-  configuredLocations.delete(Number(locationId));
-  expandedLocationIds.delete(Number(locationId));
+async function removeConfiguredLocation(locationId) {
+  const id = Number(locationId);
+  const previousValue = configuredLocations.get(id);
+
+  configuredLocations.delete(id);
+  expandedLocationIds.delete(id);
   renderConfiguredRows();
-  if (editingLocationId && Number(editingLocationId) === Number(locationId)) {
+  if (editingLocationId && Number(editingLocationId) === id) {
     resetWizardForm();
   } else {
     renderLocationOptions();
   }
-  setStatus('Location removed from cashflow plan.');
+
+  try {
+    await persistSettings('Location removed from cashflow plan.');
+  } catch (_) {
+    if (previousValue) {
+      configuredLocations.set(id, previousValue);
+      renderConfiguredRows();
+      renderLocationOptions();
+    }
+  }
 }
 
 window.editConfiguredLocation = editConfiguredLocation;
@@ -1089,6 +1415,29 @@ wizardStartOnSiteDate?.addEventListener('change', () => {
     updateWizardReview();
   }
 });
+wizardSellingPrice?.addEventListener('input', () => {
+  updateCalculatedIncomeField();
+  if (wizardCurrentStep === wizardTotalSteps) {
+    updateWizardReview();
+  }
+});
+wizardRemoveFeesPercentage?.addEventListener('input', () => {
+  updateCalculatedIncomeField();
+  if (wizardCurrentStep === wizardTotalSteps) {
+    updateWizardReview();
+  }
+});
+wizardRemoveVatRate?.addEventListener('change', () => {
+  updateCalculatedIncomeField();
+  if (wizardCurrentStep === wizardTotalSteps) {
+    updateWizardReview();
+  }
+});
+wizardHouseHandoverDate?.addEventListener('change', () => {
+  if (wizardCurrentStep === wizardTotalSteps) {
+    updateWizardReview();
+  }
+});
 wizardSiteSelect?.addEventListener('change', () => {
   wizardLocationSelect.value = '';
   renderLocationOptions();
@@ -1106,5 +1455,7 @@ templateDraftModal?.addEventListener('click', (event) => {
   }
 });
 
-setupForm?.addEventListener('submit', handleSave);
+setupForm?.addEventListener('submit', (event) => event.preventDefault());
+overallStartValueInput?.addEventListener('input', queueAutoSaveOverall);
+overallStartValueInput?.addEventListener('change', queueAutoSaveOverall);
 loadSettings();

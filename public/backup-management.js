@@ -58,6 +58,9 @@ async function loadBackups() {
     spinner.style.display = 'block';
     const response = await api('/backups/list');
     allBackups = response.backups || [];
+
+    const totalPages = Math.max(1, Math.ceil(allBackups.length / ITEMS_PER_PAGE));
+    currentPage = Math.min(Math.max(1, currentPage), totalPages);
     
     if (allBackups.length === 0) {
       tableBody.innerHTML = `
@@ -67,15 +70,17 @@ async function loadBackups() {
           </td>
         </tr>
       `;
-      document.getElementById('paginationControls').style.display = 'none';
+      renderPagination();
     } else {
       renderPage(currentPage);
       renderPagination();
-      document.getElementById('paginationControls').style.display = 'flex';
     }
   } catch (err) {
     console.error('Load backups error:', err);
     showToast('Failed to load backups: ' + err.message, 'error');
+    allBackups = [];
+    currentPage = 1;
+    renderPagination();
     tableBody.innerHTML = `
       <tr>
         <td colspan="4" class="text-center text-danger py-4">
@@ -138,46 +143,60 @@ function renderPage(page) {
 function renderPagination() {
   const totalPages = Math.ceil(allBackups.length / ITEMS_PER_PAGE);
   const paginationButtons = document.getElementById('paginationButtons');
+  const paginationControls = document.getElementById('paginationControls');
+
+  if (allBackups.length === 0) {
+    if (paginationButtons) paginationButtons.innerHTML = '';
+    const startEl = document.getElementById('paginationStart');
+    const endEl = document.getElementById('paginationEnd');
+    const totalEl = document.getElementById('paginationTotal');
+    if (startEl) startEl.textContent = '0';
+    if (endEl) endEl.textContent = '0';
+    if (totalEl) totalEl.textContent = '0';
+    if (paginationControls) paginationControls.style.display = 'none';
+    return;
+  }
+
+  if (paginationControls) paginationControls.style.display = 'flex';
   
   if (totalPages <= 1) {
     paginationButtons.innerHTML = '';
-    return;
-  }
-  
-  let buttonsHtml = '';
-  
-  // Previous button
-  buttonsHtml += `
-    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-      <a class="page-link" href="#" onclick="goToPage(${currentPage - 1}); return false;">Previous</a>
-    </li>
-  `;
-  
-  // Page numbers
-  for (let i = 1; i <= totalPages; i++) {
-    if (
-      i === 1 || 
-      i === totalPages || 
-      (i >= currentPage - 1 && i <= currentPage + 1)
-    ) {
-      buttonsHtml += `
-        <li class="page-item ${i === currentPage ? 'active' : ''}">
-          <a class="page-link" href="#" onclick="goToPage(${i}); return false;">${i}</a>
-        </li>
-      `;
-    } else if (i === currentPage - 2 || i === currentPage + 2) {
-      buttonsHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+  } else {
+    let buttonsHtml = '';
+    
+    // Previous button
+    buttonsHtml += `
+      <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+        <a class="page-link" href="#" onclick="goToPage(${currentPage - 1}); return false;">Previous</a>
+      </li>
+    `;
+    
+    // Page numbers
+    for (let i = 1; i <= totalPages; i++) {
+      if (
+        i === 1 || 
+        i === totalPages || 
+        (i >= currentPage - 1 && i <= currentPage + 1)
+      ) {
+        buttonsHtml += `
+          <li class="page-item ${i === currentPage ? 'active' : ''}">
+            <a class="page-link" href="#" onclick="goToPage(${i}); return false;">${i}</a>
+          </li>
+        `;
+      } else if (i === currentPage - 2 || i === currentPage + 2) {
+        buttonsHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+      }
     }
+    
+    // Next button
+    buttonsHtml += `
+      <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+        <a class="page-link" href="#" onclick="goToPage(${currentPage + 1}); return false;">Next</a>
+      </li>
+    `;
+    
+    paginationButtons.innerHTML = buttonsHtml;
   }
-  
-  // Next button
-  buttonsHtml += `
-    <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
-      <a class="page-link" href="#" onclick="goToPage(${currentPage + 1}); return false;">Next</a>
-    </li>
-  `;
-  
-  paginationButtons.innerHTML = buttonsHtml;
   
   // Update pagination info
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
