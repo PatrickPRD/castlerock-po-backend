@@ -256,11 +256,13 @@ All final storage must work both locally and on AWS S3 with only changes to the 
 
 ## Backup
 All new systems must work with previously created backup system and must follow its principles
+All new systems must be included in the backup system if they store any data
+Users must never be backed up 
 
 ## DB
-All shcema changes must be made through migrations. Migrations must be idempotent and handle existing data gracefully.
-the system must be resilient to migration failures and support rollbacks.
-the system must check the db state before applying migrations and skip already applied ones.
+All schema changes must be made through migrations. Migrations must be idempotent and handle existing data gracefully.
+The system must be resilient to migration failures and support rollbacks.
+The system must check the DB state before applying migrations and skip already applied ones.
 
 ## Thinking Process
 Before generating code:
