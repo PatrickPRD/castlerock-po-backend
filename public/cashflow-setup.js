@@ -70,6 +70,7 @@ const capitalCostDeleteConfirmBtn = document.getElementById('capitalCostDeleteCo
 const capitalCostsBody = document.getElementById('capitalCostsBody');
 const capitalCostsStatusEl = document.getElementById('capitalCostsStatus');
 const capitalCostsSummary = document.getElementById('capitalCostsSummary');
+const templateDraftLocationTypes = document.getElementById('templateDraftLocationTypes');
 
 let currentLocations = [];
 let cashflowTemplates = [];
@@ -90,6 +91,7 @@ let editingCapitalCostId = null;
 let deletingCapitalCostId = null;
 let projectStartDate = null;
 const expandedCapitalCostIds = new Set();
+let availableLocationTypes = [];
 
 function setStatus(message, isError = false) {
   if (!statusEl) return;
@@ -278,6 +280,134 @@ function syncCapitalCostDateWithProjectStart() {
 
   const today = new Date().toISOString().slice(0, 10);
   capitalCostDateAppliedInput.value = today;
+}
+
+/* ======================================================
+   LOCATION TYPE TO TEMPLATE MAPPINGS
+   ====================================================== */
+
+async function loadAvailableLocationTypes() {
+  try {
+    const locationTypesData = await api('/cashflow/location-types');
+    availableLocationTypes = Array.isArray(locationTypesData) ? locationTypesData : [];
+  } catch (error) {
+    console.error('Error loading available location types:', error);
+    availableLocationTypes = [];
+  }
+}
+
+function renderTemplateTagSelector(selectedTypes = []) {
+  const tagsContainer = document.getElementById('templateDraftTagsContainer');
+  if (!tagsContainer) return;
+
+  const input = document.getElementById('templateDraftTypeInput');
+  const selectedSet = new Set(selectedTypes);
+
+  // Clear container but keep input
+  const existingTags = tagsContainer.querySelectorAll('.template-type-tag');
+  existingTags.forEach(tag => tag.remove());
+
+  // Render tags before input
+  selectedSet.forEach(type => {
+    const tag = document.createElement('div');
+    tag.className = 'template-type-tag d-flex align-items-center gap-1 px-2 py-1 rounded-pill';
+    tag.style.background = '#0d6efd';
+    tag.style.color = 'white';
+    tag.style.fontSize = '0.85rem';
+    tag.style.whiteSpace = 'nowrap';
+    tag.dataset.type = type; // Store the type value for later retrieval
+    tag.innerHTML = `
+      ${type}
+      <button type="button" class="btn-close btn-close-white" style="width: 1rem; height: 1rem;" aria-label="Remove ${type}"></button>
+    `;
+    
+    const removeBtn = tag.querySelector('.btn-close');
+    removeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      selectedSet.delete(type);
+      renderTemplateTagSelector(Array.from(selectedSet));
+    });
+    
+    tagsContainer.insertBefore(tag, input);
+  });
+
+  // Attach input event listeners
+  attachTagInputHandlers(selectedSet);
+}
+
+function attachTagInputHandlers(selectedSet = new Set()) {
+  const input = document.getElementById('templateDraftTypeInput');
+  const suggestionsDiv = document.getElementById('templateDraftTypeSuggestions');
+  
+  if (!input || !suggestionsDiv) return;
+
+  input.addEventListener('input', (e) => {
+    const query = e.target.value.trim().toLowerCase();
+    
+    if (!query) {
+      suggestionsDiv.style.display = 'none';
+      return;
+    }
+    
+    // Filter available types (exclude already selected)
+    const matches = availableLocationTypes.filter(type => 
+      type.toLowerCase().includes(query) && !selectedSet.has(type)
+    );
+    
+    if (matches.length === 0) {
+      suggestionsDiv.style.display = 'none';
+      return;
+    }
+    
+    // Show suggestions
+    suggestionsDiv.innerHTML = matches.map(type => `
+      <div class="suggestion-item p-2 border-bottom" style="cursor: pointer;">
+        ${type}
+      </div>
+    `).join('');
+    suggestionsDiv.style.display = 'block';
+    
+    // Attach click handlers to suggestions
+    suggestionsDiv.querySelectorAll('.suggestion-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const type = item.textContent.trim();
+        selectedSet.add(type);
+        input.value = '';
+        suggestionsDiv.style.display = 'none';
+        renderTemplateTagSelector(Array.from(selectedSet));
+      });
+    });
+  });
+  
+  // Add on Enter key
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const query = e.target.value.trim().toLowerCase();
+      if (!query) return;
+      
+      const matching = availableLocationTypes.find(type => type.toLowerCase() === query);
+      if (matching && !selectedSet.has(matching)) {
+        selectedSet.add(matching);
+        input.value = '';
+        suggestionsDiv.style.display = 'none';
+        renderTemplateTagSelector(Array.from(selectedSet));
+      }
+    }
+  });
+  
+  // Close suggestions on blur
+  input.addEventListener('blur', () => {
+    setTimeout(() => suggestionsDiv.style.display = 'none', 150);
+  });
+}
+
+function getSelectedTemplateLocationTypes() {
+  const tagsContainer = document.getElementById('templateDraftTagsContainer');
+  if (!tagsContainer) return [];
+  
+  const tags = tagsContainer.querySelectorAll('.template-type-tag');
+  return Array.from(tags).map(tag => tag.dataset.type).filter(Boolean);
 }
 
 function updateHouseHandoverDateField() {
@@ -715,6 +845,78 @@ function getLocationById(locationId) {
   return currentLocations.find((row) => Number(row.location_id) === Number(locationId)) || null;
 }
 
+async function autoPopulateTemplateFromLocationType(locationId) {
+  if (!locationId) return;
+  
+  try {
+    const location = currentLocations.find(l => Number(l.location_id) === Number(locationId));
+    if (!location) return;
+
+    // If location has no type, user must manually select template
+    if (!location.location_type || location.location_type.trim() === '') {
+      if (wizardTemplateSelect) {
+        wizardTemplateSelect.value = '';
+        wizardTemplateSelect.focus();
+        wizardTemplateSelect.classList.add('border-warning');
+        setTimeout(() => wizardTemplateSelect.classList.remove('border-warning'), 2000);
+      }
+      return;
+    }
+
+    // Fetch template mapping for this location type
+    const response = await fetch(`/cashflow/location-type-template/${encodeURIComponent(location.location_type)}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!response.ok) {
+      // No mapping found, user must manually select
+      if (wizardTemplateSelect) {
+        wizardTemplateSelect.value = '';
+        wizardTemplateSelect.focus();
+      }
+      return;
+    }
+
+    const data = await response.json();
+    if (data.template_key && wizardTemplateSelect) {
+      wizardTemplateSelect.value = data.template_key;
+      // Trigger template change logic
+      updateCompletionDateField();
+      updateWizardReview();
+    }
+  } catch (error) {
+    console.warn('Could not auto-populate template:', error.message);
+    if (wizardTemplateSelect) {
+      wizardTemplateSelect.value = '';
+    }
+  }
+}
+
+function updateTemplateSelectorVisibility() {
+  const selectedLocationId = Number(wizardLocationSelect?.value || 0);
+  const templateSelectWrapper = document.getElementById('wizardTemplateSelectWrapper');
+  
+  if (!templateSelectWrapper) return;
+  
+  if (!selectedLocationId) {
+    // No location selected, hide template selector
+    templateSelectWrapper.style.display = 'none';
+    return;
+  }
+  
+  // Find the selected location
+  const selectedLocation = currentLocations.find(l => Number(l.location_id) === selectedLocationId);
+  
+  if (!selectedLocation) {
+    templateSelectWrapper.style.display = 'none';
+    return;
+  }
+  
+  // Show template selector only if location has no type
+  const hasNoType = !selectedLocation.type || selectedLocation.type.trim() === '';
+  templateSelectWrapper.style.display = hasNoType ? 'block' : 'none';
+}
+
 function renderLocationOptions() {
   if (!wizardLocationSelect) return;
 
@@ -895,6 +1097,7 @@ function openWizardModal(isEdit = false, locationId = null) {
 
   wizardCurrentStep = 1;
   updateWizardStepUI();
+  updateTemplateSelectorVisibility();
 
   if (wizardModalTitle) {
     wizardModalTitle.textContent = editingLocationId ? 'Edit Location in Cashflow' : 'Add Location to Cashflow';
@@ -1063,7 +1266,7 @@ function resetTemplateDraftForm() {
   renderTemplateDraftRows();
 }
 
-function openTemplateDraftModal() {
+async function openTemplateDraftModal() {
   if (templateDraftModal) {
     templateDraftModal.style.display = 'flex';
   }
@@ -1228,7 +1431,7 @@ function moveTemplateDraftRowDown(index) {
   renderTemplateDraftRows();
 }
 
-function startTemplateEdit(templateKey) {
+async function startTemplateEdit(templateKey) {
   const template = cashflowTemplates.find((entry) => entry.key === templateKey);
   if (!template) {
     setStatus('Template not found', true);
@@ -1244,7 +1447,18 @@ function startTemplateEdit(templateKey) {
   if (templateDraftName) templateDraftName.value = template.name || '';
   setTemplateDraftMode(true);
   renderTemplateDraftRows();
-  openTemplateDraftModal();
+  
+  // Load assigned location types for this template
+  try {
+    const response = await api(`/cashflow/templates/${encodeURIComponent(templateKey)}/location-types`);
+    const assignedTypes = response.location_types || [];
+    renderTemplateTagSelector(assignedTypes);
+  } catch (error) {
+    // No mappings exist yet, render empty selector
+    renderTemplateTagSelector([]);
+  }
+  
+  await openTemplateDraftModal();
   setStatus('Editing template. Update rows and save when ready.');
 }
 
@@ -1290,7 +1504,8 @@ async function saveTemplateDraft() {
     const response = await api(endpoint, method, payload);
 
     if (response?.template) {
-      const idx = cashflowTemplates.findIndex((entry) => entry.key === response.template.key);
+      const savedTemplateKey = response.template.key;
+      const idx = cashflowTemplates.findIndex((entry) => entry.key === savedTemplateKey);
       if (idx >= 0) {
         cashflowTemplates[idx] = response.template;
       } else {
@@ -1298,11 +1513,26 @@ async function saveTemplateDraft() {
       }
       cashflowTemplates.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base', numeric: true }));
 
+      // Save location type assignments
+      const selectedTypes = getSelectedTemplateLocationTypes();
+      const locationTypesResponse = await api(`/cashflow/templates/${encodeURIComponent(savedTemplateKey)}/location-types`, 'PUT', {
+        location_types: selectedTypes
+      });
+
       renderTemplateOptions();
       renderTemplateAccordion();
       resetTemplateDraftForm();
       if (templateDraftModal) templateDraftModal.style.display = 'none';
-      setStatus(isEdit ? 'Template updated successfully.' : 'Template created successfully.');
+      
+      // Show feedback about updates
+      const locationsUpdated = locationTypesResponse?.locations_updated || 0;
+      if (isEdit && locationsUpdated > 0) {
+        setStatus(`Template updated. ${locationsUpdated} location(s) in cashflow updated to use "${templateName}".`);
+        // Reload settings to refresh configured locations table
+        await loadSettings();
+      } else {
+        setStatus(isEdit ? 'Template updated successfully.' : 'Template created successfully.');
+      }
     }
   } catch (error) {
     setStatus(error.message || 'Failed to save template', true);
@@ -1745,6 +1975,7 @@ async function loadSettings() {
     renderSiteOptions();
     renderLocationOptions();
     resetWizardForm();
+    await loadAvailableLocationTypes();
     setStatus('Changes save automatically.');
   } catch (error) {
     setStatus(error.message || 'Failed to load cashflow settings', true);
@@ -1791,9 +2022,17 @@ wizardCancelBtn?.addEventListener('click', closeWizardModal);
 wizardNextBtn?.addEventListener('click', goToNextStep);
 wizardBackBtn?.addEventListener('click', goToPreviousStep);
 wizardSaveLocationBtn?.addEventListener('click', addOrUpdateWizardLocation);
-openTemplateDraftModalBtn?.addEventListener('click', () => {
+openTemplateDraftModalBtn?.addEventListener('click', async () => {
   resetTemplateDraftForm();
-  openTemplateDraftModal();
+  
+  // Ensure location types are loaded before rendering selector
+  if (availableLocationTypes.length === 0) {
+    await loadAvailableLocationTypes();
+  }
+  
+  // Now render tag selector with the loaded types
+  renderTemplateTagSelector([]);
+  await openTemplateDraftModal();
 });
 closeTemplateDraftModalBtn?.addEventListener('click', closeTemplateDraftModal);
 closeTemplateDraftCancelBtn?.addEventListener('click', closeTemplateDraftModal);
@@ -1854,6 +2093,11 @@ wizardHouseHandoverDate?.addEventListener('change', () => {
 wizardSiteSelect?.addEventListener('change', () => {
   wizardLocationSelect.value = '';
   renderLocationOptions();
+});
+
+wizardLocationSelect?.addEventListener('change', () => {
+  autoPopulateTemplateFromLocationType(wizardLocationSelect.value);
+  updateTemplateSelectorVisibility();
 });
 
 cashflowWizardModal?.addEventListener('click', (event) => {

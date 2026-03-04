@@ -829,6 +829,7 @@ router.get(
         `SELECT
           l.id AS location_id,
           l.name AS location_name,
+          l.type AS location_type,
           s.id AS site_id,
           s.name AS site_name,
           COALESCE(cls.include_in_cashflow, 0) AS include_in_cashflow,
@@ -852,6 +853,7 @@ router.get(
       const mappedLocations = rows.map((row) => ({
         location_id: row.location_id,
         location_name: row.location_name,
+        location_type: row.location_type || null,
         site_id: row.site_id,
         site_name: row.site_name,
         include_in_cashflow: Number(row.include_in_cashflow) === 1,
@@ -1160,6 +1162,257 @@ router.put(
     } catch (error) {
       console.error('Error validating cashflow settings:', error);
       res.status(500).json({ error: 'Failed to validate cashflow settings' });
+    }
+  }
+);
+
+/* ======================================================
+   GET LOCATION TYPES (Searchable list for dropdown)
+   ====================================================== */
+router.get(
+  '/location-types',
+  async (req, res) => {
+    try {
+      const [types] = await db.query(
+        `SELECT DISTINCT type FROM locations
+         WHERE type IS NOT NULL AND type != ''
+         ORDER BY type ASC`
+      );
+      res.json(types.map(t => t.type));
+    } catch (error) {
+      console.error('Error fetching location types:', error);
+      res.status(500).json({ error: 'Failed to fetch location types' });
+    }
+  }
+);
+
+/* ======================================================
+   GET LOCATION TYPE TEMPLATES (Current mappings grouped by template)
+   ====================================================== */
+router.get(
+  '/location-type-templates',
+  authenticate,
+  async (req, res) => {
+    try {
+      const [templates] = await db.query(
+        `SELECT template_key, name FROM cashflow_templates WHERE active = 1 ORDER BY created_at ASC`
+      );
+
+      const [mappings] = await db.query(
+        `SELECT location_type, template_key FROM cashflow_location_type_templates ORDER BY location_type ASC`
+      );
+
+      // Group by template
+      const templateMap = new Map();
+      templates.forEach(t => {
+        templateMap.set(t.template_key, {
+          template_key: t.template_key,
+          template_name: t.name,
+          location_types: []
+        });
+      });
+
+      mappings.forEach(m => {
+        if (templateMap.has(m.template_key)) {
+          templateMap.get(m.template_key).location_types.push(m.location_type);
+        }
+      });
+
+      res.json(Array.from(templateMap.values()));
+    } catch (error) {
+      console.error('Error fetching location type templates:', error);
+      res.status(500).json({ error: 'Failed to fetch location type templates' });
+    }
+  }
+);
+
+/* ======================================================
+   SET TEMPLATE LOCATION TYPES (Assign multiple types to template)
+   ====================================================== */
+router.put(
+  '/templates/:templateKey/location-types',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const { templateKey } = req.params;
+    const { location_types } = req.body;
+
+    if (!templateKey || !templateKey.trim()) {
+      return res.status(400).json({ error: 'Template key is required' });
+    }
+
+    if (!Array.isArray(location_types)) {
+      return res.status(400).json({ error: 'location_types must be an array' });
+    }
+
+    const normalizedTypes = [...new Set(
+      location_types
+        .map(t => String(t || '').trim())
+        .filter(t => t.length > 0)
+    )];
+
+    try {
+      // Verify template exists
+      const [[template]] = await db.query(
+        'SELECT template_key FROM cashflow_templates WHERE template_key = ? AND active = 1',
+        [templateKey]
+      );
+      
+      if (!template) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+
+      // Get current mappings for this template
+      const [currentMappings] = await db.query(
+        'SELECT location_type FROM cashflow_location_type_templates WHERE template_key = ?',
+        [templateKey]
+      );
+      const currentTypes = new Set(currentMappings.map(m => m.location_type));
+
+      // Types to add
+      const typesToAdd = normalizedTypes.filter(t => !currentTypes.has(t));
+      
+      // Types to remove (were mapped to this template but not in new list)
+      const typesToRemove = [...currentTypes].filter(t => !normalizedTypes.includes(t));
+
+      // Add new mappings
+      if (typesToAdd.length > 0) {
+        await db.query(
+          `INSERT INTO cashflow_location_type_templates (location_type, template_key)
+           VALUES ${typesToAdd.map(() => '(?, ?)').join(', ')}
+           ON DUPLICATE KEY UPDATE template_key = VALUES(template_key), updated_at = CURRENT_TIMESTAMP`,
+          typesToAdd.flatMap(t => [t, templateKey])
+        );
+      }
+
+      // Remove old mappings
+      if (typesToRemove.length > 0) {
+        await db.query(
+          `DELETE FROM cashflow_location_type_templates 
+           WHERE template_key = ? AND location_type IN (?)`,
+          [templateKey, typesToRemove]
+        );
+      }
+
+      // Update all existing cashflow locations with the newly assigned types
+      let updatedLocationsCount = 0;
+      if (normalizedTypes.length > 0) {
+        try {
+          const [result] = await db.query(
+            `UPDATE cashflow_location_settings cls
+             INNER JOIN locations l ON cls.location_id = l.location_id
+             SET cls.template_key = ?
+             WHERE l.type IN (?)
+               AND cls.include_in_cashflow = 1`,
+            [templateKey, normalizedTypes]
+          );
+          updatedLocationsCount = result.affectedRows || 0;
+        } catch (updateError) {
+          console.error('Error updating locations with new template:', updateError.message);
+          // Don't fail the whole request if the update fails
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        template_key: templateKey, 
+        location_types: normalizedTypes,
+        added: typesToAdd.length,
+        removed: typesToRemove.length,
+        locations_updated: updatedLocationsCount
+      });
+    } catch (error) {
+      console.error('Error setting template location types:', error);
+      res.status(500).json({ error: 'Failed to set template location types' });
+    }
+  }
+);
+
+/* ======================================================
+   REMOVE LOCATION TYPE TEMPLATE MAPPING
+   ====================================================== */
+router.delete(
+  '/location-type-templates/:locationType',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const { locationType } = req.params;
+
+    if (!locationType || !locationType.trim()) {
+      return res.status(400).json({ error: 'Location type is required' });
+    }
+
+    try {
+      await db.query(
+        'DELETE FROM cashflow_location_type_templates WHERE location_type = ?',
+        [locationType.trim()]
+      );
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error removing location type template:', error);
+      res.status(500).json({ error: 'Failed to remove location type template' });
+    }
+  }
+);
+
+/* ======================================================
+   GET TEMPLATE FOR LOCATION TYPE (For auto-population)
+   ====================================================== */
+router.get(
+  '/location-type-template/:locationType',
+  authenticate,
+  async (req, res) => {
+    const { locationType } = req.params;
+
+    if (!locationType) {
+      return res.status(400).json({ error: 'Location type is required' });
+    }
+
+    try {
+      const [mapping] = await db.query(
+        `SELECT template_key FROM cashflow_location_type_templates
+         WHERE location_type = ?`,
+        [locationType]
+      );
+
+      if (mapping.length === 0) {
+        return res.json({ template_key: null });
+      }
+
+      res.json({ template_key: mapping[0].template_key });
+    } catch (error) {
+      console.error('Error fetching location type template:', error);
+      res.status(500).json({ error: 'Failed to fetch location type template' });
+    }
+  }
+);
+
+/* ======================================================
+   GET LOCATION TYPES FOR TEMPLATE (For editing template)
+   ====================================================== */
+router.get(
+  '/templates/:templateKey/location-types',
+  authenticate,
+  async (req, res) => {
+    const { templateKey } = req.params;
+
+    if (!templateKey) {
+      return res.status(400).json({ error: 'Template key is required' });
+    }
+
+    try {
+      const [mappings] = await db.query(
+        `SELECT location_type FROM cashflow_location_type_templates
+         WHERE template_key = ?
+         ORDER BY location_type ASC`,
+        [templateKey]
+      );
+
+      res.json({ location_types: mappings.map(m => m.location_type) });
+    } catch (error) {
+      console.error('Error fetching template location types:', error);
+      res.status(500).json({ error: 'Failed to fetch template location types' });
     }
   }
 );

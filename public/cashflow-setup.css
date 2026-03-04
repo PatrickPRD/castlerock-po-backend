@@ -192,6 +192,88 @@
   }
 }
 
+/* Tag selector styling */
+#templateDraftTagInput {
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+#templateDraftTagInput:focus-within {
+  border-color: #0d6efd;
+  background-color: white;
+}
+
+.template-type-tag {
+  animation: slideIn 0.2s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.template-type-tag .btn-close {
+  margin-left: 6px;
+  padding: 0;
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
+}
+
+.template-type-tag .btn-close:hover {
+  opacity: 1;
+}
+
+#templateDraftTypeInput:focus {
+  box-shadow: none !important;
+}
+
+.suggestion-item {
+  transition: background-color 0.15s ease;
+}
+
+.suggestion-item:hover {
+  background-color: #e9ecef;
+}
+
+#templateDraftTypeSuggestions::-webkit-scrollbar {
+  width: 6px;
+}
+
+#templateDraftTypeSuggestions::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+#templateDraftTypeSuggestions::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+#templateDraftTypeSuggestions::-webkit-scrollbar-thumb:hover {
+  background: #888;
+}
+
+/* Dual-list selector styling */
+.list-item {
+  transition: background-color 0.15s ease;
+}
+
+.list-item:hover {
+  background-color: #e9ecef;
+}
+
+.list-item input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.list-item label {
+  user-select: none;
+}
+
 @media (max-width: 576px) {
   .wizard-actions {
     flex-direction: column;
