@@ -117,7 +117,7 @@ async function migrateDatabase() {
         console.warn(`  ⚠️  Skipped ${file} (duplicate column)`);
       }
       await pool.query(
-        'INSERT INTO schema_migrations (filename) VALUES (?)',
+        'INSERT INTO schema_migrations (filename) VALUES (?) ON DUPLICATE KEY UPDATE filename = VALUES(filename)',
         [file]
       );
       console.log(`  ✅ Applied ${file}`);

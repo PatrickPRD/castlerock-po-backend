@@ -19,17 +19,16 @@ const path = require('path');
     await conn.query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        migration_name VARCHAR(255) NOT NULL UNIQUE,
-        executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_migration_name (migration_name)
+        filename VARCHAR(255) NOT NULL UNIQUE,
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
 
     // Get list of already executed migrations
     const [executedMigrations] = await conn.query(
-      'SELECT migration_name FROM schema_migrations ORDER BY migration_name'
+      'SELECT filename FROM schema_migrations ORDER BY filename'
     );
-    const executedSet = new Set(executedMigrations.map(m => m.migration_name));
+    const executedSet = new Set(executedMigrations.map(m => m.filename));
 
     // Read all migration files
     const migrationsDir = path.join(__dirname, 'database', 'migrations');
@@ -69,7 +68,7 @@ const path = require('path');
         
         // Record that this migration has been executed
         await conn.query(
-          'INSERT INTO schema_migrations (migration_name) VALUES (?)',
+          'INSERT INTO schema_migrations (filename) VALUES (?) ON DUPLICATE KEY UPDATE filename = VALUES(filename)',
           [migrationFile]
         );
         

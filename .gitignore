@@ -3,3 +3,7 @@ node_modules/
 .env.*
 *.log
 .DS_Store
+# Ignore all backup files
+*.sql
+*.json
+*.CTBackup
