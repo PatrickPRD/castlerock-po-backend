@@ -277,3 +277,6 @@ Use existing components where possible. Avoid introducing new UI libraries or fr
 Use Modal for all forms and dialogs. Follow existing modal patterns.
 Use Modal for all CRUD operations. Follow existing modal patterns.
 Use exising toastings components where possible. Avoid introducing new UI libraries or frameworks.
+
+## Audit
+Can we make that all new systems are automatically included in the audit system.

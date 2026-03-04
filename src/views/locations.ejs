@@ -16,12 +16,26 @@
       </div>
     </div>
 
+    <!-- Filter by Site -->
+    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+      <label for="siteFilterSelect" style="font-weight: 500; margin: 0;">Filter by Site:</label>
+      <select id="siteFilterSelect" class="form-select" style="width: 250px;">
+        <option value="">All Sites</option>
+      </select>
+    </div>
+
     <table class="po-table">
       <thead>
         <tr>
-          <th>Location</th>
-          <th>Type</th>
-          <th>Site</th>
+          <th class="sortable" data-sort="name" style="cursor: pointer; user-select: none;">
+            Location <span class="sort-indicator"></span>
+          </th>
+          <th class="sortable" data-sort="type" style="cursor: pointer; user-select: none;">
+            Type <span class="sort-indicator"></span>
+          </th>
+          <th class="sortable" data-sort="site" style="cursor: pointer; user-select: none;">
+            Site <span class="sort-indicator"></span>
+          </th>
           <th style="width:160px">Actions</th>
         </tr>
       </thead>

@@ -913,7 +913,7 @@ function updateTemplateSelectorVisibility() {
   }
   
   // Show template selector only if location has no type
-  const hasNoType = !selectedLocation.type || selectedLocation.type.trim() === '';
+  const hasNoType = !selectedLocation.location_type || selectedLocation.location_type.trim() === '';
   templateSelectWrapper.style.display = hasNoType ? 'block' : 'none';
 }
 
@@ -1305,9 +1305,9 @@ function renderTemplateDraftRows() {
   templateDraftRowsBody.innerHTML = templateDraftRows
     .map((row, index) => `
       <tr>
-        <td>${row.stage}</td>
-        <td>${row.percent}</td>
-        <td>${row.weeks}</td>
+        <td class="editable-cell" data-index="${index}" data-field="stage" style="cursor: pointer; user-select: none;" title="Click to edit">${row.stage}</td>
+        <td class="editable-cell" data-index="${index}" data-field="percent" style="cursor: pointer; user-select: none;" title="Click to edit">${row.percent}</td>
+        <td class="editable-cell" data-index="${index}" data-field="weeks" style="cursor: pointer; user-select: none;" title="Click to edit">${row.weeks}</td>
         <td>
           <div class="d-flex gap-1">
             <button type="button" class="btn btn-sm btn-outline-secondary" onclick="moveTemplateDraftRowUp(${index})" ${index === 0 ? 'disabled' : ''}>↑</button>
@@ -1319,7 +1319,81 @@ function renderTemplateDraftRows() {
     `)
     .join('');
 
+  // Attach click handlers to editable cells
+  attachEditableCellHandlers();
   updateTemplateDraftTotals();
+}
+
+function attachEditableCellHandlers() {
+  const cells = document.querySelectorAll('.editable-cell');
+  cells.forEach(cell => {
+    cell.addEventListener('click', (e) => {
+      if (cell.querySelector('input')) return; // Already editing
+      
+      const index = parseInt(cell.dataset.index);
+      const field = cell.dataset.field;
+      const currentValue = templateDraftRows[index][field];
+      
+      const input = document.createElement('input');
+      input.type = field === 'stage' ? 'text' : 'number';
+      if (field !== 'stage') input.min = field === 'weeks' ? '1' : '0';
+      if (field === 'percent') {
+        input.max = '100';
+        input.step = '0.01';
+      } else if (field === 'weeks') {
+        input.step = '1';
+      }
+      input.value = currentValue;
+      input.className = 'form-control form-control-sm';
+      input.style.width = '100%';
+      
+      cell.textContent = '';
+      cell.appendChild(input);
+      input.focus();
+      input.select();
+      
+      const saveEdit = () => {
+        let newValue = input.value.trim();
+        if (!newValue) {
+          cell.textContent = currentValue;
+          return;
+        }
+        
+        if (field === 'stage') {
+          templateDraftRows[index].stage = newValue;
+        } else {
+          const numValue = parseFloat(newValue);
+          if (isNaN(numValue) || (field === 'weeks' && !Number.isInteger(numValue))) {
+            cell.textContent = currentValue;
+            return;
+          }
+          if (field === 'percent' && (numValue < 0 || numValue > 100)) {
+            cell.textContent = currentValue;
+            setStatus('Percent must be between 0 and 100', true);
+            return;
+          }
+          if (field === 'weeks' && numValue <= 0) {
+            cell.textContent = currentValue;
+            setStatus('Weeks must be greater than 0', true);
+            return;
+          }
+          templateDraftRows[index][field] = numValue;
+        }
+        
+        cell.textContent = templateDraftRows[index][field];
+        updateTemplateDraftTotals();
+      };
+      
+      input.addEventListener('blur', saveEdit);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          saveEdit();
+        } else if (e.key === 'Escape') {
+          cell.textContent = currentValue;
+        }
+      });
+    });
+  });
 }
 
 function renderTemplateAccordion() {
@@ -1353,6 +1427,7 @@ function renderTemplateAccordion() {
           <td>
             <div class="d-flex gap-1">
               <button type="button" class="btn btn-sm btn-outline-primary" onclick="startTemplateEdit('${template.key}')">Edit</button>
+              <button type="button" class="btn btn-sm btn-outline-success" onclick="duplicateTemplate('${template.key}')">Duplicate</button>
               <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteTemplate('${template.key}')">Delete</button>
             </div>
           </td>
@@ -1462,6 +1537,32 @@ async function startTemplateEdit(templateKey) {
   setStatus('Editing template. Update rows and save when ready.');
 }
 
+async function duplicateTemplate(templateKey) {
+  const template = cashflowTemplates.find((entry) => entry.key === templateKey);
+  if (!template) {
+    setStatus('Template not found', true);
+    return;
+  }
+
+  // Create new template (not editing)
+  editingTemplateKey = null;
+  templateDraftRows = (template.rows || []).map((row) => ({
+    stage: String(row.stage || ''),
+    percent: Number(row.percent),
+    weeks: Number(row.weeks)
+  }));
+  
+  // Suggest a new name
+  if (templateDraftName) templateDraftName.value = `Copy of ${template.name || 'Template'}`;
+  
+  setTemplateDraftMode(false);
+  renderTemplateDraftRows();
+  renderTemplateTagSelector([]);
+  
+  await openTemplateDraftModal();
+  setStatus('Creating duplicate template. Update the name and rows as needed, then save.');
+}
+
 function toggleTemplateAccordion(templateKey) {
   if (expandedTemplateKeys.has(templateKey)) {
     expandedTemplateKeys.delete(templateKey);
@@ -1567,6 +1668,7 @@ window.removeTemplateDraftRow = removeTemplateDraftRow;
 window.moveTemplateDraftRowUp = moveTemplateDraftRowUp;
 window.moveTemplateDraftRowDown = moveTemplateDraftRowDown;
 window.startTemplateEdit = startTemplateEdit;
+window.duplicateTemplate = duplicateTemplate;
 window.deleteTemplate = deleteTemplate;
 window.toggleTemplateAccordion = toggleTemplateAccordion;
 

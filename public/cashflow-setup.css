@@ -192,6 +192,21 @@
   }
 }
 
+/* Editable template row cells */
+.editable-cell {
+  transition: background-color 0.15s ease;
+  padding: 0.5rem !important;
+}
+
+.editable-cell:hover {
+  background-color: #e7f1ff;
+  font-weight: 500;
+}
+
+.editable-cell input {
+  margin: -0.5rem -0.5rem;
+}
+
 /* Tag selector styling */
 #templateDraftTagInput {
   transition: border-color 0.15s ease, background-color 0.15s ease;

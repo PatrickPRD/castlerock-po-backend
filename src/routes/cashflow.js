@@ -4,6 +4,7 @@ const db = require('../db');
 const SettingsService = require('../services/settingsService');
 const { authenticate } = require('../middleware/auth');
 const authorizeRoles = require('../middleware/authorizeRoles');
+const logAudit = require('../services/auditService');
 
 function toNullableNumber(value) {
   if (value === null || value === undefined || value === '') return null;
@@ -466,10 +467,25 @@ router.post(
         ]
       );
 
+      const capitalCostId = Number(result.insertId);
+
+      await logAudit({
+        table_name: 'cashflow_capital_costs',
+        record_id: String(capitalCostId),
+        action: 'CREATE',
+        new_data: {
+          title: validated.value.title,
+          cost_ex_vat: validated.value.cost_ex_vat,
+          vat_rate: validated.value.vat_rate
+        },
+        changed_by: req.user.id,
+        req
+      });
+
       res.json({
         success: true,
         capital_cost: {
-          id: Number(result.insertId),
+          id: capitalCostId,
           title: validated.value.title,
           description: validated.value.description,
           cost_ex_vat: validated.value.cost_ex_vat,
@@ -535,6 +551,19 @@ router.put(
         return res.status(404).json({ error: 'Capital cost not found' });
       }
 
+      await logAudit({
+        table_name: 'cashflow_capital_costs',
+        record_id: String(capitalCostId),
+        action: 'UPDATE',
+        new_data: {
+          title: validated.value.title,
+          cost_ex_vat: validated.value.cost_ex_vat,
+          vat_rate: validated.value.vat_rate
+        },
+        changed_by: req.user.id,
+        req
+      });
+
       res.json({
         success: true,
         capital_cost: {
@@ -575,6 +604,14 @@ router.delete(
       if (result.affectedRows === 0) {
         return res.status(404).json({ error: 'Capital cost not found' });
       }
+
+      await logAudit({
+        table_name: 'cashflow_capital_costs',
+        record_id: String(capitalCostId),
+        action: 'DELETE',
+        changed_by: req.user.id,
+        req
+      });
 
       res.json({ success: true });
     } catch (error) {
@@ -657,6 +694,19 @@ router.post(
         ]
       );
 
+      await logAudit({
+        table_name: 'cashflow_templates',
+        record_id: templateKey,
+        action: 'CREATE',
+        new_data: {
+          name: templateName,
+          week_count: normalizedWeekCount,
+          rows: normalizedRows
+        },
+        changed_by: req.user.id,
+        req
+      });
+
       res.json({
         success: true,
         template: {
@@ -727,6 +777,19 @@ router.put(
         ]
       );
 
+      await logAudit({
+        table_name: 'cashflow_templates',
+        record_id: templateKey,
+        action: 'UPDATE',
+        new_data: {
+          name: templateName,
+          week_count: normalizedWeekCount,
+          rows: normalizedRows
+        },
+        changed_by: req.user.id,
+        req
+      });
+
       res.json({
         success: true,
         template: {
@@ -779,6 +842,14 @@ router.delete(
         'UPDATE cashflow_templates SET active = 0 WHERE template_key = ?',
         [templateKey]
       );
+
+      await logAudit({
+        table_name: 'cashflow_templates',
+        record_id: templateKey,
+        action: 'DELETE',
+        changed_by: req.user.id,
+        req
+      });
 
       res.json({ success: true });
     } catch (error) {
@@ -1144,6 +1215,19 @@ router.put(
               item.weekly_spread_json
             ]
           );
+
+          await logAudit({
+            table_name: 'cashflow_location_settings',
+            record_id: String(item.location_id),
+            action: 'UPDATE',
+            new_data: {
+              include_in_cashflow: item.include_in_cashflow,
+              template_key: item.template_key,
+              estimated_construction_cost: item.estimated_construction_cost
+            },
+            changed_by: req.user.id,
+            req
+          });
         }
 
         await connection.commit();
@@ -1300,7 +1384,7 @@ router.put(
         try {
           const [result] = await db.query(
             `UPDATE cashflow_location_settings cls
-             INNER JOIN locations l ON cls.location_id = l.location_id
+             INNER JOIN locations l ON cls.location_id = l.id
              SET cls.template_key = ?
              WHERE l.type IN (?)
                AND cls.include_in_cashflow = 1`,
@@ -1312,6 +1396,19 @@ router.put(
           // Don't fail the whole request if the update fails
         }
       }
+
+      await logAudit({
+        table_name: 'cashflow_location_type_templates',
+        record_id: templateKey,
+        action: 'UPDATE',
+        new_data: {
+          location_types: normalizedTypes,
+          added: typesToAdd.length,
+          removed: typesToRemove.length
+        },
+        changed_by: req.user.id,
+        req
+      });
 
       res.json({ 
         success: true, 
@@ -1347,6 +1444,14 @@ router.delete(
         'DELETE FROM cashflow_location_type_templates WHERE location_type = ?',
         [locationType.trim()]
       );
+
+      await logAudit({
+        table_name: 'cashflow_location_type_templates',
+        record_id: locationType.trim(),
+        action: 'DELETE',
+        changed_by: req.user.id,
+        req
+      });
 
       res.json({ success: true });
     } catch (error) {
