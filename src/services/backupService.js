@@ -168,6 +168,26 @@ async function clearDatabaseExceptUsers(connection, selectedTables = null) {
   }
 }
 
+async function getExistingBackupTables(connection) {
+  const [tables] = await connection.query(
+    `
+    SELECT table_name AS tableName
+    FROM information_schema.tables
+    WHERE table_schema = DATABASE()
+      AND table_type = 'BASE TABLE'
+    `
+  );
+
+  const existingTableSet = new Set(tables.map(t => t.tableName));
+  const availableTables = BACKUP_TABLES.filter(table => existingTableSet.has(table));
+  const missingTables = BACKUP_TABLES.filter(table => !existingTableSet.has(table));
+
+  return {
+    availableTables,
+    missingTables
+  };
+}
+
 /**
  * Create a backup of all data except users
  * Returns JSON structure with metadata and all tables
@@ -176,17 +196,24 @@ async function createBackup() {
   const connection = await pool.getConnection();
 
   try {
+    const { availableTables, missingTables } = await getExistingBackupTables(connection);
+
+    if (missingTables.length > 0) {
+      console.warn(`⚠️ Skipping missing backup tables: ${missingTables.join(', ')}`);
+    }
+
     const backup = {
       metadata: {
         version: '1.0',
         createdAt: new Date().toISOString(),
-        database: process.env.DB_NAME
+        database: process.env.DB_NAME,
+        skippedTables: missingTables
       },
       tables: {}
     };
 
-    for (const table of BACKUP_TABLES) {
-      const [rows] = await connection.query(`SELECT * FROM ${table}`);
+    for (const table of availableTables) {
+      const [rows] = await connection.query(`SELECT * FROM \`${table}\``);
       backup.tables[table] = rows;
     }
 
@@ -205,18 +232,25 @@ async function createCTBackupData(user = {}) {
   const connection = await pool.getConnection();
 
   try {
+    const { availableTables, missingTables } = await getExistingBackupTables(connection);
+
+    if (missingTables.length > 0) {
+      console.warn(`⚠️ Skipping missing backup tables: ${missingTables.join(', ')}`);
+    }
+
     const backup = {
       metadata: {
         version: '1.0',
         createdAt: new Date().toISOString(),
-        database: process.env.DB_NAME
+        database: process.env.DB_NAME,
+        skippedTables: missingTables
       },
       tables: {}
     };
 
     // Get all backup tables
-    for (const table of BACKUP_TABLES) {
-      const [rows] = await connection.query(`SELECT * FROM ${table}`);
+    for (const table of availableTables) {
+      const [rows] = await connection.query(`SELECT * FROM \`${table}\``);
       backup.tables[table] = rows;
     }
 
@@ -236,6 +270,7 @@ async function createBackupSql() {
   const connection = await pool.getConnection();
 
   try {
+    const { availableTables, missingTables } = await getExistingBackupTables(connection);
     let sqlOutput = [];
 
     // Header comments
@@ -246,9 +281,15 @@ async function createBackupSql() {
     sqlOutput.push(`-- Excludes: users table`);
     sqlOutput.push(`-- ========================================\n`);
 
+    if (missingTables.length > 0) {
+      sqlOutput.push(`-- Skipped missing tables: ${missingTables.join(', ')}`);
+      sqlOutput.push('');
+      console.warn(`⚠️ Skipping missing backup tables: ${missingTables.join(', ')}`);
+    }
+
     sqlOutput.push(`SET FOREIGN_KEY_CHECKS=0;\n`);
 
-    for (const table of BACKUP_TABLES) {
+    for (const table of availableTables) {
       const [rows] = await connection.query(`SELECT * FROM \`${table}\``);
       
       if (rows.length === 0) {

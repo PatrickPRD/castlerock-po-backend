@@ -7,6 +7,7 @@ const { setupDatabase } = require('../database/setup');
 const { ensureLeaveDefaults } = require('./services/leaveService');
 const { runStartupMigrations } = require('./services/dbMigrations');
 const { checkSetupRequired } = require('./middleware/setupCheck');
+const { auditFailureLogger } = require('./middleware/auditFailureLogger');
 const dynamicTitle = require('./middleware/dynamicTitle');
 
 const app = express();
@@ -28,6 +29,9 @@ app.use(checkSetupRequired);
 
 // Add dynamic title support (Company Name | CostTracker | Page Title)
 app.use(dynamicTitle);
+
+// Capture diagnostics for failed mutating requests (POST/PUT/PATCH/DELETE)
+app.use(auditFailureLogger);
 
 // Root route → login page
 app.get('/', (req, res) => {

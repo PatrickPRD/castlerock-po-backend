@@ -99,6 +99,230 @@ function getMigrationFiles() {
     .sort();
 }
 
+function splitSqlStatements(sql) {
+  const statements = [];
+  let current = '';
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let inBacktick = false;
+  let inLineComment = false;
+  let inBlockComment = false;
+
+  for (let i = 0; i < sql.length; i += 1) {
+    const ch = sql[i];
+    const next = i + 1 < sql.length ? sql[i + 1] : '';
+
+    if (inLineComment) {
+      current += ch;
+      if (ch === '\n') {
+        inLineComment = false;
+      }
+      continue;
+    }
+
+    if (inBlockComment) {
+      current += ch;
+      if (ch === '*' && next === '/') {
+        current += next;
+        i += 1;
+        inBlockComment = false;
+      }
+      continue;
+    }
+
+    if (!inSingleQuote && !inDoubleQuote && !inBacktick) {
+      if (ch === '-' && next === '-' && /\s/.test(sql[i + 2] || '')) {
+        current += ch + next;
+        i += 1;
+        inLineComment = true;
+        continue;
+      }
+
+      if (ch === '#') {
+        current += ch;
+        inLineComment = true;
+        continue;
+      }
+
+      if (ch === '/' && next === '*') {
+        current += ch + next;
+        i += 1;
+        inBlockComment = true;
+        continue;
+      }
+    }
+
+    if (ch === "'" && !inDoubleQuote && !inBacktick) {
+      const escaped = sql[i - 1] === '\\';
+      if (!escaped) {
+        inSingleQuote = !inSingleQuote;
+      }
+      current += ch;
+      continue;
+    }
+
+    if (ch === '"' && !inSingleQuote && !inBacktick) {
+      const escaped = sql[i - 1] === '\\';
+      if (!escaped) {
+        inDoubleQuote = !inDoubleQuote;
+      }
+      current += ch;
+      continue;
+    }
+
+    if (ch === '`' && !inSingleQuote && !inDoubleQuote) {
+      inBacktick = !inBacktick;
+      current += ch;
+      continue;
+    }
+
+    if (ch === ';' && !inSingleQuote && !inDoubleQuote && !inBacktick) {
+      const statement = current.trim();
+      if (statement) {
+        statements.push(statement);
+      }
+      current = '';
+      continue;
+    }
+
+    current += ch;
+  }
+
+  const tail = current.trim();
+  if (tail) {
+    statements.push(tail);
+  }
+
+  return statements;
+}
+
+function extractCreatedTables(sql) {
+  const tableNames = new Set();
+  const createTableRegex = /CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+`?([a-zA-Z0-9_]+)`?/gi;
+
+  let match;
+  while ((match = createTableRegex.exec(sql)) !== null) {
+    tableNames.add(match[1]);
+  }
+
+  return Array.from(tableNames);
+}
+
+async function getMissingCreatedTables(sql) {
+  const expectedTables = extractCreatedTables(sql);
+  if (expectedTables.length === 0) {
+    return [];
+  }
+
+  const missingTables = [];
+  for (const tableName of expectedTables) {
+    const [rows] = await pool.query('SHOW TABLES LIKE ?', [tableName]);
+    if (!Array.isArray(rows) || rows.length === 0) {
+      missingTables.push(tableName);
+    }
+  }
+
+  return missingTables;
+}
+
+async function recordMigrationAsApplied(file, hasLegacyMigrationName) {
+  if (hasLegacyMigrationName) {
+    await pool.query(
+      'INSERT INTO schema_migrations (filename, migration_name) VALUES (?, ?) ON DUPLICATE KEY UPDATE filename = VALUES(filename), migration_name = VALUES(migration_name)',
+      [file, file]
+    );
+    return;
+  }
+
+  await pool.query(
+    'INSERT INTO schema_migrations (filename) VALUES (?) ON DUPLICATE KEY UPDATE filename = VALUES(filename)',
+    [file]
+  );
+}
+
+async function executeMigrationStatements(file, sql, mode = 'apply') {
+  const statements = splitSqlStatements(sql).filter((statement) => statement.trim().length > 0);
+
+  if (!statements.length) {
+    return { executedStatements: 0, recoverableErrors: 0 };
+  }
+
+  let recoverableErrors = 0;
+
+  for (let index = 0; index < statements.length; index += 1) {
+    const statement = statements[index];
+
+    try {
+      await pool.query(statement);
+    } catch (error) {
+      if (!RECOVERABLE_MIGRATION_ERRORS.has(error?.code)) {
+        throw new Error(`Migration ${file} failed at statement ${index + 1}: ${error.message}`);
+      }
+
+      recoverableErrors += 1;
+      console.warn(
+        `⚠️  ${mode === 'repair' ? 'Repair' : 'Migration'} ${file} statement ${index + 1} already effectively applied (${error.code})`
+      );
+    }
+  }
+
+  return {
+    executedStatements: statements.length,
+    recoverableErrors
+  };
+}
+
+async function reconcileAppliedMigrationsAgainstSchema(hasLegacyMigrationName) {
+  const [appliedRows] = await pool.query('SELECT filename FROM schema_migrations');
+  const applied = new Set(appliedRows.map((row) => row.filename));
+  const files = getMigrationFiles();
+
+  if (!files.length || applied.size === 0) {
+    return;
+  }
+
+  let repairedCount = 0;
+
+  for (const file of files) {
+    if (!applied.has(file)) {
+      continue;
+    }
+
+    const filePath = path.join(__dirname, '../../database/migrations', file);
+    const sql = fs.readFileSync(filePath, 'utf8').trim();
+
+    if (!sql) {
+      continue;
+    }
+
+    const missingTables = await getMissingCreatedTables(sql);
+    if (missingTables.length === 0) {
+      continue;
+    }
+
+    console.warn(
+      `⚠️  Migration drift detected for ${file}. Missing table(s): ${missingTables.join(', ')}. Running repair...`
+    );
+
+    await executeMigrationStatements(file, sql, 'repair');
+    await recordMigrationAsApplied(file, hasLegacyMigrationName);
+
+    const missingAfterRepair = await getMissingCreatedTables(sql);
+    if (missingAfterRepair.length > 0) {
+      throw new Error(
+        `Migration repair failed for ${file}. Still missing table(s): ${missingAfterRepair.join(', ')}`
+      );
+    }
+
+    repairedCount += 1;
+    console.log(`✅ Repaired migration drift for ${file}`);
+  }
+
+  if (repairedCount > 0) {
+    console.log(`✅ Repaired ${repairedCount} applied migration(s) with schema drift`);
+  }
+}
+
 async function applyPendingSqlMigrations() {
   const [columns] = await pool.query('SHOW COLUMNS FROM schema_migrations');
   const columnNames = new Set(columns.map((column) => String(column.Field || '').toLowerCase()));
@@ -128,26 +352,8 @@ async function applyPendingSqlMigrations() {
     }
 
     console.log(`⏳ Applying migration ${file}...`);
-    try {
-      await pool.query(sql);
-    } catch (error) {
-      if (!RECOVERABLE_MIGRATION_ERRORS.has(error?.code)) {
-        throw error;
-      }
-      console.warn(`⚠️  Migration ${file} is already effectively applied (${error.code})`);
-    }
-
-    if (hasLegacyMigrationName) {
-      await pool.query(
-        'INSERT INTO schema_migrations (filename, migration_name) VALUES (?, ?) ON DUPLICATE KEY UPDATE filename = VALUES(filename), migration_name = VALUES(migration_name)',
-        [file, file]
-      );
-    } else {
-      await pool.query(
-        'INSERT INTO schema_migrations (filename) VALUES (?) ON DUPLICATE KEY UPDATE filename = VALUES(filename)',
-        [file]
-      );
-    }
+    await executeMigrationStatements(file, sql, 'apply');
+    await recordMigrationAsApplied(file, hasLegacyMigrationName);
 
     appliedCount += 1;
   }
@@ -157,6 +363,8 @@ async function applyPendingSqlMigrations() {
   } else {
     console.log('✅ SQL migrations already up to date');
   }
+
+  await reconcileAppliedMigrationsAgainstSchema(hasLegacyMigrationName);
 }
 
 async function runStartupMigrations() {

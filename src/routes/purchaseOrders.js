@@ -6,6 +6,7 @@ const authorizeRoles = require('../middleware/authorizeRoles');
 const db = require('../db');
 const { generatePONumber } = require('../services/poService');
 const logAudit = require('../services/auditService');
+const { captureAuditFailure } = require('../middleware/auditFailureLogger');
 
 function normalizeLineItems(lineItems) {
   if (!Array.isArray(lineItems)) return [];
@@ -345,6 +346,15 @@ router.post(
         });
       } catch (error) {
         await conn.rollback();
+        captureAuditFailure(req, error, {
+          operation: 'purchase_order_create',
+          supplierId,
+          siteId,
+          locationId,
+          poDate,
+          stageId,
+          lineItemsCount: Array.isArray(lineItems) ? lineItems.length : 0
+        });
         throw error;
       } finally {
         conn.release();
@@ -352,6 +362,15 @@ router.post(
 
     } catch (err) {
       console.error('CREATE PO ERROR:', err);
+      captureAuditFailure(req, err, {
+        operation: 'purchase_order_create',
+        supplierId,
+        siteId,
+        locationId,
+        poDate,
+        stageId,
+        lineItemsCount: Array.isArray(lineItems) ? lineItems.length : 0
+      });
       res.status(500).json({ error: 'Failed to create purchase order' });
     }
   }
@@ -499,6 +518,16 @@ router.put(
     } catch (error) {
       await conn.rollback();
       console.error('UPDATE PO ERROR:', error);
+      captureAuditFailure(req, error, {
+        operation: 'purchase_order_update',
+        purchaseOrderId: id,
+        supplierId,
+        siteId,
+        locationId,
+        poDate,
+        stageId,
+        lineItemsCount: Array.isArray(lineItems) ? lineItems.length : 0
+      });
       res.status(500).json({ error: 'Failed to save changes' });
     } finally {
       conn.release();
