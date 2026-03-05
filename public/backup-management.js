@@ -16,6 +16,30 @@ const ITEMS_PER_PAGE = 10;
 const MAX_BACKUPS = 20;
 let restoreProgressInterval = null;
 let restoreStartedAt = null;
+const RESTORABLE_TABLES = new Set([
+  'site_settings',
+  'po_stages',
+  'suppliers',
+  'sites',
+  'site_letters',
+  'locations',
+  'cashflow_settings',
+  'cashflow_templates',
+  'cashflow_location_type_templates',
+  'cashflow_location_settings',
+  'cashflow_capital_costs',
+  'location_spread_rules',
+  'location_spread_rule_sites',
+  'location_spread_rule_locations',
+  'purchase_orders',
+  'po_line_items',
+  'invoices',
+  'po_sequences',
+  'workers',
+  'timesheets',
+  'timesheet_entries'
+]);
+let hasAnalyzedRestoreTables = false;
 
 // API helper
 async function api(url, method = 'GET', body) {
@@ -330,6 +354,7 @@ async function openRestoreConfirmation(filename) {
   currentRestoreFilename = filename;
   currentRestoreSqlContent = null;
   resetRestoreProgressUi();
+  resetRestoreSelectionUi();
   
   try {
     // Show spinner
@@ -371,6 +396,160 @@ async function openRestoreConfirmation(filename) {
     
     showToast('Note: Backup analyzed as SQL dump', 'info');
   }
+}
+
+function resetRestoreSelectionUi() {
+  hasAnalyzedRestoreTables = false;
+
+  const selectAll = document.getElementById('restoreSelectAll');
+  if (selectAll) {
+    selectAll.checked = false;
+    selectAll.indeterminate = false;
+    selectAll.disabled = true;
+  }
+
+  const tablesBody = document.getElementById('tablesBody');
+  if (tablesBody) {
+    tablesBody.innerHTML = '';
+  }
+
+  const summary = document.getElementById('restoreSelectionSummary');
+  if (summary) {
+    summary.textContent = 'Select tables from the analysed list to run a selective restore.';
+  }
+
+  const confirmBtn = document.getElementById('confirmPreviewBtn');
+  if (confirmBtn) {
+    confirmBtn.disabled = false;
+  }
+}
+
+function getSelectableRestoreTableCheckboxes() {
+  return Array.from(document.querySelectorAll('#tablesBody input[data-restore-table]:not(:disabled)'));
+}
+
+function getSelectedRestoreTables() {
+  return Array.from(document.querySelectorAll('#tablesBody input[data-restore-table]:checked'))
+    .map(input => input.getAttribute('data-restore-table'))
+    .filter(Boolean);
+}
+
+function shouldDisableRestoreConfirm() {
+  const selectable = getSelectableRestoreTableCheckboxes();
+  if (selectable.length === 0) {
+    return hasAnalyzedRestoreTables;
+  }
+
+  return getSelectedRestoreTables().length === 0;
+}
+
+function updateRestoreSelectionSummary() {
+  const selectable = getSelectableRestoreTableCheckboxes();
+  const selectedCount = getSelectedRestoreTables().length;
+  const selectAll = document.getElementById('restoreSelectAll');
+  const summary = document.getElementById('restoreSelectionSummary');
+  const confirmBtn = document.getElementById('confirmPreviewBtn');
+
+  if (selectAll) {
+    if (selectable.length === 0) {
+      selectAll.checked = false;
+      selectAll.indeterminate = false;
+      selectAll.disabled = true;
+    } else {
+      selectAll.disabled = false;
+      selectAll.checked = selectedCount === selectable.length;
+      selectAll.indeterminate = selectedCount > 0 && selectedCount < selectable.length;
+    }
+  }
+
+  if (summary) {
+    if (!hasAnalyzedRestoreTables) {
+      summary.textContent = 'No analysed table list available. Full restore will be used.';
+    } else if (selectable.length === 0) {
+      summary.textContent = 'No restorable tables detected in this backup analysis.';
+    } else {
+      summary.textContent = `Selected ${selectedCount} of ${selectable.length} analysed tables.`;
+    }
+  }
+
+  if (confirmBtn && !restoreProgressInterval) {
+    confirmBtn.disabled = shouldDisableRestoreConfirm();
+  }
+}
+
+function toggleAllRestoreTables(checked) {
+  const checkboxes = getSelectableRestoreTableCheckboxes();
+  checkboxes.forEach(cb => {
+    cb.checked = checked;
+  });
+
+  updateRestoreSelectionSummary();
+}
+
+function renderAnalyzedTables(reportTables, mode = 'json') {
+  const entries = Object.entries(reportTables || {});
+  const tablesBody = document.getElementById('tablesBody');
+
+  if (!tablesBody) {
+    return;
+  }
+
+  if (entries.length === 0) {
+    hasAnalyzedRestoreTables = false;
+    tablesBody.innerHTML = `
+      <tr>
+        <td colspan="4" class="text-center text-muted">No tables found in analysis.</td>
+      </tr>
+    `;
+    updateRestoreSelectionSummary();
+    return;
+  }
+
+  hasAnalyzedRestoreTables = true;
+
+  const tablesHtml = entries
+    .map(([tableName, tableInfo]) => {
+      const rowCount = tableInfo.rowCount || 0;
+      const isRestorableTable = RESTORABLE_TABLES.has(tableName);
+      const selectable = rowCount > 0 && isRestorableTable;
+
+      let statusBadge = 'bg-success';
+      let statusText = 'Ready';
+
+      if (!isRestorableTable) {
+        statusBadge = 'bg-warning text-dark';
+        statusText = 'Not Restorable';
+      } else if (mode === 'json' && tableInfo.status === 'EMPTY') {
+        statusBadge = 'bg-secondary';
+        statusText = 'Empty';
+      } else if (rowCount === 0) {
+        statusBadge = 'bg-secondary';
+        statusText = 'Empty';
+      } else if (mode === 'sql') {
+        statusText = 'Ready to Restore';
+      }
+
+      return `
+        <tr>
+          <td class="text-center">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              data-restore-table="${escapeHtml(tableName)}"
+              onchange="updateRestoreSelectionSummary()"
+              ${selectable ? 'checked' : 'disabled'}
+            >
+          </td>
+          <td><code>${escapeHtml(tableName)}</code></td>
+          <td class="text-end"><strong>${rowCount.toLocaleString()}</strong></td>
+          <td><span class="badge ${statusBadge}">${statusText}</span></td>
+        </tr>
+      `;
+    })
+    .join('');
+
+  tablesBody.innerHTML = tablesHtml;
+  updateRestoreSelectionSummary();
 }
 
 // Validate and preview backup
@@ -488,31 +667,7 @@ function displayValidationReport(report) {
       .join('');
   }
   
-  // Display tables
-  if (report.tables && Object.keys(report.tables).length > 0) {
-    const tablesHtml = Object.entries(report.tables)
-      .map(([tableName, tableInfo]) => {
-        const rowCount = tableInfo.rowCount || 0;
-        let statusBadge = 'bg-success';
-        let statusText = 'Ready';
-        
-        if (tableInfo.status === 'EMPTY') {
-          statusBadge = 'bg-secondary';
-          statusText = 'Empty';
-        }
-        
-        return `
-          <tr>
-            <td><code>${escapeHtml(tableName)}</code></td>
-            <td class="text-end"><strong>${rowCount.toLocaleString()}</strong></td>
-            <td><span class="badge ${statusBadge}">${statusText}</span></td>
-          </tr>
-        `;
-      })
-      .join('');
-    
-    document.getElementById('tablesBody').innerHTML = tablesHtml;
-  }
+  renderAnalyzedTables(report.tables, 'json');
 }
 
 // Display validation report for SQL backups
@@ -546,32 +701,34 @@ function displaySqlValidationReport(report) {
       .join('');
   }
   
-  // Display tables found in SQL backup
-  if (report.tables && Object.keys(report.tables).length > 0) {
-    const tablesHtml = Object.entries(report.tables)
-      .map(([tableName, tableInfo]) => {
-        const rowCount = tableInfo.rowCount || 0;
-        
-        return `
-          <tr>
-            <td><code>${escapeHtml(tableName)}</code></td>
-            <td class="text-end"><strong>${rowCount.toLocaleString()}</strong></td>
-            <td><span class="badge bg-success">Ready to Restore</span></td>
-          </tr>
-        `;
-      })
-      .join('');
-    
-    document.getElementById('tablesBody').innerHTML = tablesHtml;
-  }
+  renderAnalyzedTables(report.tables, 'sql');
 }
 
 // Display preview for SQL backups
 function displaySqlBackupPreview() {
+  hasAnalyzedRestoreTables = false;
+
   document.getElementById('sqlFileInfo').style.display = 'block';
   document.getElementById('tablesSummary').style.display = 'none';
   document.getElementById('validationWarnings').style.display = 'none';
   document.getElementById('validationErrors').style.display = 'none';
+
+  const selectAll = document.getElementById('restoreSelectAll');
+  if (selectAll) {
+    selectAll.checked = false;
+    selectAll.indeterminate = false;
+    selectAll.disabled = true;
+  }
+
+  const summary = document.getElementById('restoreSelectionSummary');
+  if (summary) {
+    summary.textContent = 'No analysed table list available. Full restore will be used.';
+  }
+
+  const confirmBtn = document.getElementById('confirmPreviewBtn');
+  if (confirmBtn) {
+    confirmBtn.disabled = false;
+  }
 }
 
 // HTML escape utility
@@ -596,7 +753,7 @@ function setRestoreUiRunningState(isRunning) {
   const cancelBtn = document.getElementById('cancelRestorePreviewBtn');
   const closeBtn = document.getElementById('closeRestorePreviewBtn');
 
-  if (confirmBtn) confirmBtn.disabled = isRunning;
+  if (confirmBtn) confirmBtn.disabled = isRunning || shouldDisableRestoreConfirm();
   if (cancelBtn) cancelBtn.disabled = isRunning;
   if (closeBtn) closeBtn.disabled = isRunning;
 }
@@ -767,6 +924,19 @@ async function proceedWithRestore() {
     showToast('❌ No backup file selected', 'error');
     return;
   }
+
+  const selectedTables = getSelectedRestoreTables();
+  const selectableTables = getSelectableRestoreTableCheckboxes();
+
+  if (hasAnalyzedRestoreTables && selectableTables.length === 0) {
+    showToast('❌ No restorable tables were found in this backup analysis', 'error');
+    return;
+  }
+
+  if (selectableTables.length > 0 && selectedTables.length === 0) {
+    showToast('❌ Select at least one table to restore', 'warning');
+    return;
+  }
   
   try {
     startRestoreProgressUi();
@@ -774,14 +944,27 @@ async function proceedWithRestore() {
     
     // Start async restore job
     console.log('📤 Starting restore job...');
-    const startResult = await api('/backups/restore/start', 'POST', { filename: currentRestoreFilename, force: true });
+    const restorePayload = {
+      filename: currentRestoreFilename,
+      force: true
+    };
+
+    if (selectedTables.length > 0) {
+      restorePayload.selectedTables = selectedTables;
+    }
+
+    const startResult = await api('/backups/restore/start', 'POST', restorePayload);
     const jobId = startResult?.jobId;
 
     if (!jobId) {
       throw new Error('Restore job did not return a job ID');
     }
 
-    showToast('Restore in progress... this can take several minutes.', 'info');
+    if (selectedTables.length > 0) {
+      showToast(`Selective restore in progress (${selectedTables.length} tables)... this can take several minutes.`, 'info');
+    } else {
+      showToast('Restore in progress... this can take several minutes.', 'info');
+    }
 
     console.log('⏳ Waiting for restore job:', jobId);
     const jobResult = await waitForRestoreJob(jobId);

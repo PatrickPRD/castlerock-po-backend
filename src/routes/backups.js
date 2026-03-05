@@ -50,7 +50,7 @@ function cleanupRestoreJobs() {
   }
 }
 
-async function performRestore({ backup, sql, filename, force, req }) {
+async function performRestore({ backup, sql, filename, force, selectedTables, req }) {
   let sqlContent = sql;
   let ctBackup = null;
 
@@ -122,11 +122,11 @@ async function performRestore({ backup, sql, filename, force, req }) {
   // Perform restore based on backup type
   let result;
   if (ctBackup) {
-    result = await restoreBackup(ctBackup);
+    result = await restoreBackup(ctBackup, { selectedTables });
   } else if (sqlContent) {
-    result = await restoreBackupSql(sqlContent);
+    result = await restoreBackupSql(sqlContent, { selectedTables });
   } else {
-    result = await restoreBackup(backup);
+    result = await restoreBackup(backup, { selectedTables });
   }
 
   console.log('='.repeat(80));
@@ -459,7 +459,7 @@ router.post(
     try {
       cleanupRestoreJobs();
 
-      const { backup, sql, filename, force } = req.body;
+      const { backup, sql, filename, force, selectedTables } = req.body;
       const jobId = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
       const startedAt = Date.now();
 
@@ -481,7 +481,7 @@ router.post(
 
       (async () => {
         try {
-          const result = await performRestore({ backup, sql, filename, force, req: requestForJob });
+          const result = await performRestore({ backup, sql, filename, force, selectedTables, req: requestForJob });
           const existing = restoreJobs.get(jobId);
           if (!existing) return;
 
@@ -572,8 +572,8 @@ router.post(
   authorizeRoles('super_admin'),
   async (req, res) => {
     try {
-      const { backup, sql, filename, force } = req.body;
-      const response = await performRestore({ backup, sql, filename, force, req });
+      const { backup, sql, filename, force, selectedTables } = req.body;
+      const response = await performRestore({ backup, sql, filename, force, selectedTables, req });
       console.log('📤 Sending restore response:', response);
       res.json(response);
     } catch (err) {

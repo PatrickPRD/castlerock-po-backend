@@ -85,7 +85,31 @@ const CLEAR_ORDER_PREFERENCE = [
   'site_settings'
 ];
 
-async function clearDatabaseExceptUsers(connection) {
+const RESTORABLE_TABLE_SET = new Set(BACKUP_TABLES);
+
+function normalizeSelectedTables(selectedTables) {
+  if (!Array.isArray(selectedTables) || selectedTables.length === 0) {
+    return null;
+  }
+
+  const normalized = [];
+  const seen = new Set();
+
+  for (const tableName of selectedTables) {
+    if (typeof tableName !== 'string') continue;
+
+    const safeName = tableName.trim();
+    if (!safeName || seen.has(safeName)) continue;
+    if (!RESTORABLE_TABLE_SET.has(safeName)) continue;
+
+    seen.add(safeName);
+    normalized.push(safeName);
+  }
+
+  return normalized.length > 0 ? normalized : null;
+}
+
+async function clearDatabaseExceptUsers(connection, selectedTables = null) {
   const [tables] = await connection.query(
     `
     SELECT table_name AS tableName
@@ -95,9 +119,15 @@ async function clearDatabaseExceptUsers(connection) {
     `
   );
 
+  const normalizedSelectedTables = normalizeSelectedTables(selectedTables);
+  const selectedTableSet = normalizedSelectedTables
+    ? new Set(normalizedSelectedTables)
+    : null;
+
   const clearOrder = tables
     .map(t => t.tableName)
     .filter(table => !EXCLUDED_TABLES.has(table))
+    .filter(table => !selectedTableSet || selectedTableSet.has(table))
     .sort((a, b) => {
       const indexA = CLEAR_ORDER_PREFERENCE.indexOf(a);
       const indexB = CLEAR_ORDER_PREFERENCE.indexOf(b);
@@ -372,17 +402,34 @@ async function validateCTBackupFile(ctBackup) {
   } catch (err) {
     throw new Error(`CTBackup validation failed: ${err.message}`);
   }
-}/**
+}
+
+/**
  * Restore a backup
  * Clears all data except users, then restores from backup
  */
-async function restoreBackup(backupData) {
+async function restoreBackup(backupData, options = {}) {
   const connection = await pool.getConnection();
 
   try {
     // Validate backup structure
     if (!backupData.metadata || !backupData.tables) {
       throw new Error('Invalid backup format: missing metadata or tables');
+    }
+
+    const hasSelectionRequest = Array.isArray(options.selectedTables) && options.selectedTables.length > 0;
+    const selectedTables = normalizeSelectedTables(options.selectedTables);
+
+    if (hasSelectionRequest && !selectedTables) {
+      throw new Error('No valid tables selected for restore');
+    }
+
+    const restoreTables = selectedTables
+      ? RESTORE_ORDER.filter(table => selectedTables.includes(table))
+      : RESTORE_ORDER;
+
+    if (selectedTables && restoreTables.length === 0) {
+      throw new Error('No valid tables selected for restore');
     }
 
     // Start transaction
@@ -394,9 +441,9 @@ async function restoreBackup(backupData) {
       await connection.query('SET UNIQUE_CHECKS=0');
       console.log('🔓 Foreign key and unique constraint checks disabled');
 
-      // Clear all tables except users
+      // Clear all tables except users (or selected tables only)
       console.log('🧹 Clearing database...');
-      await clearDatabaseExceptUsers(connection);
+      await clearDatabaseExceptUsers(connection, selectedTables ? restoreTables : null);
       console.log('✅ Database cleared');
 
       // Restore data
@@ -406,7 +453,7 @@ async function restoreBackup(backupData) {
         errors: []
       };
 
-      for (const table of RESTORE_ORDER) {
+      for (const table of restoreTables) {
         const rows = backupData.tables[table];
 
         if (!rows || rows.length === 0) {
@@ -519,7 +566,9 @@ async function restoreBackup(backupData) {
 
       return { 
         success: true, 
-        message: 'Backup restored successfully',
+        message: selectedTables
+          ? `Backup restored successfully (${restoreTables.length} selected tables)`
+          : 'Backup restored successfully',
         report: restoreReport
       };
     } catch (err) {
@@ -541,13 +590,21 @@ async function restoreBackup(backupData) {
  * Restore a SQL backup script
  * Executes raw SQL (super admin only)
  */
-async function restoreBackupSql(sqlText) {
+async function restoreBackupSql(sqlText, options = {}) {
   if (!sqlText || !sqlText.trim()) {
     throw new Error('Invalid SQL backup: empty file');
   }
 
   // Convert INSERT statements to REPLACE to handle duplicate key errors
   const modifiedSql = sqlText.replace(/^(\s*)INSERT INTO/gim, '$1REPLACE INTO');
+  const hasSelectionRequest = Array.isArray(options.selectedTables) && options.selectedTables.length > 0;
+  const selectedTables = normalizeSelectedTables(options.selectedTables);
+
+  if (hasSelectionRequest && !selectedTables) {
+    throw new Error('No valid tables selected for restore');
+  }
+
+  const selectedTableSet = selectedTables ? new Set(selectedTables) : null;
 
   const connection = await pool.getConnection();
 
@@ -557,19 +614,44 @@ async function restoreBackupSql(sqlText) {
     await connection.query('SET UNIQUE_CHECKS=0');
     
     console.log('🧹 Clearing database before SQL restore...');
-    await clearDatabaseExceptUsers(connection);
+    await clearDatabaseExceptUsers(connection, selectedTables);
     console.log('✅ Database cleared');
 
     console.log('📥 Executing SQL restore...');
-    await connection.query(modifiedSql);
+
+    if (!selectedTableSet) {
+      await connection.query(modifiedSql);
+    } else {
+      const replaceStatementRegex = /REPLACE\s+INTO\s+`?(\w+)`?[\s\S]*?;/gi;
+      let statementMatch;
+      let restoredStatements = 0;
+
+      while ((statementMatch = replaceStatementRegex.exec(modifiedSql)) !== null) {
+        const tableName = statementMatch[1];
+        if (!selectedTableSet.has(tableName)) {
+          continue;
+        }
+
+        const statement = statementMatch[0];
+        await connection.query(statement);
+        restoredStatements++;
+      }
+
+      if (restoredStatements === 0) {
+        throw new Error('No SQL statements matched the selected tables');
+      }
+    }
+
     console.log('✅ SQL restore completed');
     
     await connection.query('SET FOREIGN_KEY_CHECKS=1');
     await connection.query('SET UNIQUE_CHECKS=1');
 
-    return { 
-      success: true, 
-      message: 'SQL backup restored successfully' 
+    return {
+      success: true,
+      message: selectedTables
+        ? `SQL backup restored successfully (${selectedTables.length} selected tables)`
+        : 'SQL backup restored successfully'
     };
   } catch (err) {
     console.error('❌ SQL restore error:', err.message);

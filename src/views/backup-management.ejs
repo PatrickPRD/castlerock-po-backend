@@ -197,6 +197,15 @@
               <table class="table table-sm table-bordered">
                 <thead class="table-light">
                   <tr>
+                    <th class="text-center" style="width: 56px;">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        id="restoreSelectAll"
+                        title="Select all restorable tables"
+                        onchange="toggleAllRestoreTables(this.checked)"
+                      >
+                    </th>
                     <th>Table Name</th>
                     <th class="text-end">Records</th>
                     <th>Status</th>
@@ -206,6 +215,9 @@
                 </tbody>
               </table>
             </div>
+            <small id="restoreSelectionSummary" class="text-muted d-block mt-2">
+              Select tables from the analysed list to run a selective restore.
+            </small>
           </div>
           
           <div id="sqlFileInfo" style="display: none;" class="alert alert-info">
@@ -215,7 +227,7 @@
           
           <div class="alert alert-danger mt-3">
             <i class="bi bi-exclamation-triangle-fill me-2"></i>
-            <strong>WARNING:</strong> This will delete all existing data and replace it with the backup data.
+            <strong>WARNING:</strong> Selected tables will be cleared and replaced with backup data (or all tables if none are selected).
             <ul class="mb-0 mt-2">
               <li>All current operational and cashflow data will be lost (POs, invoices, sites, locations, suppliers, workers, timesheets, cashflow settings, and cashflow templates)</li>
               <li>User accounts will NOT be affected</li>
