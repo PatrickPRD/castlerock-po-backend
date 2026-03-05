@@ -241,6 +241,8 @@ router.post(
     if (!stageId) {
       return res.status(400).json({ error: 'Stage is required' });
     }
+
+    let poNumberForError = null;
     try {
       const normalizedLineItems = normalizeLineItems(lineItems);
       const net = normalizedLineItems.length
@@ -255,6 +257,7 @@ router.post(
         await conn.beginTransaction();
 
         const poNumber = await generatePONumber(conn, siteId);
+        poNumberForError = poNumber;
 
         const [result] = await conn.query(`
           INSERT INTO purchase_orders
@@ -362,6 +365,21 @@ router.post(
 
     } catch (err) {
       console.error('CREATE PO ERROR:', err);
+      if (err && err.code === 'ER_DUP_ENTRY') {
+        captureAuditFailure(req, err, {
+          operation: 'purchase_order_create',
+          supplierId,
+          siteId,
+          locationId,
+          poDate,
+          stageId,
+          poNumber: poNumberForError,
+          lineItemsCount: Array.isArray(lineItems) ? lineItems.length : 0,
+          reason: 'duplicate_po_number'
+        });
+        return res.status(409).json({ error: 'PO number collision detected. Please retry.' });
+      }
+
       captureAuditFailure(req, err, {
         operation: 'purchase_order_create',
         supplierId,
@@ -369,6 +387,7 @@ router.post(
         locationId,
         poDate,
         stageId,
+        poNumber: poNumberForError,
         lineItemsCount: Array.isArray(lineItems) ? lineItems.length : 0
       });
       res.status(500).json({ error: 'Failed to create purchase order' });
