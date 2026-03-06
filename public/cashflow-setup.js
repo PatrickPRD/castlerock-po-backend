@@ -89,9 +89,18 @@ let lastAutoHandoverDate = null;
 let capitalCosts = [];
 let editingCapitalCostId = null;
 let deletingCapitalCostId = null;
+let deletingLocationId = null;
 let projectStartDate = null;
 const expandedCapitalCostIds = new Set();
 let availableLocationTypes = [];
+const deleteLocationModal = document.getElementById('deleteLocationModal');
+const closeDeleteLocationModalBtn = document.getElementById('closeDeleteLocationModalBtn');
+const deleteLocationCancelBtn = document.getElementById('deleteLocationCancelBtn');
+const deleteLocationConfirmBtn = document.getElementById('deleteLocationConfirmBtn');
+const deleteLocationName = document.getElementById('deleteLocationName');
+const openBulkUploadModalBtn = document.getElementById('openBulkUploadModalBtn');
+const bulkUploadModal = document.getElementById('bulkUploadModal');
+const closeBulkUploadModalBtn = document.getElementById('closeBulkUploadModalBtn');
 
 function setStatus(message, isError = false) {
   if (!statusEl) return;
@@ -2090,8 +2099,35 @@ function editConfiguredLocation(locationId) {
   openWizardModal(true, locationId);
 }
 
-async function removeConfiguredLocation(locationId) {
+function openDeleteLocationModal(locationId) {
   const id = Number(locationId);
+  const location = configuredLocations.get(id);
+  if (!location) {
+    setStatus('Location not found', true);
+    return;
+  }
+
+  deletingLocationId = id;
+  if (deleteLocationName) {
+    deleteLocationName.textContent = `${location.site_name} — ${location.location_name}`;
+  }
+  if (deleteLocationModal) {
+    deleteLocationModal.style.display = 'flex';
+  }
+}
+
+function closeDeleteLocationModal() {
+  deletingLocationId = null;
+  if (deleteLocationModal) {
+    deleteLocationModal.style.display = 'none';
+  }
+  if (deleteLocationName) {
+    deleteLocationName.textContent = 'this location';
+  }
+}
+
+async function confirmDeleteLocation() {
+  const id = Number(deletingLocationId);
   const previousValue = configuredLocations.get(id);
 
   configuredLocations.delete(id);
@@ -2105,6 +2141,7 @@ async function removeConfiguredLocation(locationId) {
 
   try {
     await persistSettings('Location removed from cashflow plan.');
+    closeDeleteLocationModal();
   } catch (_) {
     if (previousValue) {
       configuredLocations.set(id, previousValue);
@@ -2112,6 +2149,10 @@ async function removeConfiguredLocation(locationId) {
       renderLocationOptions();
     }
   }
+}
+
+async function removeConfiguredLocation(locationId) {
+  openDeleteLocationModal(locationId);
 }
 
 window.editConfiguredLocation = editConfiguredLocation;
@@ -2157,6 +2198,31 @@ capitalCostSaveBtn?.addEventListener('click', saveCapitalCost);
 closeCapitalCostDeleteModalBtn?.addEventListener('click', closeCapitalCostDeleteModal);
 capitalCostDeleteCancelBtn?.addEventListener('click', closeCapitalCostDeleteModal);
 capitalCostDeleteConfirmBtn?.addEventListener('click', confirmCapitalCostDelete);
+closeDeleteLocationModalBtn?.addEventListener('click', closeDeleteLocationModal);
+deleteLocationCancelBtn?.addEventListener('click', closeDeleteLocationModal);
+deleteLocationConfirmBtn?.addEventListener('click', confirmDeleteLocation);
+openBulkUploadModalBtn?.addEventListener('click', () => {
+  if (bulkUploadModal) {
+    bulkUploadModal.style.display = 'flex';
+  }
+
+  // Default to Locations tab and refresh available options each time modal opens.
+  const locationsTabTrigger = document.querySelector('#bulkUploadTabs .nav-link[data-tab="locations"]');
+  bulkUploadTabs?.forEach((tab) => tab.classList.remove('active'));
+  locationsTabTrigger?.classList.add('active');
+  if (locationsTab) locationsTab.style.display = 'block';
+  if (templatesTab) templatesTab.style.display = 'none';
+
+  Promise.resolve(refreshLocationTypeTemplateMap()).finally(() => {
+    resetBulkLocationSelectionForm();
+  });
+});
+closeBulkUploadModalBtn?.addEventListener('click', () => {
+  if (bulkUploadModal) {
+    bulkUploadModal.style.display = 'none';
+  }
+  resetBulkLocationSelectionForm();
+});
 wizardTemplateSelect?.addEventListener('change', () => {
   updateCompletionDateField();
   if (wizardCurrentStep === wizardTotalSteps) {
@@ -2229,4 +2295,510 @@ capitalCostDeleteModal?.addEventListener('click', (event) => {
 setupForm?.addEventListener('submit', (event) => event.preventDefault());
 overallStartValueInput?.addEventListener('input', queueAutoSaveOverall);
 overallStartValueInput?.addEventListener('change', queueAutoSaveOverall);
+
+/* ======================================================
+   BULK UPLOAD FUNCTIONALITY
+   ====================================================== */
+
+const bulkUploadTabs = document.querySelectorAll('#bulkUploadTabs .nav-link');
+const locationsTab = document.getElementById('locationsTab');
+const templatesTab = document.getElementById('templatesTab');
+const templatesFileInput = document.getElementById('templatesFileInput');
+const bulkUploadLocationsBtn = document.getElementById('bulkUploadLocationsBtn');
+const bulkUploadTemplatesBtn = document.getElementById('bulkUploadTemplatesBtn');
+const templatesPreview = document.getElementById('templatesPreview');
+const locationsStatus = document.getElementById('locationsStatus');
+const templatesStatus = document.getElementById('templatesStatus');
+const downloadTemplateTemplate = document.getElementById('downloadTemplateTemplate');
+const bulkUploadLocationsCancel = document.getElementById('bulkUploadLocationsCancel');
+const bulkUploadTemplatesCancel = document.getElementById('bulkUploadTemplatesCancel');
+const bulkLocationSiteFilter = document.getElementById('bulkLocationSiteFilter');
+const bulkLocationStartDate = document.getElementById('bulkLocationStartDate');
+const bulkLocationEstimatedCost = document.getElementById('bulkLocationEstimatedCost');
+const bulkLocationSellingPrice = document.getElementById('bulkLocationSellingPrice');
+const bulkLocationSelectAllBtn = document.getElementById('bulkLocationSelectAllBtn');
+const bulkLocationList = document.getElementById('bulkLocationList');
+
+const bulkSelectedLocationIds = new Set();
+const locationTypeTemplateMap = new Map();
+
+async function refreshLocationTypeTemplateMap() {
+  const response = await api('/cashflow/location-type-templates');
+  locationTypeTemplateMap.clear();
+
+  const rows = Array.isArray(response) ? response : [];
+  rows.forEach((entry) => {
+    const templateKey = String(entry?.template_key || '').trim();
+    const locationTypes = Array.isArray(entry?.location_types) ? entry.location_types : [];
+    if (!templateKey) return;
+
+    locationTypes.forEach((value) => {
+      const typeKey = String(value || '').trim().toLowerCase();
+      if (!typeKey) return;
+      locationTypeTemplateMap.set(typeKey, templateKey);
+    });
+  });
+}
+
+function getBulkAddAvailableLocations() {
+  return currentLocations
+    .filter((location) => !configuredLocations.has(Number(location.location_id)))
+    .sort((a, b) => {
+      const siteSort = String(a.site_name || '').localeCompare(String(b.site_name || ''), undefined, { sensitivity: 'base', numeric: true });
+      if (siteSort !== 0) return siteSort;
+      return String(a.location_name || '').localeCompare(String(b.location_name || ''), undefined, { sensitivity: 'base', numeric: true });
+    });
+}
+
+function updateBulkLocationActionState() {
+  if (!bulkUploadLocationsBtn) return;
+  const hasSelection = bulkSelectedLocationIds.size > 0;
+  const hasStartDate = !!normalizeInputDate(bulkLocationStartDate?.value);
+  bulkUploadLocationsBtn.disabled = !(hasSelection && hasStartDate);
+}
+
+function renderBulkLocationSiteFilterOptions() {
+  if (!bulkLocationSiteFilter) return;
+
+  const selectedBefore = bulkLocationSiteFilter.value;
+  const available = getBulkAddAvailableLocations();
+  const siteMap = new Map();
+  available.forEach((location) => {
+    const siteId = Number(location.site_id);
+    if (!siteMap.has(siteId)) {
+      siteMap.set(siteId, String(location.site_name || ''));
+    }
+  });
+
+  const siteRows = [...siteMap.entries()].sort((a, b) =>
+    String(a[1] || '').localeCompare(String(b[1] || ''), undefined, { sensitivity: 'base', numeric: true })
+  );
+
+  bulkLocationSiteFilter.innerHTML = '<option value="">All sites</option>';
+  siteRows.forEach(([siteId, siteName]) => {
+    const option = document.createElement('option');
+    option.value = String(siteId);
+    option.textContent = siteName || `Site ${siteId}`;
+    bulkLocationSiteFilter.appendChild(option);
+  });
+
+  if (selectedBefore && [...bulkLocationSiteFilter.options].some((o) => o.value === selectedBefore)) {
+    bulkLocationSiteFilter.value = selectedBefore;
+  }
+}
+
+function renderBulkLocationList() {
+  if (!bulkLocationList) return;
+
+  const selectedSiteId = Number(bulkLocationSiteFilter?.value || 0);
+  const available = getBulkAddAvailableLocations().filter((location) => {
+    if (!selectedSiteId) return true;
+    return Number(location.site_id) === selectedSiteId;
+  });
+
+  // Remove stale selected ids after filtering/refresh.
+  [...bulkSelectedLocationIds].forEach((locationId) => {
+    if (!getBulkAddAvailableLocations().some((entry) => Number(entry.location_id) === Number(locationId))) {
+      bulkSelectedLocationIds.delete(locationId);
+    }
+  });
+
+  if (!available.length) {
+    bulkLocationList.innerHTML = '<div class="text-muted small">No available locations for this filter.</div>';
+    updateBulkLocationActionState();
+    return;
+  }
+
+  bulkLocationList.innerHTML = available.map((location) => {
+    const locationId = Number(location.location_id);
+    const checked = bulkSelectedLocationIds.has(locationId) ? 'checked' : '';
+    return `
+      <label class="d-flex align-items-start gap-2 py-1 px-1 border-bottom bulk-location-row">
+        <input type="checkbox" class="form-check-input mt-1 bulk-location-checkbox" data-location-id="${locationId}" ${checked}>
+        <span>
+          <strong>${escapeHtml(location.location_name)}</strong>
+          <span class="text-muted d-block small">${escapeHtml(location.site_name || '')}${location.location_type ? ` | ${escapeHtml(location.location_type)}` : ''}</span>
+        </span>
+      </label>
+    `;
+  }).join('');
+
+  bulkLocationList.querySelectorAll('.bulk-location-checkbox').forEach((checkbox) => {
+    checkbox.addEventListener('change', (event) => {
+      const locationId = Number(event.target.getAttribute('data-location-id'));
+      if (event.target.checked) {
+        bulkSelectedLocationIds.add(locationId);
+      } else {
+        bulkSelectedLocationIds.delete(locationId);
+      }
+      if (locationsStatus) {
+        locationsStatus.textContent = `${bulkSelectedLocationIds.size} location${bulkSelectedLocationIds.size === 1 ? '' : 's'} selected`;
+        locationsStatus.classList.remove('text-danger');
+        locationsStatus.classList.add('text-muted');
+      }
+      updateBulkLocationActionState();
+    });
+  });
+
+  updateBulkLocationActionState();
+}
+
+function resetBulkLocationSelectionForm() {
+  bulkSelectedLocationIds.clear();
+  if (bulkLocationSiteFilter) bulkLocationSiteFilter.value = '';
+  if (bulkLocationEstimatedCost) bulkLocationEstimatedCost.value = '0';
+  if (bulkLocationSellingPrice) bulkLocationSellingPrice.value = '0';
+  if (bulkLocationStartDate) {
+    const fallbackDate = normalizeInputDate(projectStartDate) || new Date().toISOString().slice(0, 10);
+    bulkLocationStartDate.value = fallbackDate;
+  }
+  if (locationsStatus) {
+    locationsStatus.textContent = '';
+    locationsStatus.classList.remove('text-success', 'text-danger');
+    locationsStatus.classList.add('text-muted');
+  }
+
+  renderBulkLocationSiteFilterOptions();
+  renderBulkLocationList();
+}
+
+// Tab switching
+bulkUploadTabs?.forEach(tab => {
+  tab.addEventListener('click', (e) => {
+    e.preventDefault();
+    const targetTab = tab.dataset.tab;
+    
+    // Update active tab
+    bulkUploadTabs.forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    
+    // Show/hide tab content
+    if (locationsTab && templatesTab) {
+      locationsTab.style.display = targetTab === 'locations' ? 'block' : 'none';
+      templatesTab.style.display = targetTab === 'templates' ? 'block' : 'none';
+    }
+  });
+});
+
+// Download template template
+downloadTemplateTemplate?.addEventListener('click', async () => {
+  try {
+    const response = await fetch('/cashflow/bulk-import/templates/template', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to download template');
+    }
+    
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'templates_template.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  } catch (error) {
+    if (templatesStatus) {
+      templatesStatus.textContent = 'Failed to download template';
+      templatesStatus.classList.add('text-danger');
+    }
+  }
+});
+
+bulkLocationSiteFilter?.addEventListener('change', () => {
+  renderBulkLocationList();
+});
+
+bulkLocationStartDate?.addEventListener('change', () => {
+  updateBulkLocationActionState();
+});
+
+bulkLocationSelectAllBtn?.addEventListener('click', () => {
+  const selectedSiteId = Number(bulkLocationSiteFilter?.value || 0);
+  const visible = getBulkAddAvailableLocations().filter((location) => {
+    if (!selectedSiteId) return true;
+    return Number(location.site_id) === selectedSiteId;
+  });
+
+  visible.forEach((location) => {
+    bulkSelectedLocationIds.add(Number(location.location_id));
+  });
+
+  renderBulkLocationList();
+  if (locationsStatus) {
+    locationsStatus.textContent = `${bulkSelectedLocationIds.size} location${bulkSelectedLocationIds.size === 1 ? '' : 's'} selected`;
+    locationsStatus.classList.remove('text-danger');
+    locationsStatus.classList.add('text-muted');
+  }
+});
+
+// Template file input handler
+templatesFileInput?.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) {
+    if (bulkUploadTemplatesBtn) bulkUploadTemplatesBtn.disabled = true;
+    if (templatesPreview) templatesPreview.innerHTML = '';
+    if (templatesStatus) {
+      templatesStatus.textContent = '';
+      templatesStatus.classList.remove('text-danger', 'text-success');
+    }
+    return;
+  }
+  
+  if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+    if (templatesStatus) {
+      templatesStatus.textContent = 'Please select an Excel file (.xlsx or .xls)';
+      templatesStatus.classList.add('text-danger');
+      templatesStatus.classList.remove('text-success');
+    }
+    if (bulkUploadTemplatesBtn) bulkUploadTemplatesBtn.disabled = true;
+    return;
+  }
+  
+  if (bulkUploadTemplatesBtn) bulkUploadTemplatesBtn.disabled = false;
+  if (templatesPreview) {
+    templatesPreview.innerHTML = `<div class="alert alert-info">File selected: ${file.name}</div>`;
+  }
+  if (templatesStatus) {
+    templatesStatus.textContent = 'Ready to upload';
+    templatesStatus.classList.remove('text-danger');
+    templatesStatus.classList.add('text-success');
+  }
+});
+
+// Upload locations
+bulkUploadLocationsBtn?.addEventListener('click', async () => {
+  const selectedIds = [...bulkSelectedLocationIds];
+  const startOnSiteDate = normalizeInputDate(bulkLocationStartDate?.value);
+  const estimatedConstructionCost = parseNumber(bulkLocationEstimatedCost?.value);
+  const sellingPrice = parseNumber(bulkLocationSellingPrice?.value);
+
+  if (!selectedIds.length) {
+    if (locationsStatus) {
+      locationsStatus.textContent = 'Select at least one location.';
+      locationsStatus.classList.remove('text-muted', 'text-success');
+      locationsStatus.classList.add('text-danger');
+    }
+    return;
+  }
+
+  if (!startOnSiteDate) {
+    if (locationsStatus) {
+      locationsStatus.textContent = 'Start on site date is required.';
+      locationsStatus.classList.remove('text-muted', 'text-success');
+      locationsStatus.classList.add('text-danger');
+    }
+    return;
+  }
+
+  const defaultVatRate = Number(availableVatRates?.[0] ?? 0);
+  const defaultEstimatedCost = estimatedConstructionCost === null || Number.isNaN(estimatedConstructionCost) ? 0 : estimatedConstructionCost;
+  const defaultSellingPrice = sellingPrice === null || Number.isNaN(sellingPrice) ? 0 : sellingPrice;
+
+  if (locationsStatus) {
+    locationsStatus.textContent = 'Adding selected locations...';
+    locationsStatus.classList.remove('text-danger', 'text-success');
+    locationsStatus.classList.add('text-muted');
+  }
+  if (bulkUploadLocationsBtn) bulkUploadLocationsBtn.disabled = true;
+
+  const previousConfigured = new Map(configuredLocations);
+  const previousExpanded = new Set(expandedLocationIds);
+
+  try {
+    await refreshLocationTypeTemplateMap();
+
+    const selectedLocations = selectedIds
+      .map((locationId) => currentLocations.find((row) => Number(row.location_id) === Number(locationId)))
+      .filter(Boolean);
+
+    const missingMappings = selectedLocations
+      .filter((location) => {
+        const locationTypeKey = String(location.location_type || '').trim().toLowerCase();
+        return !locationTypeKey || !locationTypeTemplateMap.has(locationTypeKey);
+      })
+      .map((location) => `${location.site_name} - ${location.location_name}`);
+
+    if (missingMappings.length) {
+      throw new Error(`Missing template mapping for location type on: ${missingMappings.slice(0, 6).join(', ')}${missingMappings.length > 6 ? '...' : ''}`);
+    }
+
+    selectedIds.forEach((locationId) => {
+      const sourceLocation = currentLocations.find((row) => Number(row.location_id) === Number(locationId));
+      if (!sourceLocation) return;
+
+      const locationTypeKey = String(sourceLocation.location_type || '').trim().toLowerCase();
+      const templateKey = locationTypeTemplateMap.get(locationTypeKey);
+      if (!templateKey) return;
+
+      const completionDate = deriveCompletionDate(startOnSiteDate, templateKey);
+      if (!completionDate) return;
+
+      const derivedTimescaleWeeks = getDerivedTimescaleWeeks(templateKey);
+      const weeklySpread = getTemplateDefaultSpread(templateKey);
+      const handoverDate = deriveHouseHandoverDate(completionDate) || completionDate;
+
+      const income = calculateIncomeBreakdown(defaultSellingPrice, defaultVatRate, 0);
+      configuredLocations.set(Number(sourceLocation.location_id), {
+        location_id: sourceLocation.location_id,
+        location_name: sourceLocation.location_name,
+        location_type: sourceLocation.location_type || null,
+        site_id: sourceLocation.site_id,
+        site_name: sourceLocation.site_name,
+        include_in_cashflow: true,
+        template_key: templateKey,
+        template_name: templateNameByKey(templateKey),
+        weekly_spread: weeklySpread,
+        estimated_construction_cost: defaultEstimatedCost,
+        predicted_spend_percentage: null,
+        spend_timescale_months: derivedTimescaleWeeks,
+        start_on_site_date: startOnSiteDate,
+        completion_date: completionDate,
+        house_handover_date: handoverDate,
+        remove_fees_percentage: 0,
+        remove_vat_rate: defaultVatRate,
+        selling_price: defaultSellingPrice,
+        vat_amount: income.vatAmount,
+        fees_amount: income.feesAmount,
+        calculated_income: income.calculatedIncome
+      });
+      expandedLocationIds.add(Number(sourceLocation.location_id));
+    });
+
+    renderConfiguredRows();
+    renderLocationOptions();
+    await persistSettings(`${selectedIds.length} location${selectedIds.length === 1 ? '' : 's'} added to cashflow plan.`);
+
+    if (locationsStatus) {
+      locationsStatus.textContent = `${selectedIds.length} location${selectedIds.length === 1 ? '' : 's'} added successfully.`;
+      locationsStatus.classList.remove('text-danger', 'text-muted');
+      locationsStatus.classList.add('text-success');
+    }
+
+    setTimeout(() => {
+      if (bulkUploadModal) bulkUploadModal.style.display = 'none';
+      resetBulkLocationSelectionForm();
+    }, 1000);
+  } catch (error) {
+    configuredLocations.clear();
+    previousConfigured.forEach((value, key) => configuredLocations.set(key, value));
+    expandedLocationIds.clear();
+    previousExpanded.forEach((value) => expandedLocationIds.add(value));
+    renderConfiguredRows();
+    renderLocationOptions();
+
+    if (locationsStatus) {
+      locationsStatus.textContent = error.message || 'Failed to add selected locations.';
+      locationsStatus.classList.remove('text-success', 'text-muted');
+      locationsStatus.classList.add('text-danger');
+    }
+    updateBulkLocationActionState();
+  }
+});
+
+// Upload templates
+bulkUploadTemplatesBtn?.addEventListener('click', async () => {
+  const file = templatesFileInput?.files[0];
+  if (!file) return;
+  
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  if (templatesStatus) {
+    templatesStatus.textContent = 'Uploading...';
+    templatesStatus.classList.remove('text-danger', 'text-success');
+    templatesStatus.classList.add('text-muted');
+  }
+  if (bulkUploadTemplatesBtn) bulkUploadTemplatesBtn.disabled = true;
+  
+  try {
+    const response = await fetch('/cashflow/bulk-import/templates', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Upload failed');
+    }
+    
+    if (templatesStatus) {
+      templatesStatus.textContent = data.message || 'Upload successful';
+      templatesStatus.classList.remove('text-danger', 'text-muted');
+      templatesStatus.classList.add('text-success');
+    }
+    if (templatesPreview) {
+      templatesPreview.innerHTML = `
+        <div class="alert alert-success">
+          <strong>Success!</strong> ${data.message}<br>
+          <small>Inserted: ${data.inserted} | Skipped: ${data.skipped}</small>
+        </div>
+      `;
+    }
+    
+    // Reset form and reload data
+    if (templatesFileInput) templatesFileInput.value = '';
+    if (bulkUploadTemplatesBtn) bulkUploadTemplatesBtn.disabled = true;
+    await loadSettings();
+    renderTemplateOptions();
+    renderTemplateAccordion();
+    
+    // Close modal after a delay
+    setTimeout(() => {
+      if (bulkUploadModal) bulkUploadModal.style.display = 'none';
+      if (templatesPreview) templatesPreview.innerHTML = '';
+      if (templatesStatus) {
+        templatesStatus.textContent = '';
+        templatesStatus.classList.remove('text-success', 'text-danger');
+      }
+    }, 2000);
+  } catch (error) {
+    if (templatesStatus) {
+      templatesStatus.textContent = error.message || 'Upload failed';
+      templatesStatus.classList.remove('text-success', 'text-muted');
+      templatesStatus.classList.add('text-danger');
+    }
+    if (templatesPreview) {
+      templatesPreview.innerHTML = `<div class="alert alert-danger">${error.message || 'Upload failed'}</div>`;
+    }
+    if (bulkUploadTemplatesBtn) bulkUploadTemplatesBtn.disabled = false;
+  }
+});
+
+// Cancel buttons
+bulkUploadLocationsCancel?.addEventListener('click', () => {
+  if (bulkUploadModal) bulkUploadModal.style.display = 'none';
+  resetBulkLocationSelectionForm();
+});
+
+bulkUploadTemplatesCancel?.addEventListener('click', () => {
+  if (bulkUploadModal) bulkUploadModal.style.display = 'none';
+  if (templatesFileInput) templatesFileInput.value = '';
+  if (bulkUploadTemplatesBtn) bulkUploadTemplatesBtn.disabled = true;
+  if (templatesPreview) templatesPreview.innerHTML = '';
+  if (templatesStatus) {
+    templatesStatus.textContent = '';
+    templatesStatus.classList.remove('text-success', 'text-danger');
+  }
+});
+
+// Close bulk upload modal on backdrop click
+bulkUploadModal?.addEventListener('click', (event) => {
+  if (event.target === bulkUploadModal) {
+    bulkUploadModal.style.display = 'none';
+  }
+});
+
+// Close delete location modal on backdrop click
+deleteLocationModal?.addEventListener('click', (event) => {
+  if (event.target === deleteLocationModal) {
+    closeDeleteLocationModal();
+  }
+});
+
 loadSettings();

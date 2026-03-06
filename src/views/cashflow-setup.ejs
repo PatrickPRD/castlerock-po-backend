@@ -23,6 +23,7 @@
         </div>
         <div class="d-flex gap-2">
           <button type="button" id="openWizardModalBtn" class="btn btn-outline-primary">Add Location</button>
+          <button type="button" id="openBulkUploadModalBtn" class="btn btn-outline-secondary">Bulk Upload</button>
         </div>
       </div>
 
@@ -205,6 +206,93 @@
       <div class="wizard-actions d-flex justify-content-end gap-2 mt-2">
         <button type="button" id="capitalCostDeleteCancelBtn" class="btn btn-outline-secondary">Cancel</button>
         <button type="button" id="capitalCostDeleteConfirmBtn" class="btn btn-danger">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="deleteLocationModal" class="modal" style="display:none;">
+    <div class="modal-content cashflow-delete-location-modal">
+      <div class="modal-header">
+        <h3>Remove Location from Cashflow</h3>
+        <button class="modal-close" type="button" id="closeDeleteLocationModalBtn">×</button>
+      </div>
+      <p class="mb-3">Are you sure you want to remove <strong id="deleteLocationName">this location</strong> from the cashflow plan?</p>
+      <div class="wizard-actions d-flex justify-content-end gap-2 mt-2">
+        <button type="button" id="deleteLocationCancelBtn" class="btn btn-outline-secondary">Cancel</button>
+        <button type="button" id="deleteLocationConfirmBtn" class="btn btn-danger">Remove</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="bulkUploadModal" class="modal" style="display:none;">
+    <div class="modal-content cashflow-bulk-upload-modal" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3>Bulk Upload</h3>
+        <button class="modal-close" type="button" id="closeBulkUploadModalBtn">×</button>
+      </div>
+
+      <div class="nav nav-tabs mb-3" id="bulkUploadTabs">
+        <button type="button" class="nav-link active" data-tab="locations">Locations</button>
+        <button type="button" class="nav-link" data-tab="templates">Templates</button>
+      </div>
+
+      <div id="locationsTab" class="bulk-upload-tab" style="display:block;">
+        <div class="mb-3">
+          <label for="bulkLocationSiteFilter" class="form-label">Filter by Site</label>
+          <select id="bulkLocationSiteFilter" class="form-select">
+            <option value="">All sites</option>
+          </select>
+        </div>
+
+        <div class="row g-2 mb-3">
+          <div class="col-12">
+            <div class="text-muted small border rounded p-2 bg-light">
+              Templates are assigned automatically using each location's <strong>Location Type</strong> mapping.
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <label for="bulkLocationStartDate" class="form-label">Start on Site Date</label>
+            <input id="bulkLocationStartDate" type="date" class="form-control" />
+          </div>
+          <div class="col-12 col-md-6">
+            <label for="bulkLocationEstimatedCost" class="form-label">Default Est. Construction Cost (<span data-currency-symbol>€</span>)</label>
+            <input id="bulkLocationEstimatedCost" type="number" min="0" step="0.01" class="form-control" value="0" />
+          </div>
+          <div class="col-12 col-md-6">
+            <label for="bulkLocationSellingPrice" class="form-label">Default Location Selling Price (<span data-currency-symbol>€</span>)</label>
+            <input id="bulkLocationSellingPrice" type="number" min="0" step="0.01" class="form-control" value="0" />
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">Available Locations</h6>
+          <button type="button" id="bulkLocationSelectAllBtn" class="btn btn-sm btn-outline-secondary">Select Visible</button>
+        </div>
+
+        <div id="bulkLocationList" class="bulk-location-list border rounded p-2 mb-3">
+          <div class="text-muted small">No available locations to add.</div>
+        </div>
+
+        <div id="locationsStatus" class="text-muted small mb-3"></div>
+        <div class="d-flex justify-content-end gap-2">
+          <button type="button" id="bulkUploadLocationsCancel" class="btn btn-outline-secondary">Cancel</button>
+          <button type="button" id="bulkUploadLocationsBtn" class="btn btn-primary" disabled>Add Selected Locations</button>
+        </div>
+      </div>
+
+      <div id="templatesTab" class="bulk-upload-tab" style="display:none;">
+        <div class="mb-3">
+          <label class="form-label">Upload Templates Excel File</label>
+          <input type="file" id="templatesFileInput" class="form-control" accept=".xlsx,.xls" />
+          <p class="text-muted small mt-2">Upload an Excel file with template data. Required columns: Template Name, Stage, Percent, Weeks.</p>
+          <button type="button" id="downloadTemplateTemplate" class="btn btn-sm btn-outline-secondary mt-2">Download Template</button>
+        </div>
+        <div id="templatesPreview" class="mb-3"></div>
+        <div id="templatesStatus" class="text-muted small mb-3"></div>
+        <div class="d-flex justify-content-end gap-2">
+          <button type="button" id="bulkUploadTemplatesCancel" class="btn btn-outline-secondary">Cancel</button>
+          <button type="button" id="bulkUploadTemplatesBtn" class="btn btn-primary" disabled>Upload Templates</button>
+        </div>
       </div>
     </div>
   </div>

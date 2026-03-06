@@ -153,6 +153,10 @@ app.use('/timesheets', timesheetRoutes);
 const cashflowRoutes = require('./routes/cashflow');
 app.use('/cashflow', cashflowRoutes);
 
+// Cashflow Bulk Import
+const cashflowBulkImportRoutes = require('./routes/cashflow-bulk-import');
+app.use('/cashflow', cashflowBulkImportRoutes);
+
 // ✅ EXPORTS — THIS IS THE CRITICAL PART
 const exportRoutes = require('./routes/exports');
 app.use('/exports', exportRoutes);

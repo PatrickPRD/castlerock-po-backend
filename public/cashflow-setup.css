@@ -268,6 +268,60 @@
   border-radius: 3px;
 }
 
+/* Bulk upload modal */
+.cashflow-bulk-upload-modal {
+  max-width: 600px;
+}
+
+.bulk-location-list {
+  max-height: 280px;
+  overflow-y: auto;
+  background: #fff;
+}
+
+.bulk-location-row {
+  cursor: pointer;
+}
+
+.bulk-location-row:last-child {
+  border-bottom: none !important;
+}
+
+.bulk-location-row:hover {
+  background: #f8f9fa;
+}
+
+.bulk-upload-tab {
+  display: none;
+}
+
+.nav-tabs .nav-link {
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-top-left-radius: 0.375rem;
+  border-top-right-radius: 0.375rem;
+  padding: 0.5rem 1rem;
+  color: #6c757d;
+  background-color: transparent;
+  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+}
+
+.nav-tabs .nav-link:hover {
+  border-color: #e9ecef #e9ecef #dee2e6;
+  color: #495057;
+}
+
+.nav-tabs .nav-link.active {
+  color: #495057;
+  background-color: #fff;
+  border-color: #dee2e6 #dee2e6 #fff;
+}
+
+/* Delete location confirmation modal */
+.cashflow-delete-location-modal {
+  max-width: 480px;
+}
+
 #templateDraftTypeSuggestions::-webkit-scrollbar-thumb:hover {
   background: #888;
 }
@@ -290,6 +344,10 @@
 }
 
 @media (max-width: 576px) {
+  .bulk-location-list {
+    max-height: 220px;
+  }
+
   .wizard-actions {
     flex-direction: column;
     align-items: stretch;
