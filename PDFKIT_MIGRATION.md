@@ -99,13 +99,13 @@ downloadGDPRPDF(buttonElement);
 
 ### Backward Compatibility
 
-Old Puppeteer-based endpoints (`/pdfs/*`) are still available but deprecated:
-- `/pdfs/po/:poId` - ⚠️ Deprecated (requires Puppeteer)
-- `/pdfs/worker/:workerId` - ⚠️ Deprecated (requires Puppeteer)
-- `/pdfs/worker-blank` - ⚠️ Deprecated (requires Puppeteer)
-- `/pdfs/gdpr` - ⚠️ Deprecated (requires Puppeteer)
+Legacy Puppeteer endpoints (`/pdfs/*`) were available during migration but have now been fully removed from runtime.
 
-**Note**: These endpoints will fail since Puppeteer is removed. Use browser-based generation instead.
+Use browser-based generation via:
+- `/pdf-data/po/:poId`
+- `/pdf-data/worker/:workerId`
+- `/pdf-data/worker-blank`
+- `/pdf-data/gdpr`
 
 ### Breaking Changes
 
@@ -191,18 +191,22 @@ None for end-users. The API remains the same:
 
 If issues occur:
 
-1. **Revert to main branch**
+1. **Revert to a commit/branch before PDF route retirement**
    ```bash
-   git checkout main
+   git checkout <commit-or-branch-with-legacy-pdfs>
    ```
 
-2. **Reinstall Puppeteer**
+2. **Restore legacy files if needed**
+   - `src/routes/pdfs.js`
+   - `src/services/pdfService.js`
+
+3. **Reinstall Puppeteer (legacy mode only)**
    ```bash
    npm install puppeteer
    npx puppeteer browsers install chrome
    ```
 
-3. **Restore EC2 dependencies** (on Amazon Linux 2023)
+4. **Restore EC2 dependencies** (on Amazon Linux 2023, legacy mode only)
    ```bash
    sudo dnf install -y atk cairo cups-libs dbus-glib expat fontconfig freetype glib2 gtk3 libX11 libXcomposite libXcursor libXdamage libXext libXfixes libXi libXrandr libXrender libXScrnSaver libXtst nss pango alsa-lib
    ```

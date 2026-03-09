@@ -1,7 +1,6 @@
 require('dotenv').config();
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
-const fs = require('fs');
 
 function runDependencyPreflight() {
   try {
@@ -9,17 +8,6 @@ function runDependencyPreflight() {
   } catch (error) {
     console.warn('⚠️  bcrypt native module not available:', error.message);
     console.warn('   You can switch to bcryptjs or install build tools for your OS.');
-  }
-
-  try {
-    const puppeteer = require('puppeteer');
-    const chromePath = puppeteer.executablePath();
-    if (!chromePath || !fs.existsSync(chromePath)) {
-      console.warn('⚠️  Puppeteer Chromium not found. PDF generation will fail.');
-      console.warn('   Run: npx puppeteer browsers install chrome');
-    }
-  } catch (error) {
-    console.warn('⚠️  Puppeteer not available:', error.message);
   }
 }
 

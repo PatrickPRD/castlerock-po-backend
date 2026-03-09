@@ -133,10 +133,6 @@ app.use('/invoices', invoiceRoutes);
 const reportRoutes = require('./routes/reports');
 app.use('/reports', reportRoutes);
 
-// PDFs
-const pdfRoutes = require('./routes/pdfs');
-app.use('/pdfs', pdfRoutes);
-
 // PDF Data (for browser-based PDFKit generation)
 const pdfDataRoutes = require('./routes/pdfData');
 app.use('/pdf-data', pdfDataRoutes);
