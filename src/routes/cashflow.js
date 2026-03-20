@@ -141,15 +141,46 @@ function validateSpreadTotal(spread) {
 function normalizeTemplateRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) return null;
 
-  const normalized = rows.map((row) => ({
-    stage: String(row?.stage || '').trim(),
-    percent: Number(row?.percent),
-    weeks: Number(row?.weeks)
-  }));
+  const normalized = [];
+  let nextSequentialWeek = 0;
+
+  rows.forEach((row, index) => {
+    const stage = String(row?.stage ?? row?.stageName ?? row?.stage_name ?? '').trim();
+    const percent = Number(row?.percent);
+    const durationWeeks = Number(row?.durationWeeks ?? row?.duration_weeks ?? row?.weeks);
+    const rawWeekStart = row?.weekStart ?? row?.week_start;
+    const hasExplicitWeekStart = !(rawWeekStart === undefined || rawWeekStart === null || rawWeekStart === '');
+    const parsedWeekStart = hasExplicitWeekStart ? Number(rawWeekStart) : nextSequentialWeek;
+    const parsedSortOrder = Number(row?.sortOrder ?? row?.sort_order ?? index);
+
+    normalized.push({
+      stage,
+      percent,
+      weeks: durationWeeks,
+      week_start: parsedWeekStart,
+      duration_weeks: durationWeeks,
+      sort_order: Number.isInteger(parsedSortOrder) && parsedSortOrder >= 0 ? parsedSortOrder : index
+    });
+
+    if (Number.isInteger(parsedWeekStart) && Number.isInteger(durationWeeks) && durationWeeks > 0) {
+      nextSequentialWeek = Math.max(nextSequentialWeek, parsedWeekStart + durationWeeks);
+    }
+  });
 
   if (normalized.some((row) => !row.stage)) return null;
   if (normalized.some((row) => !Number.isFinite(row.percent) || row.percent < 0)) return null;
   if (normalized.some((row) => !Number.isInteger(row.weeks) || row.weeks <= 0)) return null;
+  if (normalized.some((row) => !Number.isInteger(row.week_start) || row.week_start < 0)) return null;
+
+  normalized.sort((left, right) => {
+    if (left.sort_order !== right.sort_order) return left.sort_order - right.sort_order;
+    if (left.week_start !== right.week_start) return left.week_start - right.week_start;
+    return String(left.stage).localeCompare(String(right.stage), undefined, { sensitivity: 'base', numeric: true });
+  });
+
+  normalized.forEach((row, index) => {
+    row.sort_order = index;
+  });
 
   const percentTotal = Number(normalized.reduce((sum, row) => sum + row.percent, 0).toFixed(2));
   if (Math.abs(percentTotal - 100) > 0.05) return null;
@@ -157,12 +188,24 @@ function normalizeTemplateRows(rows) {
   return normalized;
 }
 
+function getTemplateWeekCount(rows) {
+  return rows.reduce((maxWeeks, row) => {
+    const rowEnd = Number(row?.week_start) + Number(row?.duration_weeks ?? row?.weeks ?? 0);
+    return Number.isFinite(rowEnd) ? Math.max(maxWeeks, rowEnd) : maxWeeks;
+  }, 0);
+}
+
 function buildWeeklySpreadFromRows(rows) {
-  const spread = [];
+  const weekCount = getTemplateWeekCount(rows);
+  const spread = Array(Math.max(weekCount, 0)).fill(0);
+
   rows.forEach((row) => {
-    const evenWeekValue = Number((row.percent / row.weeks).toFixed(4));
-    for (let index = 0; index < row.weeks; index += 1) {
-      spread.push(evenWeekValue);
+    const durationWeeks = Number(row.duration_weeks ?? row.weeks);
+    const weekStart = Number(row.week_start ?? 0);
+    const evenWeekValue = Number((row.percent / durationWeeks).toFixed(4));
+    for (let index = 0; index < durationWeeks; index += 1) {
+      const weekIndex = weekStart + index;
+      spread[weekIndex] = Number((Number(spread[weekIndex] || 0) + evenWeekValue).toFixed(4));
     }
   });
 
@@ -170,18 +213,27 @@ function buildWeeklySpreadFromRows(rows) {
   const roundedTotal = rounded.reduce((sum, value) => sum + value, 0);
   const diff = Number((100 - roundedTotal).toFixed(2));
   if (rounded.length > 0) {
-    rounded[rounded.length - 1] = Number((rounded[rounded.length - 1] + diff).toFixed(2));
+    let adjustmentIndex = rounded.length - 1;
+    for (let index = rounded.length - 1; index >= 0; index -= 1) {
+      if (rounded[index] > 0) {
+        adjustmentIndex = index;
+        break;
+      }
+    }
+    rounded[adjustmentIndex] = Number((rounded[adjustmentIndex] + diff).toFixed(2));
   }
   return rounded;
 }
 
 function toTemplateDto(row) {
-  const templateRows = parseTemplateRows(row.template_rows_json) || [];
+  const parsedRows = parseTemplateRows(row.template_rows_json) || [];
+  const templateRows = normalizeTemplateRows(parsedRows) || [];
+  const derivedWeekCount = templateRows.length ? getTemplateWeekCount(templateRows) : Number(row.week_count);
   return {
     key: row.template_key,
     name: row.name,
-    week_count: Number(row.week_count),
-    default_spread: parseWeeklySpread(row.default_spread_json) || [],
+    week_count: Number(derivedWeekCount || row.week_count || 0),
+    default_spread: parseWeeklySpread(row.default_spread_json) || buildWeeklySpreadFromRows(templateRows),
     rows: templateRows
   };
 }
@@ -654,7 +706,7 @@ router.post(
       return res.status(400).json({ error: 'rows must include valid stage, percent, and weeks values totaling 100%' });
     }
 
-    const normalizedWeekCount = normalizedRows.reduce((sum, row) => sum + row.weeks, 0);
+    const normalizedWeekCount = getTemplateWeekCount(normalizedRows);
     if (!Number.isInteger(normalizedWeekCount) || normalizedWeekCount <= 0 || normalizedWeekCount > 104) {
       return res.status(400).json({ error: 'Total weeks across rows must be between 1 and 104' });
     }
@@ -747,7 +799,7 @@ router.put(
       return res.status(400).json({ error: 'rows must include valid stage, percent, and weeks values totaling 100%' });
     }
 
-    const normalizedWeekCount = normalizedRows.reduce((sum, row) => sum + row.weeks, 0);
+    const normalizedWeekCount = getTemplateWeekCount(normalizedRows);
     if (!Number.isInteger(normalizedWeekCount) || normalizedWeekCount <= 0 || normalizedWeekCount > 104) {
       return res.status(400).json({ error: 'Total weeks across rows must be between 1 and 104' });
     }

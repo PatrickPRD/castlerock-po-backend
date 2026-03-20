@@ -50,6 +50,93 @@ function normalizeDate(value) {
   return candidate;
 }
 
+function toTemplateKeyBase(name) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function normalizeTemplateHeader(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function getWorksheetHeaderMap(worksheet) {
+  const headerMap = new Map();
+  const headerRow = worksheet.getRow(1);
+
+  headerRow.eachCell((cell, columnNumber) => {
+    const normalized = normalizeTemplateHeader(cell.value);
+    if (normalized) {
+      headerMap.set(normalized, columnNumber);
+    }
+  });
+
+  return headerMap;
+}
+
+function findWorksheetColumn(headerMap, aliases, fallbackColumn) {
+  for (const alias of aliases) {
+    const columnNumber = headerMap.get(alias);
+    if (columnNumber) {
+      return columnNumber;
+    }
+  }
+
+  return fallbackColumn;
+}
+
+function readWorksheetValue(row, columnNumber) {
+  if (!columnNumber) return null;
+  const cell = row.getCell(columnNumber);
+  return cell ? cell.value : null;
+}
+
+function getTemplateWeekCount(rows) {
+  return rows.reduce((maxWeekCount, row) => {
+    const weekStart = Number(row.week_start || 0);
+    const durationWeeks = Number(row.duration_weeks || row.weeks || 0);
+    return Math.max(maxWeekCount, weekStart + durationWeeks);
+  }, 0);
+}
+
+function buildWeeklySpreadFromRows(rows) {
+  const totalWeeks = getTemplateWeekCount(rows);
+  const spread = Array.from({ length: totalWeeks }, () => 0);
+
+  rows.forEach((row) => {
+    const durationWeeks = Number(row.duration_weeks || row.weeks || 0);
+    const weekStart = Number(row.week_start || 0);
+    if (!durationWeeks || durationWeeks <= 0) return;
+
+    const evenWeekValue = Number((Number(row.percent || 0) / durationWeeks).toFixed(4));
+    for (let index = 0; index < durationWeeks; index += 1) {
+      const targetWeek = weekStart + index;
+      if (targetWeek >= 0 && targetWeek < spread.length) {
+        spread[targetWeek] = Number((spread[targetWeek] + evenWeekValue).toFixed(4));
+      }
+    }
+  });
+
+  const rounded = spread.map((value) => Number(value.toFixed(2)));
+  const roundedTotal = rounded.reduce((sum, value) => sum + value, 0);
+  const diff = Number((100 - roundedTotal).toFixed(2));
+
+  if (rounded.length > 0) {
+    let adjustIndex = rounded.length - 1;
+    while (adjustIndex > 0 && rounded[adjustIndex] === 0) {
+      adjustIndex -= 1;
+    }
+    rounded[adjustIndex] = Number((rounded[adjustIndex] + diff).toFixed(2));
+  }
+
+  return rounded;
+}
+
 /* ======================================================
    DOWNLOAD LOCATION BULK IMPORT TEMPLATE
    ====================================================== */
@@ -255,7 +342,7 @@ router.get(
       });
 
       // Add headers
-      const headers = ['Template Name', 'Stage', 'Percent', 'Weeks'];
+      const headers = ['Template Name', 'Stage', 'Percent', 'Start Week', 'Duration Weeks'];
       worksheet.columns = headers.map(h => ({ header: h, key: h.toLowerCase().replace(/ /g, '_'), width: 20 }));
 
       // Style headers
@@ -271,25 +358,28 @@ router.get(
         template_name: 'Standard Build 26 Week',
         stage: 'Sub-Structure',
         percent: 15,
-        weeks: 4
+        start_week: 0,
+        duration_weeks: 4
       });
       worksheet.addRow({
         template_name: 'Standard Build 26 Week',
         stage: 'Superstructure',
         percent: 45,
-        weeks: 10
+        start_week: 4,
+        duration_weeks: 10
       });
       worksheet.addRow({
         template_name: 'Standard Build 26 Week',
         stage: 'Finishes',
         percent: 40,
-        weeks: 12
+        start_week: 14,
+        duration_weeks: 12
       });
 
       // Add instructions
       const instructionRow = 6;
-      worksheet.mergeCells(`A${instructionRow}:D${instructionRow}`);
-      worksheet.getCell(`A${instructionRow}`).value = 'Instructions: Group rows by Template Name. Percent must total 100 per template. Weeks must be positive integers.';
+      worksheet.mergeCells(`A${instructionRow}:E${instructionRow}`);
+      worksheet.getCell(`A${instructionRow}`).value = 'Instructions: Group rows by Template Name. Percent must total 100 per template. Start Week must be 0 or greater. Duration Weeks must be positive integers. Legacy sheets using a Weeks column are still accepted.';
       worksheet.getCell(`A${instructionRow}`).font = { italic: true, color: { argb: 'FF7F7F7F' } };
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -326,16 +416,30 @@ router.post(
         return res.status(400).json({ error: 'No valid worksheet found in Excel file' });
       }
 
+      const headerMap = getWorksheetHeaderMap(worksheet);
+      const templateNameColumn = findWorksheetColumn(headerMap, ['template_name', 'template'], 1);
+      const stageColumn = findWorksheetColumn(headerMap, ['stage', 'stage_name'], 2);
+      const percentColumn = findWorksheetColumn(headerMap, ['percent', 'percentage'], 3);
+      const startWeekColumn = findWorksheetColumn(headerMap, ['start_week', 'week_start'], null);
+      const durationColumn = findWorksheetColumn(headerMap, ['duration_weeks', 'duration', 'weeks'], 4);
+
       const templateMap = new Map();
       const errors = [];
+      const templateRowCounts = new Map();
 
       worksheet.eachRow((row, index) => {
         if (index === 1) return; // Skip header
 
-        const templateName = String(row.getCell(1).value || '').trim();
-        const stage = String(row.getCell(2).value || '').trim();
-        const percent = toNullableNumber(row.getCell(3).value);
-        const weeks = toNullableNumber(row.getCell(4).value);
+        const templateName = String(readWorksheetValue(row, templateNameColumn) || '').trim();
+        const stage = String(readWorksheetValue(row, stageColumn) || '').trim();
+        const percent = toNullableNumber(readWorksheetValue(row, percentColumn));
+        const rawStartWeek = toNullableNumber(readWorksheetValue(row, startWeekColumn));
+        const rawDurationWeeks = toNullableNumber(readWorksheetValue(row, durationColumn));
+
+        const isBlankRow = !templateName && !stage && percent === null && rawStartWeek === null && rawDurationWeeks === null;
+        if (isBlankRow) {
+          return;
+        }
 
         if (!templateName) {
           errors.push(`Row ${index}: Template Name is required`);
@@ -353,20 +457,39 @@ router.post(
           errors.push(`Row ${index}: Percent must be between 0 and 100`);
           return;
         }
-        if (weeks === null || !Number.isInteger(weeks) || weeks <= 0) {
-          errors.push(`Row ${index}: Weeks must be a positive whole number`);
+
+        const durationWeeks = rawDurationWeeks;
+        if (durationWeeks === null || !Number.isInteger(durationWeeks) || durationWeeks <= 0) {
+          errors.push(`Row ${index}: Duration Weeks must be a positive whole number`);
+          return;
+        }
+
+        if (rawStartWeek !== null && (!Number.isInteger(rawStartWeek) || rawStartWeek < 0)) {
+          errors.push(`Row ${index}: Start Week must be a whole number from 0`);
           return;
         }
 
         if (!templateMap.has(templateName)) {
           templateMap.set(templateName, []);
+          templateRowCounts.set(templateName, 0);
         }
+
+        const currentSortOrder = templateRowCounts.get(templateName) || 0;
+        const rows = templateMap.get(templateName);
+        const previousRow = rows[rows.length - 1] || null;
+        const weekStart = rawStartWeek === null
+          ? (previousRow ? previousRow.week_start + previousRow.duration_weeks : 0)
+          : Number(rawStartWeek);
 
         templateMap.get(templateName).push({
           stage,
           percent: Number(percent),
-          weeks: Number(weeks)
+          weeks: Number(durationWeeks),
+          week_start: weekStart,
+          duration_weeks: Number(durationWeeks),
+          sort_order: currentSortOrder
         });
+        templateRowCounts.set(templateName, currentSortOrder + 1);
       });
 
       if (errors.length > 0) {
@@ -389,33 +512,6 @@ router.post(
         return res.status(400).json({ error: 'Template validation errors', details: errors });
       }
 
-      // Helper function to generate template key
-      function toTemplateKeyBase(name) {
-        return String(name || '')
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '_')
-          .replace(/^_+|_+$/g, '');
-      }
-
-      // Helper function to build weekly spread
-      function buildWeeklySpreadFromRows(rows) {
-        const spread = [];
-        rows.forEach((row) => {
-          const evenWeekValue = Number((row.percent / row.weeks).toFixed(4));
-          for (let index = 0; index < row.weeks; index += 1) {
-            spread.push(evenWeekValue);
-          }
-        });
-
-        const rounded = spread.map((value) => Number(value.toFixed(2)));
-        const roundedTotal = rounded.reduce((sum, value) => sum + value, 0);
-        const diff = Number((100 - roundedTotal).toFixed(2));
-        if (rounded.length > 0) {
-          rounded[rounded.length - 1] = Number((rounded[rounded.length - 1] + diff).toFixed(2));
-        }
-        return rounded;
-      }
-
       // Insert templates
       let inserted = 0;
       let skipped = 0;
@@ -436,7 +532,7 @@ router.post(
           templateKey = `${keyBase}_${suffix}`;
         }
 
-        const totalWeeks = rows.reduce((sum, r) => sum + r.weeks, 0);
+        const totalWeeks = getTemplateWeekCount(rows);
         const spreadJson = JSON.stringify(buildWeeklySpreadFromRows(rows));
         const rowsJson = JSON.stringify(rows);
 

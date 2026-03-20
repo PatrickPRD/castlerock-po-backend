@@ -40,12 +40,12 @@ const closeTemplateDraftModalBtn = document.getElementById('closeTemplateDraftMo
 const closeTemplateDraftCancelBtn = document.getElementById('closeTemplateDraftCancelBtn');
 const templateFormTitle = document.getElementById('templateFormTitle');
 const templateDraftName = document.getElementById('templateDraftName');
-const templateDraftStage = document.getElementById('templateDraftStage');
-const templateDraftPercent = document.getElementById('templateDraftPercent');
-const templateDraftWeeks = document.getElementById('templateDraftWeeks');
 const templateDraftAddRowBtn = document.getElementById('templateDraftAddRowBtn');
 const templateDraftRowsBody = document.getElementById('templateDraftRowsBody');
 const templateDraftTotals = document.getElementById('templateDraftTotals');
+const templateDraftRowsData = document.getElementById('templateDraftRowsData');
+const templateDraftChart = document.getElementById('templateDraftChart');
+const templateDraftStatus = document.getElementById('templateDraftStatus');
 const templateDraftSaveBtn = document.getElementById('templateDraftSaveBtn');
 const templateDraftCancelEditBtn = document.getElementById('templateDraftCancelEditBtn');
 const templateAccordionBody = document.getElementById('templateAccordionBody');
@@ -79,9 +79,10 @@ const expandedLocationIds = new Set();
 let editingLocationId = null;
 let wizardCurrentStep = 1;
 const wizardTotalSteps = 1;
-let templateDraftRows = [];
 let editingTemplateKey = null;
 const expandedTemplateKeys = new Set();
+let templateDraftDragState = null;
+let templateDraftReorderDragIndex = -1;
 let isLoadingSettings = false;
 let autoSaveTimer = null;
 let availableVatRates = [0, 13.5, 23];
@@ -298,7 +299,17 @@ function syncCapitalCostDateWithProjectStart() {
 async function loadAvailableLocationTypes() {
   try {
     const locationTypesData = await api('/cashflow/location-types');
-    availableLocationTypes = Array.isArray(locationTypesData) ? locationTypesData : [];
+    const rawTypes = Array.isArray(locationTypesData)
+      ? locationTypesData
+      : Array.isArray(locationTypesData?.location_types)
+        ? locationTypesData.location_types
+        : [];
+
+    availableLocationTypes = [...new Set(
+      rawTypes
+        .map((entry) => String(entry || '').trim())
+        .filter((entry) => entry.length > 0)
+    )].sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'base', numeric: true }));
   } catch (error) {
     console.error('Error loading available location types:', error);
     availableLocationTypes = [];
@@ -310,7 +321,12 @@ function renderTemplateTagSelector(selectedTypes = []) {
   if (!tagsContainer) return;
 
   const input = document.getElementById('templateDraftTypeInput');
-  const selectedSet = new Set(selectedTypes);
+  const normalizedSelectedTypes = [...new Set(
+    (Array.isArray(selectedTypes) ? selectedTypes : [])
+      .map((entry) => String(entry || '').trim())
+      .filter((entry) => entry.length > 0)
+  )];
+  const selectedSet = new Set(normalizedSelectedTypes);
 
   // Clear container but keep input
   const existingTags = tagsContainer.querySelectorAll('.template-type-tag');
@@ -326,8 +342,8 @@ function renderTemplateTagSelector(selectedTypes = []) {
     tag.style.whiteSpace = 'nowrap';
     tag.dataset.type = type; // Store the type value for later retrieval
     tag.innerHTML = `
-      ${type}
-      <button type="button" class="btn-close btn-close-white" style="width: 1rem; height: 1rem;" aria-label="Remove ${type}"></button>
+      ${escapeHtml(type)}
+      <button type="button" class="btn-close btn-close-white" style="width: 1rem; height: 1rem;" aria-label="Remove ${escapeHtml(type)}"></button>
     `;
     
     const removeBtn = tag.querySelector('.btn-close');
@@ -350,7 +366,7 @@ function attachTagInputHandlers(selectedSet = new Set()) {
   
   if (!input || !suggestionsDiv) return;
 
-  input.addEventListener('input', (e) => {
+  input.oninput = (e) => {
     const query = e.target.value.trim().toLowerCase();
     
     if (!query) {
@@ -359,8 +375,9 @@ function attachTagInputHandlers(selectedSet = new Set()) {
     }
     
     // Filter available types (exclude already selected)
+    const selectedLowerSet = new Set(Array.from(selectedSet).map((entry) => entry.toLowerCase()));
     const matches = availableLocationTypes.filter(type => 
-      type.toLowerCase().includes(query) && !selectedSet.has(type)
+      type.toLowerCase().includes(query) && !selectedLowerSet.has(type.toLowerCase())
     );
     
     if (matches.length === 0) {
@@ -371,7 +388,7 @@ function attachTagInputHandlers(selectedSet = new Set()) {
     // Show suggestions
     suggestionsDiv.innerHTML = matches.map(type => `
       <div class="suggestion-item p-2 border-bottom" style="cursor: pointer;">
-        ${type}
+        ${escapeHtml(type)}
       </div>
     `).join('');
     suggestionsDiv.style.display = 'block';
@@ -386,10 +403,10 @@ function attachTagInputHandlers(selectedSet = new Set()) {
         renderTemplateTagSelector(Array.from(selectedSet));
       });
     });
-  });
+  };
   
   // Add on Enter key
-  input.addEventListener('keydown', (e) => {
+  input.onkeydown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       const query = e.target.value.trim().toLowerCase();
@@ -403,12 +420,12 @@ function attachTagInputHandlers(selectedSet = new Set()) {
         renderTemplateTagSelector(Array.from(selectedSet));
       }
     }
-  });
+  };
   
   // Close suggestions on blur
-  input.addEventListener('blur', () => {
+  input.onblur = () => {
     setTimeout(() => suggestionsDiv.style.display = 'none', 150);
-  });
+  };
 }
 
 function getSelectedTemplateLocationTypes() {
@@ -1264,145 +1281,629 @@ function setTemplateDraftMode(editMode) {
   }
 }
 
+function setTemplateDraftStatus(message, isError = false) {
+  if (!templateDraftStatus) {
+    setStatus(message, isError);
+    return;
+  }
+
+  templateDraftStatus.textContent = message || '';
+  templateDraftStatus.classList.toggle('text-danger', !!isError);
+  templateDraftStatus.classList.toggle('text-muted', !isError);
+}
+
+function normalizeTemplateDraftRows(rows) {
+  if (!Array.isArray(rows)) return [];
+
+  const normalized = [];
+  let nextSequentialWeek = 0;
+
+  rows.forEach((row, index) => {
+    const stage = String(row?.stage ?? row?.stageName ?? row?.stage_name ?? '').trim();
+    const percent = parseNumber(row?.percent);
+    const durationRaw = row?.durationWeeks ?? row?.duration_weeks ?? row?.weeks;
+    const durationWeeks = parseNumber(durationRaw);
+    const explicitWeekStart = row?.weekStart ?? row?.week_start;
+    const parsedWeekStart = explicitWeekStart === '' || explicitWeekStart === null || explicitWeekStart === undefined
+      ? nextSequentialWeek
+      : parseNumber(explicitWeekStart);
+    const parsedSortOrder = parseNumber(row?.sortOrder ?? row?.sort_order ?? index);
+
+    if (!stage) return;
+    if (percent === null || Number.isNaN(percent) || percent < 0 || percent > 100) return;
+    if (parsedWeekStart === null || Number.isNaN(parsedWeekStart) || !Number.isInteger(parsedWeekStart) || parsedWeekStart < 0) return;
+    if (durationWeeks === null || Number.isNaN(durationWeeks) || !Number.isInteger(durationWeeks) || durationWeeks <= 0) return;
+
+    normalized.push({
+      stage,
+      percent: Number(percent.toFixed(2)),
+      weekStart: parsedWeekStart,
+      durationWeeks,
+      sortOrder: parsedSortOrder === null || Number.isNaN(parsedSortOrder) ? index : parsedSortOrder
+    });
+
+    nextSequentialWeek = Math.max(nextSequentialWeek, parsedWeekStart + durationWeeks);
+  });
+
+  normalized.sort((left, right) => {
+    if (left.sortOrder !== right.sortOrder) return left.sortOrder - right.sortOrder;
+    if (left.weekStart !== right.weekStart) return left.weekStart - right.weekStart;
+    return String(left.stage).localeCompare(String(right.stage), undefined, { sensitivity: 'base', numeric: true });
+  });
+
+  return normalized.map((row, index) => ({
+    ...row,
+    sortOrder: index
+  }));
+}
+
+function getTemplateDraftRows() {
+  return [...document.querySelectorAll('#templateDraftRowsBody .programme-stage-row')];
+}
+
+function getTemplateDraftDurationWeeks(rows) {
+  return rows.reduce((maxWeeks, row) => Math.max(maxWeeks, Number(row.weekStart) + Number(row.durationWeeks)), 0);
+}
+
+function getTemplateDraftPercentTotal(rows) {
+  return Number(rows.reduce((sum, row) => sum + Number(row.percent || 0), 0).toFixed(2));
+}
+
+function getTemplateDraftSummaryLabel(rows) {
+  if (!rows.length) return 'No programme set';
+  const totalPercent = getTemplateDraftPercentTotal(rows);
+  const totalWeeks = getTemplateDraftDurationWeeks(rows);
+  return `${rows.length} stage${rows.length === 1 ? '' : 's'} / ${totalWeeks} week${totalWeeks === 1 ? '' : 's'} / ${totalPercent}%`;
+}
+
+function clearTemplateDraftDropIndicators() {
+  document.querySelectorAll('.programme-stage-row, .programme-chart-stage-label').forEach((element) => {
+    element.classList.remove('is-drop-before', 'is-drop-after');
+    delete element.dataset.dropPosition;
+  });
+}
+
+function setTemplateDraftDropIndicator(element, dropPosition) {
+  if (!element) return;
+  element.classList.remove('is-drop-before', 'is-drop-after');
+  element.classList.add(dropPosition === 'after' ? 'is-drop-after' : 'is-drop-before');
+  element.dataset.dropPosition = dropPosition;
+}
+
+function updateTemplateDraftRowFinish(row) {
+  if (!row) return;
+  const weekStartInput = row.querySelector('.js-template-week-start');
+  const durationInput = row.querySelector('.js-template-duration');
+  const finishLabel = row.querySelector('.js-template-finish');
+  if (!weekStartInput || !durationInput || !finishLabel) return;
+
+  const weekStart = parseNumber(weekStartInput.value);
+  const durationWeeks = parseNumber(durationInput.value);
+  if (
+    weekStart === null ||
+    Number.isNaN(weekStart) ||
+    !Number.isInteger(weekStart) ||
+    weekStart < 0 ||
+    durationWeeks === null ||
+    Number.isNaN(durationWeeks) ||
+    !Number.isInteger(durationWeeks) ||
+    durationWeeks <= 0
+  ) {
+    finishLabel.textContent = '—';
+    return;
+  }
+
+  finishLabel.textContent = `W${weekStart} to W${weekStart + durationWeeks - 1}`;
+}
+
+function readTemplateDraftRows(strict = false) {
+  const rows = getTemplateDraftRows();
+  const parsedRows = [];
+  const seenStageNames = new Set();
+
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    const stageInput = row.querySelector('.js-template-stage-name');
+    const percentInput = row.querySelector('.js-template-percent');
+    const weekStartInput = row.querySelector('.js-template-week-start');
+    const durationInput = row.querySelector('.js-template-duration');
+
+    const stage = String(stageInput?.value || '').trim();
+    const percentRaw = String(percentInput?.value || '').trim();
+    const weekStartRaw = String(weekStartInput?.value || '').trim();
+    const durationRaw = String(durationInput?.value || '').trim();
+    const isBlank = !stage && !percentRaw && !weekStartRaw && !durationRaw;
+
+    if (isBlank) continue;
+
+    const percent = parseNumber(percentRaw);
+    const weekStart = parseNumber(weekStartRaw);
+    const durationWeeks = parseNumber(durationRaw);
+
+    const fail = (message, input) => {
+      if (strict) {
+        setTemplateDraftStatus(message, true);
+        input?.focus();
+        input?.select?.();
+        return null;
+      }
+      return undefined;
+    };
+
+    if (!stage) {
+      if (strict) return fail('Each stage needs a name.', stageInput);
+      continue;
+    }
+    if (percent === null || Number.isNaN(percent) || percent < 0 || percent > 100) {
+      if (strict) return fail(`Percent for "${stage}" must be between 0 and 100.`, percentInput);
+      continue;
+    }
+    if (weekStart === null || Number.isNaN(weekStart) || !Number.isInteger(weekStart) || weekStart < 0) {
+      if (strict) return fail(`Start week for "${stage}" must be a whole number from 0.`, weekStartInput);
+      continue;
+    }
+    if (durationWeeks === null || Number.isNaN(durationWeeks) || !Number.isInteger(durationWeeks) || durationWeeks <= 0) {
+      if (strict) return fail(`Duration for "${stage}" must be a positive whole number.`, durationInput);
+      continue;
+    }
+
+    const duplicateKey = stage.toLowerCase();
+    if (seenStageNames.has(duplicateKey)) {
+      if (strict) return fail(`Stage names must be unique. Duplicate found: "${stage}".`, stageInput);
+      continue;
+    }
+    seenStageNames.add(duplicateKey);
+
+    parsedRows.push({
+      stage,
+      percent: Number(percent.toFixed(2)),
+      weekStart,
+      durationWeeks,
+      sortOrder: parsedRows.length
+    });
+  }
+
+  if (strict && !parsedRows.length) {
+    setTemplateDraftStatus('Add at least one stage to the template.', true);
+    return null;
+  }
+
+  return parsedRows;
+}
+
+function createTemplateDraftRow(stage = {}) {
+  const row = document.createElement('tr');
+  row.className = 'programme-stage-row';
+  row.draggable = true;
+  row.innerHTML = `
+    <td class="programme-drag-cell text-center">
+      <button type="button" class="btn btn-sm btn-light border js-template-row-drag-handle" aria-label="Reorder stage">⋮⋮</button>
+    </td>
+    <td>
+      <input type="text" class="form-control form-control-sm js-template-stage-name" maxlength="120" placeholder="e.g. Sub-Structure" value="${escapeHtml(stage.stage || '')}" />
+    </td>
+    <td>
+      <input type="number" class="form-control form-control-sm js-template-percent" min="0" max="100" step="0.01" value="${stage.percent ?? 0}" />
+    </td>
+    <td>
+      <input type="number" class="form-control form-control-sm js-template-week-start" min="0" step="1" value="${stage.weekStart ?? 0}" />
+    </td>
+    <td>
+      <input type="number" class="form-control form-control-sm js-template-duration" min="1" max="104" step="1" value="${stage.durationWeeks ?? 1}" />
+    </td>
+    <td>
+      <span class="badge text-bg-light border js-template-finish">—</span>
+    </td>
+    <td>
+      <button type="button" class="btn btn-sm btn-outline-danger js-remove-template-row">Remove</button>
+    </td>
+  `;
+
+  row.querySelectorAll('input').forEach((input) => {
+    input.addEventListener('input', () => {
+      updateTemplateDraftRowFinish(row);
+      setTemplateDraftStatus('');
+      renderTemplateDraftPreview();
+    });
+  });
+
+  row.querySelector('.js-remove-template-row')?.addEventListener('click', () => {
+    row.remove();
+    if (!getTemplateDraftRows().length) {
+      renderTemplateDraftRows([]);
+      return;
+    }
+    renderTemplateDraftPreview();
+  });
+
+  row.addEventListener('dragstart', (event) => {
+    templateDraftReorderDragIndex = getTemplateDraftRows().indexOf(row);
+    row.classList.add('is-dragging');
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', String(templateDraftReorderDragIndex));
+    }
+  });
+
+  row.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    const rect = row.getBoundingClientRect();
+    const dropPosition = event.clientY >= rect.top + (rect.height / 2) ? 'after' : 'before';
+    setTemplateDraftDropIndicator(row, dropPosition);
+  });
+
+  row.addEventListener('dragleave', () => {
+    row.classList.remove('is-drop-before', 'is-drop-after');
+    delete row.dataset.dropPosition;
+  });
+
+  row.addEventListener('drop', (event) => {
+    event.preventDefault();
+    const targetIndex = getTemplateDraftRows().indexOf(row);
+    reorderTemplateDraftRows(templateDraftReorderDragIndex, targetIndex, row.dataset.dropPosition || 'before');
+  });
+
+  row.addEventListener('dragend', () => {
+    templateDraftReorderDragIndex = -1;
+    clearTemplateDraftDropIndicators();
+    row.classList.remove('is-dragging');
+  });
+
+  updateTemplateDraftRowFinish(row);
+  return row;
+}
+
+function renderTemplateDraftRows(stages) {
+  if (!templateDraftRowsBody) return;
+
+  const normalizedStages = normalizeTemplateDraftRows(stages);
+  templateDraftRowsBody.innerHTML = '';
+
+  if (!normalizedStages.length) {
+    templateDraftRowsBody.innerHTML = `
+      <tr>
+        <td colspan="7" class="text-muted text-center py-3">Add a stage to start building this template.</td>
+      </tr>
+    `;
+    renderTemplateDraftPreview();
+    return;
+  }
+
+  normalizedStages.forEach((stage) => {
+    templateDraftRowsBody.appendChild(createTemplateDraftRow(stage));
+  });
+
+  renderTemplateDraftPreview();
+}
+
+function resetTemplateDraftRows(stages) {
+  renderTemplateDraftRows(stages || []);
+}
+
+function getDefaultTemplateDraftStage() {
+  const stages = readTemplateDraftRows(false) || [];
+  const totalWeeks = getTemplateDraftDurationWeeks(stages);
+  return {
+    stage: `Stage ${stages.length + 1}`,
+    percent: 0,
+    weekStart: totalWeeks,
+    durationWeeks: 1,
+    sortOrder: stages.length
+  };
+}
+
+function reorderTemplateDraftRows(fromIndex, toIndex, dropPosition = 'before') {
+  const rows = getTemplateDraftRows();
+  if (
+    !Number.isInteger(fromIndex) ||
+    !Number.isInteger(toIndex) ||
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= rows.length ||
+    toIndex >= rows.length
+  ) {
+    clearTemplateDraftDropIndicators();
+    return;
+  }
+
+  const movingRow = rows[fromIndex];
+  const targetRow = rows[toIndex];
+  if (!movingRow || !targetRow || movingRow === targetRow) {
+    clearTemplateDraftDropIndicators();
+    return;
+  }
+
+  const insertAfter = dropPosition === 'after';
+  const referenceNode = insertAfter ? targetRow.nextSibling : targetRow;
+  templateDraftRowsBody.insertBefore(movingRow, referenceNode);
+  clearTemplateDraftDropIndicators();
+  renderTemplateDraftPreview();
+}
+
+function enableTemplateDraftInlineRename(stageIndex) {
+  const rows = getTemplateDraftRows();
+  const row = rows[stageIndex];
+  const stageInput = row?.querySelector('.js-template-stage-name');
+  if (!stageInput) return;
+  stageInput.focus();
+  stageInput.select();
+}
+
+function buildTemplateDraftChartHtml(stages) {
+  if (!Array.isArray(stages) || !stages.length) {
+    return '<div class="programme-chart-empty-state">Add a stage to build the template timeline.</div>';
+  }
+
+  const totalWeeks = Math.max(getTemplateDraftDurationWeeks(stages), 1);
+  const weekHeaders = Array.from({ length: totalWeeks }, (_, weekIndex) => `
+    <div class="programme-chart-header">W${weekIndex}</div>
+  `).join('');
+
+  const stageRows = stages.map((stage, index) => {
+    const finishWeek = stage.weekStart + stage.durationWeeks - 1;
+    return `
+      <div class="programme-chart-stage-label" data-stage-index="${index}">
+        <button type="button" class="btn btn-sm btn-light border js-template-chart-reorder" data-stage-index="${index}" draggable="true" aria-label="Reorder stage">⋮⋮</button>
+        <button type="button" class="programme-chart-stage-name js-template-stage-name-display" data-stage-index="${index}">${escapeHtml(stage.stage)}</button>
+        <span class="badge rounded-pill text-bg-light border">${stage.percent}%</span>
+        <button type="button" class="btn btn-sm btn-link text-danger text-decoration-none js-template-chart-delete" data-stage-index="${index}" aria-label="Remove ${escapeHtml(stage.stage)}">✕</button>
+      </div>
+      <div class="programme-chart-track" data-stage-index="${index}">
+        <div class="programme-chart-bar programme-chart-bar-interactive js-template-chart-bar" data-stage-index="${index}" style="grid-column: ${stage.weekStart + 1} / span ${stage.durationWeeks};">
+          <span>${escapeHtml(stage.stage)}</span>
+          <small>${stage.percent}% · W${stage.weekStart} to W${finishWeek}</small>
+          <span class="programme-chart-handle programme-chart-handle-start js-template-chart-handle-start" data-stage-index="${index}"></span>
+          <span class="programme-chart-handle programme-chart-handle-end js-template-chart-handle-end" data-stage-index="${index}"></span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="programme-chart-grid" style="--programme-weeks: ${totalWeeks};">
+      <div class="programme-chart-spacer"></div>
+      ${weekHeaders}
+      ${stageRows}
+    </div>
+  `;
+}
+
+function renderTemplateDraftPreview() {
+  const stages = readTemplateDraftRows(false) || [];
+  const totalPercent = getTemplateDraftPercentTotal(stages);
+  const hasPercentError = stages.length > 0 && Math.abs(totalPercent - 100) > 0.05;
+
+  if (templateDraftTotals) {
+    templateDraftTotals.textContent = getTemplateDraftSummaryLabel(stages);
+    templateDraftTotals.classList.toggle('text-danger', hasPercentError);
+    templateDraftTotals.classList.toggle('text-muted', !hasPercentError);
+  }
+
+  if (templateDraftRowsData) {
+    templateDraftRowsData.value = JSON.stringify(stages);
+  }
+
+  if (templateDraftChart) {
+    templateDraftChart.innerHTML = buildTemplateDraftChartHtml(stages);
+    templateDraftChart.classList.toggle('programme-chart-empty-state', !stages.length);
+  }
+
+  templateDraftChart?.querySelectorAll('.js-template-chart-delete').forEach((button) => {
+    button.addEventListener('click', () => {
+      const stageIndex = Number(button.dataset.stageIndex);
+      const row = getTemplateDraftRows()[stageIndex];
+      row?.remove();
+      if (!getTemplateDraftRows().length) {
+        renderTemplateDraftRows([]);
+        return;
+      }
+      renderTemplateDraftPreview();
+    });
+  });
+
+  templateDraftChart?.querySelectorAll('.js-template-stage-name-display').forEach((button) => {
+    button.addEventListener('click', () => {
+      enableTemplateDraftInlineRename(Number(button.dataset.stageIndex));
+    });
+  });
+
+  templateDraftChart?.querySelectorAll('.js-template-chart-bar').forEach((barElement) => {
+    barElement.addEventListener('pointerdown', (event) => {
+      if (event.target.closest('.programme-chart-handle')) return;
+      startTemplateDraftDrag(event, 'move', Number(barElement.dataset.stageIndex), barElement);
+    });
+  });
+
+  templateDraftChart?.querySelectorAll('.js-template-chart-handle-start').forEach((handleElement) => {
+    handleElement.addEventListener('pointerdown', (event) => {
+      event.stopPropagation();
+      startTemplateDraftDrag(event, 'resize-start', Number(handleElement.dataset.stageIndex), handleElement.closest('.js-template-chart-bar'));
+    });
+  });
+
+  templateDraftChart?.querySelectorAll('.js-template-chart-handle-end').forEach((handleElement) => {
+    handleElement.addEventListener('pointerdown', (event) => {
+      event.stopPropagation();
+      startTemplateDraftDrag(event, 'resize-end', Number(handleElement.dataset.stageIndex), handleElement.closest('.js-template-chart-bar'));
+    });
+  });
+
+  templateDraftChart?.querySelectorAll('.js-template-chart-reorder').forEach((handleElement) => {
+    const labelElement = handleElement.closest('.programme-chart-stage-label');
+    handleElement.addEventListener('dragstart', (event) => {
+      templateDraftReorderDragIndex = Number(handleElement.dataset.stageIndex);
+      labelElement?.classList.add('is-dragging');
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', String(templateDraftReorderDragIndex));
+      }
+    });
+    handleElement.addEventListener('dragend', () => {
+      templateDraftReorderDragIndex = -1;
+      clearTemplateDraftDropIndicators();
+      labelElement?.classList.remove('is-dragging');
+    });
+  });
+
+  templateDraftChart?.querySelectorAll('.programme-chart-stage-label').forEach((labelElement) => {
+    labelElement.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      const rect = labelElement.getBoundingClientRect();
+      const dropPosition = event.clientY >= rect.top + (rect.height / 2) ? 'after' : 'before';
+      setTemplateDraftDropIndicator(labelElement, dropPosition);
+    });
+    labelElement.addEventListener('dragleave', () => {
+      labelElement.classList.remove('is-drop-before', 'is-drop-after');
+      delete labelElement.dataset.dropPosition;
+    });
+    labelElement.addEventListener('drop', (event) => {
+      event.preventDefault();
+      reorderTemplateDraftRows(templateDraftReorderDragIndex, Number(labelElement.dataset.stageIndex), labelElement.dataset.dropPosition || 'before');
+    });
+  });
+
+  if (stages.length && hasPercentError) {
+    setTemplateDraftStatus('Stage percentages must total 100% before you can save.', true);
+  } else if (!templateDraftStatus?.classList.contains('text-danger')) {
+    setTemplateDraftStatus('');
+  }
+}
+
+function startTemplateDraftDrag(event, type, stageIndex, barElement) {
+  const stages = readTemplateDraftRows(false) || [];
+  const stage = stages[stageIndex];
+  const trackElement = barElement?.closest('.programme-chart-track');
+  if (!stage || !trackElement) return;
+
+  const totalWeeks = Math.max(getTemplateDraftDurationWeeks(stages), stage.weekStart + stage.durationWeeks + 8, 1);
+  const pointerWeek = getTemplateDraftWeekFromPointer(trackElement, event.clientX, totalWeeks);
+
+  templateDraftDragState = {
+    type,
+    stageIndex,
+    totalWeeks,
+    trackElement,
+    initialWeekStart: stage.weekStart,
+    initialDurationWeeks: stage.durationWeeks,
+    pointerOffsetWeeks: Math.max(0, pointerWeek - stage.weekStart)
+  };
+
+  document.body.classList.add('programme-chart-dragging');
+  event.preventDefault();
+}
+
+function getTemplateDraftWeekFromPointer(trackElement, clientX, totalWeeks) {
+  const rect = trackElement.getBoundingClientRect();
+  if (rect.width <= 0 || totalWeeks <= 0) return 0;
+  const cellWidth = rect.width / totalWeeks;
+  const rawWeek = Math.floor((clientX - rect.left) / cellWidth);
+  return Math.max(0, Math.min(totalWeeks - 1, rawWeek));
+}
+
+function syncTemplateDraftRowFromDrag(stageIndex, nextWeekStart, nextDurationWeeks) {
+  const row = getTemplateDraftRows()[stageIndex];
+  if (!row) return;
+
+  const weekStartInput = row.querySelector('.js-template-week-start');
+  const durationInput = row.querySelector('.js-template-duration');
+  if (!weekStartInput || !durationInput) return;
+
+  weekStartInput.value = String(nextWeekStart);
+  durationInput.value = String(nextDurationWeeks);
+  updateTemplateDraftRowFinish(row);
+  renderTemplateDraftPreview();
+
+  if (templateDraftDragState) {
+    templateDraftDragState.trackElement = templateDraftChart?.querySelector(`.programme-chart-track[data-stage-index="${stageIndex}"]`) || null;
+  }
+}
+
+function handleTemplateDraftPointerMove(event) {
+  if (!templateDraftDragState || !templateDraftDragState.trackElement) return;
+
+  const hoveredWeek = getTemplateDraftWeekFromPointer(
+    templateDraftDragState.trackElement,
+    event.clientX,
+    templateDraftDragState.totalWeeks
+  );
+
+  const initialEndWeek = templateDraftDragState.initialWeekStart + templateDraftDragState.initialDurationWeeks - 1;
+  let nextWeekStart = templateDraftDragState.initialWeekStart;
+  let nextDurationWeeks = templateDraftDragState.initialDurationWeeks;
+
+  if (templateDraftDragState.type === 'move') {
+    const maxStart = Math.max(0, templateDraftDragState.totalWeeks - templateDraftDragState.initialDurationWeeks);
+    nextWeekStart = Math.max(0, Math.min(maxStart, hoveredWeek - templateDraftDragState.pointerOffsetWeeks));
+  } else if (templateDraftDragState.type === 'resize-end') {
+    nextDurationWeeks = Math.max(1, (hoveredWeek - templateDraftDragState.initialWeekStart) + 1);
+  } else if (templateDraftDragState.type === 'resize-start') {
+    nextWeekStart = Math.max(0, Math.min(hoveredWeek, initialEndWeek));
+    nextDurationWeeks = Math.max(1, (initialEndWeek - nextWeekStart) + 1);
+  }
+
+  syncTemplateDraftRowFromDrag(templateDraftDragState.stageIndex, nextWeekStart, nextDurationWeeks);
+}
+
+function stopTemplateDraftPointerDrag() {
+  if (!templateDraftDragState) return;
+  templateDraftDragState = null;
+  document.body.classList.remove('programme-chart-dragging');
+}
+
 function resetTemplateDraftForm() {
   editingTemplateKey = null;
-  templateDraftRows = [];
   if (templateDraftName) templateDraftName.value = '';
-  if (templateDraftStage) templateDraftStage.value = '';
-  if (templateDraftPercent) templateDraftPercent.value = '';
-  if (templateDraftWeeks) templateDraftWeeks.value = '';
   setTemplateDraftMode(false);
-  renderTemplateDraftRows();
+  setTemplateDraftStatus('');
+  resetTemplateDraftRows([]);
 }
 
 async function openTemplateDraftModal() {
   if (templateDraftModal) {
     templateDraftModal.style.display = 'flex';
   }
+  templateDraftName?.focus();
 }
 
 function closeTemplateDraftModal() {
   if (templateDraftModal) {
     templateDraftModal.style.display = 'none';
   }
+  stopTemplateDraftPointerDrag();
   resetTemplateDraftForm();
 }
 
-function updateTemplateDraftTotals() {
-  const totalPercent = Number(templateDraftRows.reduce((sum, row) => sum + (Number(row.percent) || 0), 0).toFixed(2));
-  const totalWeeks = Number(templateDraftRows.reduce((sum, row) => sum + (Number(row.weeks) || 0), 0));
-  if (templateDraftTotals) {
-    templateDraftTotals.textContent = `Total: ${totalPercent}% | ${totalWeeks} weeks`;
-    templateDraftTotals.classList.toggle('text-danger', Math.abs(totalPercent - 100) > 0.05);
-    templateDraftTotals.classList.toggle('text-muted', Math.abs(totalPercent - 100) <= 0.05);
-  }
-}
-
-function renderTemplateDraftRows() {
-  if (!templateDraftRowsBody) return;
-
-  if (!templateDraftRows.length) {
-    templateDraftRowsBody.innerHTML = `
-      <tr>
-        <td colspan="4" class="text-muted text-center py-3">No rows added yet.</td>
-      </tr>
-    `;
-    updateTemplateDraftTotals();
-    return;
+function buildTemplateAccordionGanttHtml(stages) {
+  if (!Array.isArray(stages) || !stages.length) {
+    return '<div class="programme-chart-empty-state">No stages available for this template.</div>';
   }
 
-  templateDraftRowsBody.innerHTML = templateDraftRows
-    .map((row, index) => `
-      <tr>
-        <td class="editable-cell" data-index="${index}" data-field="stage" style="cursor: pointer; user-select: none;" title="Click to edit">${row.stage}</td>
-        <td class="editable-cell" data-index="${index}" data-field="percent" style="cursor: pointer; user-select: none;" title="Click to edit">${row.percent}</td>
-        <td class="editable-cell" data-index="${index}" data-field="weeks" style="cursor: pointer; user-select: none;" title="Click to edit">${row.weeks}</td>
-        <td>
-          <div class="d-flex gap-1">
-            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="moveTemplateDraftRowUp(${index})" ${index === 0 ? 'disabled' : ''}>↑</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="moveTemplateDraftRowDown(${index})" ${index === templateDraftRows.length - 1 ? 'disabled' : ''}>↓</button>
-            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeTemplateDraftRow(${index})">Remove</button>
-          </div>
-        </td>
-      </tr>
-    `)
-    .join('');
+  const totalWeeks = Math.max(getTemplateDraftDurationWeeks(stages), 1);
+  const weekHeaders = Array.from({ length: totalWeeks }, (_, weekIndex) => `
+    <div class="programme-chart-header">W${weekIndex}</div>
+  `).join('');
 
-  // Attach click handlers to editable cells
-  attachEditableCellHandlers();
-  updateTemplateDraftTotals();
-}
+  const rowsHtml = stages.map((stage) => `
+    <div class="programme-chart-stage-label">
+      <span class="fw-semibold text-truncate">${escapeHtml(stage.stage)}</span>
+      <span class="badge rounded-pill text-bg-light border">${stage.percent}%</span>
+    </div>
+    <div class="programme-chart-track">
+      <div class="programme-chart-bar" style="grid-column: ${stage.weekStart + 1} / span ${stage.durationWeeks};">
+        <span>${stage.durationWeeks}</span>
+      </div>
+    </div>
+  `).join('');
 
-function attachEditableCellHandlers() {
-  const cells = document.querySelectorAll('.editable-cell');
-  cells.forEach(cell => {
-    cell.addEventListener('click', (e) => {
-      if (cell.querySelector('input')) return; // Already editing
-      
-      const index = parseInt(cell.dataset.index);
-      const field = cell.dataset.field;
-      const currentValue = templateDraftRows[index][field];
-      
-      const input = document.createElement('input');
-      input.type = field === 'stage' ? 'text' : 'number';
-      if (field !== 'stage') input.min = field === 'weeks' ? '1' : '0';
-      if (field === 'percent') {
-        input.max = '100';
-        input.step = '0.01';
-      } else if (field === 'weeks') {
-        input.step = '1';
-      }
-      input.value = currentValue;
-      input.className = 'form-control form-control-sm';
-      input.style.width = '100%';
-      
-      cell.textContent = '';
-      cell.appendChild(input);
-      input.focus();
-      input.select();
-      
-      const saveEdit = () => {
-        let newValue = input.value.trim();
-        if (!newValue) {
-          cell.textContent = currentValue;
-          return;
-        }
-        
-        if (field === 'stage') {
-          templateDraftRows[index].stage = newValue;
-        } else {
-          const numValue = parseFloat(newValue);
-          if (isNaN(numValue) || (field === 'weeks' && !Number.isInteger(numValue))) {
-            cell.textContent = currentValue;
-            return;
-          }
-          if (field === 'percent' && (numValue < 0 || numValue > 100)) {
-            cell.textContent = currentValue;
-            setStatus('Percent must be between 0 and 100', true);
-            return;
-          }
-          if (field === 'weeks' && numValue <= 0) {
-            cell.textContent = currentValue;
-            setStatus('Weeks must be greater than 0', true);
-            return;
-          }
-          templateDraftRows[index][field] = numValue;
-        }
-        
-        cell.textContent = templateDraftRows[index][field];
-        updateTemplateDraftTotals();
-      };
-      
-      input.addEventListener('blur', saveEdit);
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          saveEdit();
-        } else if (e.key === 'Escape') {
-          cell.textContent = currentValue;
-        }
-      });
-    });
-  });
+  return `
+    <div class="programme-chart programme-chart-readonly">
+      <div class="programme-chart-grid" style="--programme-weeks: ${totalWeeks};">
+        <div class="programme-chart-spacer"></div>
+        ${weekHeaders}
+        ${rowsHtml}
+      </div>
+    </div>
+  `;
 }
 
 function renderTemplateAccordion() {
@@ -1419,11 +1920,10 @@ function renderTemplateAccordion() {
 
   templateAccordionBody.innerHTML = cashflowTemplates
     .map((template) => {
-      const percentTotal = Number((template.rows || []).reduce((sum, row) => sum + (Number(row.percent) || 0), 0).toFixed(2));
+      const normalizedRows = normalizeTemplateDraftRows(template.rows || []);
+      const percentTotal = getTemplateDraftPercentTotal(normalizedRows);
       const isExpanded = expandedTemplateKeys.has(template.key);
-      const rowsHtml = (template.rows || [])
-        .map((row) => `<tr><td>${row.stage}</td><td>${row.percent}</td><td>${row.weeks}</td></tr>`)
-        .join('') || '<tr><td colspan="3" class="text-muted text-center">No rows</td></tr>';
+      const ganttHtml = buildTemplateAccordionGanttHtml(normalizedRows);
 
       return `
         <tr>
@@ -1444,15 +1944,8 @@ function renderTemplateAccordion() {
         <tr style="display:${isExpanded ? 'table-row' : 'none'};">
           <td colspan="5">
             <div class="p-2 border rounded bg-white">
-              <div class="fw-semibold mb-2">Template Rows</div>
-              <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                  <thead>
-                    <tr><th>Stage</th><th>Percent</th><th>Weeks</th></tr>
-                  </thead>
-                  <tbody>${rowsHtml}</tbody>
-                </table>
-              </div>
+              <div class="fw-semibold mb-2">Template Gantt</div>
+              ${ganttHtml}
             </div>
           </td>
         </tr>
@@ -1462,114 +1955,55 @@ function renderTemplateAccordion() {
 }
 
 function addTemplateDraftRow() {
-  const stage = String(templateDraftStage?.value || '').trim();
-  const percent = parseNumber(templateDraftPercent?.value);
-  const weeks = parseNumber(templateDraftWeeks?.value);
-
-  if (!stage) {
-    setStatus('Stage is required', true);
-    return;
+  const existingRows = getTemplateDraftRows();
+  if (existingRows.length === 1) {
+    const stageInput = existingRows[0].querySelector('.js-template-stage-name');
+    const percentInput = existingRows[0].querySelector('.js-template-percent');
+    const weekStartInput = existingRows[0].querySelector('.js-template-week-start');
+    const durationInput = existingRows[0].querySelector('.js-template-duration');
+    if (
+      stageInput &&
+      percentInput &&
+      weekStartInput &&
+      durationInput &&
+      !String(stageInput.value || '').trim() &&
+      !String(percentInput.value || '').trim() &&
+      !String(weekStartInput.value || '').trim() &&
+      !String(durationInput.value || '').trim()
+    ) {
+      const defaultStage = getDefaultTemplateDraftStage();
+      stageInput.value = defaultStage.stage;
+      percentInput.value = String(defaultStage.percent);
+      weekStartInput.value = String(defaultStage.weekStart);
+      durationInput.value = String(defaultStage.durationWeeks);
+      updateTemplateDraftRowFinish(existingRows[0]);
+      renderTemplateDraftPreview();
+      stageInput.focus();
+      stageInput.select();
+      return;
+    }
   }
-  if (percent === null || Number.isNaN(percent) || percent < 0) {
-    setStatus('Percent must be a valid non-negative number', true);
-    return;
-  }
-  if (weeks === null || Number.isNaN(weeks) || !Number.isInteger(weeks) || weeks <= 0) {
-    setStatus('Weeks must be a positive whole number', true);
-    return;
+
+  if (!templateDraftRowsBody) return;
+  if (templateDraftRowsBody.querySelector('td[colspan="7"]')) {
+    templateDraftRowsBody.innerHTML = '';
   }
 
-  templateDraftRows.push({ stage, percent, weeks });
-  renderTemplateDraftRows();
-
-  if (templateDraftStage) templateDraftStage.value = '';
-  if (templateDraftPercent) templateDraftPercent.value = '';
-  if (templateDraftWeeks) templateDraftWeeks.value = '';
-  setStatus('');
-}
-
-function removeTemplateDraftRow(index) {
-  templateDraftRows = templateDraftRows.filter((_, rowIndex) => rowIndex !== Number(index));
-  renderTemplateDraftRows();
-}
-
-function moveTemplateDraftRowUp(index) {
-  const rowIndex = Number(index);
-  if (!Number.isInteger(rowIndex) || rowIndex <= 0 || rowIndex >= templateDraftRows.length) return;
-
-  const reordered = [...templateDraftRows];
-  const [current] = reordered.splice(rowIndex, 1);
-  reordered.splice(rowIndex - 1, 0, current);
-  templateDraftRows = reordered;
-  renderTemplateDraftRows();
-}
-
-function moveTemplateDraftRowDown(index) {
-  const rowIndex = Number(index);
-  if (!Number.isInteger(rowIndex) || rowIndex < 0 || rowIndex >= templateDraftRows.length - 1) return;
-
-  const reordered = [...templateDraftRows];
-  const [current] = reordered.splice(rowIndex, 1);
-  reordered.splice(rowIndex + 1, 0, current);
-  templateDraftRows = reordered;
-  renderTemplateDraftRows();
+  const row = createTemplateDraftRow(getDefaultTemplateDraftStage());
+  templateDraftRowsBody.appendChild(row);
+  renderTemplateDraftPreview();
+  row.querySelector('.js-template-stage-name')?.focus();
+  row.querySelector('.js-template-stage-name')?.select();
 }
 
 async function startTemplateEdit(templateKey) {
-  const template = cashflowTemplates.find((entry) => entry.key === templateKey);
-  if (!template) {
-    setStatus('Template not found', true);
-    return;
-  }
-
-  editingTemplateKey = template.key;
-  templateDraftRows = (template.rows || []).map((row) => ({
-    stage: String(row.stage || ''),
-    percent: Number(row.percent),
-    weeks: Number(row.weeks)
-  }));
-  if (templateDraftName) templateDraftName.value = template.name || '';
-  setTemplateDraftMode(true);
-  renderTemplateDraftRows();
-  
-  // Load assigned location types for this template
-  try {
-    const response = await api(`/cashflow/templates/${encodeURIComponent(templateKey)}/location-types`);
-    const assignedTypes = response.location_types || [];
-    renderTemplateTagSelector(assignedTypes);
-  } catch (error) {
-    // No mappings exist yet, render empty selector
-    renderTemplateTagSelector([]);
-  }
-  
-  await openTemplateDraftModal();
-  setStatus('Editing template. Update rows and save when ready.');
+  const targetUrl = `/cashflow-template-builder.html?mode=edit&template=${encodeURIComponent(templateKey)}`;
+  window.location.href = targetUrl;
 }
 
 async function duplicateTemplate(templateKey) {
-  const template = cashflowTemplates.find((entry) => entry.key === templateKey);
-  if (!template) {
-    setStatus('Template not found', true);
-    return;
-  }
-
-  // Create new template (not editing)
-  editingTemplateKey = null;
-  templateDraftRows = (template.rows || []).map((row) => ({
-    stage: String(row.stage || ''),
-    percent: Number(row.percent),
-    weeks: Number(row.weeks)
-  }));
-  
-  // Suggest a new name
-  if (templateDraftName) templateDraftName.value = `Copy of ${template.name || 'Template'}`;
-  
-  setTemplateDraftMode(false);
-  renderTemplateDraftRows();
-  renderTemplateTagSelector([]);
-  
-  await openTemplateDraftModal();
-  setStatus('Creating duplicate template. Update the name and rows as needed, then save.');
+  const targetUrl = `/cashflow-template-builder.html?mode=duplicate&template=${encodeURIComponent(templateKey)}`;
+  window.location.href = targetUrl;
 }
 
 function toggleTemplateAccordion(templateKey) {
@@ -1584,26 +2018,42 @@ function toggleTemplateAccordion(templateKey) {
 async function saveTemplateDraft() {
   const templateName = String(templateDraftName?.value || '').trim();
   if (!templateName) {
-    setStatus('Template name is required', true);
-    return;
-  }
-  if (!templateDraftRows.length) {
-    setStatus('Add at least one row to the template', true);
+    setTemplateDraftStatus('Template name is required.', true);
+    templateDraftName?.focus();
     return;
   }
 
-  const totalPercent = Number(templateDraftRows.reduce((sum, row) => sum + Number(row.percent || 0), 0).toFixed(2));
+  const templateRows = readTemplateDraftRows(true);
+  if (!templateRows) {
+    return;
+  }
+
+  if (!templateRows.length) {
+    setTemplateDraftStatus('Add at least one stage to the template.', true);
+    return;
+  }
+
+  const totalPercent = getTemplateDraftPercentTotal(templateRows);
   if (Math.abs(totalPercent - 100) > 0.05) {
-    setStatus('Template rows must total 100%', true);
+    setTemplateDraftStatus('Template rows must total 100%.', true);
+    return;
+  }
+
+  const totalWeeks = getTemplateDraftDurationWeeks(templateRows);
+  if (!Number.isInteger(totalWeeks) || totalWeeks <= 0 || totalWeeks > 104) {
+    setTemplateDraftStatus('The full template programme must finish between week 1 and week 104.', true);
     return;
   }
 
   const payload = {
     name: templateName,
-    rows: templateDraftRows.map((row) => ({
+    rows: templateRows.map((row) => ({
       stage: row.stage,
       percent: Number(row.percent),
-      weeks: Number(row.weeks)
+      weeks: Number(row.durationWeeks),
+      week_start: Number(row.weekStart),
+      duration_weeks: Number(row.durationWeeks),
+      sort_order: Number(row.sortOrder)
     }))
   };
 
@@ -1645,7 +2095,7 @@ async function saveTemplateDraft() {
       }
     }
   } catch (error) {
-    setStatus(error.message || 'Failed to save template', true);
+    setTemplateDraftStatus(error.message || 'Failed to save template.', true);
   }
 }
 
@@ -1673,9 +2123,6 @@ async function deleteTemplate(templateKey) {
   }
 }
 
-window.removeTemplateDraftRow = removeTemplateDraftRow;
-window.moveTemplateDraftRowUp = moveTemplateDraftRowUp;
-window.moveTemplateDraftRowDown = moveTemplateDraftRowDown;
 window.startTemplateEdit = startTemplateEdit;
 window.duplicateTemplate = duplicateTemplate;
 window.deleteTemplate = deleteTemplate;
@@ -2166,21 +2613,15 @@ wizardNextBtn?.addEventListener('click', goToNextStep);
 wizardBackBtn?.addEventListener('click', goToPreviousStep);
 wizardSaveLocationBtn?.addEventListener('click', addOrUpdateWizardLocation);
 openTemplateDraftModalBtn?.addEventListener('click', async () => {
-  resetTemplateDraftForm();
-  
-  // Ensure location types are loaded before rendering selector
-  if (availableLocationTypes.length === 0) {
-    await loadAvailableLocationTypes();
-  }
-  
-  // Now render tag selector with the loaded types
-  renderTemplateTagSelector([]);
-  await openTemplateDraftModal();
+  window.location.href = '/cashflow-template-builder.html';
 });
 closeTemplateDraftModalBtn?.addEventListener('click', closeTemplateDraftModal);
 closeTemplateDraftCancelBtn?.addEventListener('click', closeTemplateDraftModal);
 templateDraftAddRowBtn?.addEventListener('click', addTemplateDraftRow);
 templateDraftSaveBtn?.addEventListener('click', saveTemplateDraft);
+document.addEventListener('pointermove', handleTemplateDraftPointerMove);
+document.addEventListener('pointerup', stopTemplateDraftPointerDrag);
+document.addEventListener('pointercancel', stopTemplateDraftPointerDrag);
 templateDraftCancelEditBtn?.addEventListener('click', () => {
   resetTemplateDraftForm();
   setStatus('Template edit cancelled.');
@@ -2560,7 +3001,12 @@ templatesFileInput?.addEventListener('change', (e) => {
   
   if (bulkUploadTemplatesBtn) bulkUploadTemplatesBtn.disabled = false;
   if (templatesPreview) {
-    templatesPreview.innerHTML = `<div class="alert alert-info">File selected: ${file.name}</div>`;
+    templatesPreview.innerHTML = `
+      <div class="alert alert-info mb-0">
+        <div><strong>File selected:</strong> ${escapeHtml(file.name)}</div>
+        <small class="d-block mt-1">Expected columns: Template Name, Stage, Percent, Start Week, Duration Weeks. Legacy uploads with Weeks are also accepted.</small>
+      </div>
+    `;
   }
   if (templatesStatus) {
     templatesStatus.textContent = 'Ready to upload';

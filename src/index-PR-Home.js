@@ -66,7 +66,6 @@ app.get('/workers-information.html', (req, res) => res.render('workers-informati
 app.get('/leave-report.html', (req, res) => res.redirect('/workers-information.html'));
 app.get('/labour-costs.html', (req, res) => res.render('labour-costs', { pageTitle: 'Labour Costs' }));
 app.get('/cashflow-setup.html', (req, res) => res.render('cashflow-setup', { pageTitle: 'Cashflow Setup' }));
-app.get('/cashflow-template-builder.html', (req, res) => res.render('cashflow-template-builder', { pageTitle: 'Cashflow Template Builder' }));
 app.get('/cashflow-report.html', (req, res) => res.render('cashflow-report', { pageTitle: 'Cashflow Report' }));
 app.get('/gdpr.html', (req, res) => res.render('gdpr', { pageTitle: 'GDPR Privacy Notice' }));
 app.get('/audit-log.html', (req, res) => res.render('audit-log', { pageTitle: 'Audit Log' }));
@@ -133,10 +132,6 @@ app.use('/invoices', invoiceRoutes);
 // Reports
 const reportRoutes = require('./routes/reports');
 app.use('/reports', reportRoutes);
-
-// PDFs
-const pdfRoutes = require('./routes/pdfs');
-app.use('/pdfs', pdfRoutes);
 
 // PDF Data (for browser-based PDFKit generation)
 const pdfDataRoutes = require('./routes/pdfData');

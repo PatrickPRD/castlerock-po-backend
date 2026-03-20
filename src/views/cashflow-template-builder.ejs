@@ -1,0 +1,98 @@
+<%- include('partials/head', { pageTitle: 'Cashflow Template Builder', styles: ['admin.css', 'cashflow-setup.css?v=20260320a'] }) %>
+<%- include('partials/header', { pageTitle: 'Cashflow Template Builder' }) %>
+
+<main class="container py-4">
+  <div class="card p-4 mb-4">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+      <div>
+        <h3 id="templateBuilderHeading" class="mb-2">Create Template</h3>
+        <p class="text-muted mb-0">Build and edit cashflow templates on a dedicated page with the full programme timeline editor.</p>
+      </div>
+      <div class="d-flex gap-2">
+        <a href="/cashflow-setup.html#templateManagerCard" class="btn btn-outline-secondary">Back to Cashflow Setup</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-4">
+    <div class="mb-3">
+      <label for="templateDraftName" class="form-label">Template Name</label>
+      <input id="templateDraftName" type="text" class="form-control" maxlength="120" placeholder="e.g. Standard Build 26 Week" />
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Apply to Location Types (Auto-populate)</label>
+      <div id="templateDraftTagInput" class="border rounded p-2" style="min-height: 42px; background: #f8f9fa; cursor: text; position: relative;">
+        <div id="templateDraftTagsContainer" class="d-flex flex-wrap gap-2 align-items-center" style="min-height: 30px;">
+          <input
+            type="text"
+            id="templateDraftTypeInput"
+            class="form-control form-control-sm"
+            style="border: none; outline: none; flex: 1; min-width: 120px; background: transparent; padding: 0;"
+            placeholder="Type location type name..."
+            autocomplete="off"
+          />
+        </div>
+        <div id="templateDraftTypeSuggestions" class="position-absolute border rounded mt-1" style="display: none; top: 100%; left: 0; right: 0; background: white; max-height: 200px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
+      </div>
+      <p class="text-muted small mt-2">When adding locations with these types to cashflow, this template will auto-populate.</p>
+    </div>
+
+    <hr class="my-3">
+
+    <div class="template-stage-builder">
+      <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
+        <div>
+          <h6 class="mb-1">Template Stages</h6>
+          <p class="text-muted small mb-0">Define spend percent, start week, and duration for each stage. Drag rows or chart bars to reorder, move, and resize.</p>
+        </div>
+        <button type="button" id="templateDraftAddRowBtn" class="btn btn-outline-primary">Add Stage</button>
+      </div>
+
+      <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-2">
+        <span id="templateDraftTotals" class="text-muted small">No programme set</span>
+        <span class="text-muted small">Edit stage name and percent here. Set timing by dragging/resizing the bars.</span>
+      </div>
+
+      <input type="hidden" id="templateDraftRowsData" />
+
+      <div id="templateDraftChart" class="programme-chart programme-chart-empty-state mb-3">
+        Add a stage to build the template timeline.
+      </div>
+
+      <div class="table-responsive mb-2 d-none" aria-hidden="true">
+        <table class="table table-sm align-middle mb-0 programme-builder-table">
+          <thead>
+            <tr>
+              <th style="width: 44px;"></th>
+              <th>Stage</th>
+              <th style="width: 110px;">Percent</th>
+              <th style="width: 110px;">Start</th>
+              <th style="width: 120px;">Duration</th>
+              <th style="width: 120px;">Finish</th>
+              <th style="width: 96px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="templateDraftRowsBody">
+            <tr>
+              <td colspan="7" class="text-muted text-center py-3">Add a stage to start building this template.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div id="templateDraftStatus" class="small text-muted mb-3"></div>
+    </div>
+
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mt-3">
+      <span id="templateBuilderPageStatus" class="text-muted small"></span>
+      <div class="d-flex justify-content-end gap-2">
+        <button type="button" id="templateDraftCancelEditBtn" class="btn btn-outline-secondary" style="display:none;">Reset</button>
+        <a href="/cashflow-setup.html#templateManagerCard" class="btn btn-outline-secondary">Cancel</a>
+        <button type="button" id="templateDraftSaveBtn" class="btn btn-primary">Create Template</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/footer', { scripts: ['cashflow-template-builder.js?v=20260320a'], includeNavScript: true }) %>
