@@ -297,6 +297,11 @@ router.put(
       const yellowThreshold = parseThresholdValue(req.body?.yellowThreshold, 'yellowThreshold');
       const redThreshold = parseThresholdValue(req.body?.redThreshold, 'redThreshold');
 
+      const [oldYellow, oldRed] = await Promise.all([
+        SettingsService.getSetting('cost_warning_yellow_threshold'),
+        SettingsService.getSetting('cost_warning_red_threshold')
+      ]);
+
       await SettingsService.updateSetting('cost_warning_yellow_threshold', yellowThreshold);
       await SettingsService.updateSetting('cost_warning_red_threshold', redThreshold);
 
@@ -304,7 +309,10 @@ router.put(
         table_name: 'site_settings',
         record_id: 0,
         action: 'UPDATE_COST_THRESHOLDS',
-        old_data: null,
+        old_data: {
+          yellow_threshold: oldYellow,
+          red_threshold: oldRed
+        },
         new_data: {
           yellow_threshold: yellowThreshold,
           red_threshold: redThreshold
@@ -422,8 +430,10 @@ router.put(
         action: 'UPDATE_HISTORY_ENTRY',
         old_data: {
           id: existing.id,
+          cost_item_id: existing.cost_item_id,
           old_cost_per: Number(existing.old_cost_per),
           new_cost_per: Number(existing.new_cost_per),
+          change_source: existing.change_source,
           changed_at: existing.changed_at
         },
         new_data: updates,
