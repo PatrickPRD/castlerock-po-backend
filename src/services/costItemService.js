@@ -142,11 +142,11 @@ function determineComparisonStatus(deltaPercent, thresholds) {
     return 'green';
   }
 
-  if (deltaPercent >= thresholds.red) {
+  if (deltaPercent > thresholds.red) {
     return 'red';
   }
 
-  if (deltaPercent >= thresholds.yellow) {
+  if (deltaPercent > thresholds.yellow) {
     return 'yellow';
   }
 
