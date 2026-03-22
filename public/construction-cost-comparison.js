@@ -65,6 +65,12 @@ ensureAuthenticated();
   const mergeTypesModal = new bootstrap.Modal(document.getElementById('mergeTypesModal'));
   const importModal = new bootstrap.Modal(document.getElementById('importModal'));
   const permanentDeleteModal = new bootstrap.Modal(document.getElementById('permanentDeleteModal'));
+  const historyEditModal = new bootstrap.Modal(document.getElementById('historyEditModal'));
+  const historyEditModalTitle = document.getElementById('historyEditModalTitle');
+  const historyEditModalBody = document.getElementById('historyEditModalBody');
+
+  let historyEditItemId = null;
+  let historyEditRows = [];
 
   let items = [];
   let thresholdState = { yellow_threshold: null, red_threshold: null };
@@ -422,6 +428,7 @@ ensureAuthenticated();
                          <button class="btn btn-sm btn-outline-danger" type="button" data-action="permanent-delete" data-id="${item.id}" data-code="${escapeHtml(item.code)}">Delete Permanently</button>`
                       : '')
                     : `<button class="btn btn-sm btn-outline-primary" type="button" data-action="edit" data-id="${item.id}">Update</button>
+                       ${isSuperAdmin ? `<button class="btn btn-sm btn-outline-secondary" type="button" data-action="edit-history" data-id="${item.id}"><i class="bi bi-clock-history me-1"></i>History</button>` : ''}
                        <button class="btn btn-sm btn-outline-danger" type="button" data-action="soft-delete" data-id="${item.id}">Delete</button>`}
                 </div>
               </div>
@@ -652,7 +659,7 @@ ensureAuthenticated();
   }
 
   async function softDeleteItem(itemId) {
-    if (!window.confirm('Soft delete this cost item?')) {
+    if (!(await confirmDialog('Delete this cost item?'))) {
       return;
     }
 
@@ -680,6 +687,88 @@ ensureAuthenticated();
     permanentDeleteCodeInput.value = '';
     permanentDeleteCodeHint.textContent = `Enter ${code} to confirm.`;
     permanentDeleteModal.show();
+  }
+
+  async function openHistoryEditModal(itemId) {
+    const item = items.find((entry) => Number(entry.id) === Number(itemId));
+    historyEditItemId = Number(itemId);
+    historyEditRows = [];
+    historyEditModalTitle.textContent = item
+      ? `Cost History – ${item.code} · ${item.description}`
+      : 'Cost History';
+    historyEditModalBody.innerHTML = '<div class="p-3 text-muted small">Loading...</div>';
+    historyEditModal.show();
+
+    try {
+      const rows = await apiJson(`/cost-items/${historyEditItemId}/history/admin`);
+      historyEditRows = Array.isArray(rows) ? rows : [];
+      renderHistoryEditTable();
+    } catch (error) {
+      historyEditModalBody.innerHTML = `<div class="p-3 text-danger small">${escapeHtml(error.message || 'Failed to load history')}</div>`;
+    }
+  }
+
+  function renderHistoryEditTable(editingId = null) {
+    if (!historyEditRows.length) {
+      historyEditModalBody.innerHTML = '<div class="p-3 text-muted small">No history entries found.</div>';
+      return;
+    }
+
+    const rowsHtml = historyEditRows.map((row) => {
+      const isEditing = editingId === row.id;
+      const dateStr = row.changed_at
+        ? new Date(row.changed_at).toLocaleString('en-IE', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+        : '-';
+      const datetimeLocal = row.changed_at
+        ? new Date(row.changed_at).toISOString().slice(0, 16)
+        : '';
+
+      if (isEditing) {
+        return `
+          <tr data-history-id="${row.id}">
+            <td><input type="datetime-local" class="form-control form-control-sm" id="hedit-date-${row.id}" value="${escapeHtml(datetimeLocal)}" style="min-width:180px;"></td>
+            <td>${escapeHtml(row.change_source || '-')}</td>
+            <td><input type="number" step="0.01" min="0" class="form-control form-control-sm text-end" id="hedit-new-${row.id}" value="${Number(row.new_cost_per).toFixed(2)}" style="width:100px;"></td>
+            <td>
+              <div class="d-flex gap-1">
+                <button class="btn btn-sm btn-success" type="button" data-h-action="save" data-history-id="${row.id}">Save</button>
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-h-action="cancel">Cancel</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }
+
+      return `
+        <tr data-history-id="${row.id}">
+          <td class="text-nowrap">${escapeHtml(dateStr)}</td>
+          <td>${escapeHtml(row.change_source || '-')}</td>
+          <td class="text-end text-nowrap">${money(row.new_cost_per)}</td>
+          <td>
+            <div class="d-flex gap-1">
+              <button class="btn btn-sm btn-outline-primary" type="button" data-h-action="edit" data-history-id="${row.id}">Edit</button>
+              <button class="btn btn-sm btn-outline-danger" type="button" data-h-action="delete" data-history-id="${row.id}">Delete</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    historyEditModalBody.innerHTML = `
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Date</th>
+              <th>Source</th>
+              <th class="text-end">Cost</th>
+              <th style="width:150px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+    `;
   }
 
   async function saveThresholds() {
@@ -841,8 +930,61 @@ ensureAuthenticated();
       restoreItem(itemId);
     } else if (action === 'permanent-delete') {
       openPermanentDelete(itemId, actionButton.getAttribute('data-code'));
+    } else if (action === 'edit-history') {
+      openHistoryEditModal(itemId);
     }
   });
+
+  if (historyEditModalBody) {
+    historyEditModalBody.addEventListener('click', async (event) => {
+      const btn = event.target.closest('[data-h-action]');
+      if (!btn) return;
+
+      const hAction = btn.getAttribute('data-h-action');
+      const historyId = Number(btn.getAttribute('data-history-id'));
+
+      if (hAction === 'edit') {
+        renderHistoryEditTable(historyId);
+      } else if (hAction === 'cancel') {
+        renderHistoryEditTable();
+      } else if (hAction === 'save') {
+        const newCostInput = document.getElementById(`hedit-new-${historyId}`);
+        const dateInput = document.getElementById(`hedit-date-${historyId}`);
+
+        const payload = {};
+        if (newCostInput) payload.new_cost_per = Number(newCostInput.value);
+        if (dateInput && dateInput.value) payload.changed_at = new Date(dateInput.value).toISOString();
+
+        try {
+          await apiJson(`/cost-items/history/${historyId}`, 'PUT', payload);
+          const idx = historyEditRows.findIndex((row) => row.id === historyId);
+          if (idx !== -1) {
+            if (payload.new_cost_per !== undefined) historyEditRows[idx].new_cost_per = payload.new_cost_per;
+            if (payload.old_cost_per !== undefined) historyEditRows[idx].old_cost_per = payload.old_cost_per;
+            if (payload.changed_at !== undefined) historyEditRows[idx].changed_at = payload.changed_at;
+          }
+          showToast('History entry updated', 'success');
+          renderHistoryEditTable();
+          historyCache.delete(historyEditItemId);
+          loadHistoryForItem(historyEditItemId);
+        } catch (error) {
+          showToast(error.message || 'Failed to update entry', 'error');
+        }
+      } else if (hAction === 'delete') {
+        if (!(await confirmDialog('Delete this history entry? This cannot be undone.'))) return;
+        try {
+          await apiJson(`/cost-items/history/${historyId}`, 'DELETE', {});
+          historyEditRows = historyEditRows.filter((row) => row.id !== historyId);
+          showToast('History entry deleted', 'success');
+          renderHistoryEditTable();
+          historyCache.delete(historyEditItemId);
+          loadHistoryForItem(historyEditItemId);
+        } catch (error) {
+          showToast(error.message || 'Failed to delete entry', 'error');
+        }
+      }
+    });
+  }
 
   searchInput.addEventListener('input', renderTable);
   if (searchClearBtn) {

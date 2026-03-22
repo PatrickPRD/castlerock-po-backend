@@ -44,19 +44,17 @@
   </div>
 
   <div class="card p-0 overflow-hidden">
-    <div class="table-responsive">
-      <table class="po-table comparison-table mb-0">
-        <thead>
-          <tr>
-            <th style="width: 160px;">Code</th>
-            <th style="min-width: 360px;">Description</th>
-            <th style="width: 160px;" class="text-end">Current Cost</th>
-            <th style="width: 140px;">Unit</th>
-          </tr>
-        </thead>
-        <tbody id="costItemsTable"></tbody>
-      </table>
-    </div>
+    <table class="po-table comparison-table mb-0">
+      <thead>
+        <tr>
+          <th style="width: 160px;">Code</th>
+          <th>Description</th>
+          <th style="width: 160px;" class="text-end">Current Cost</th>
+          <th style="width: 140px;">Unit</th>
+        </tr>
+      </thead>
+      <tbody id="costItemsTable"></tbody>
+    </table>
   </div>
 </main>
 
@@ -188,6 +186,23 @@
   </div>
 </div>
 
+<div class="modal fade" id="historyEditModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="historyEditModalTitle">Cost History</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0" id="historyEditModalBody">
+        <div class="p-3 text-muted small">Loading...</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="permanentDeleteModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -212,4 +227,4 @@
   </div>
 </div>
 
-<%- include('partials/footer', { scripts: ['/ui.js', 'construction-cost-comparison.js?v=20260322e'], includeNavScript: true }) %>
+<%- include('partials/footer', { scripts: ['/ui.js', 'construction-cost-comparison.js?v=20260322f'], includeNavScript: true }) %>

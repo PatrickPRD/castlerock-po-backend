@@ -234,6 +234,43 @@ router.get(
 );
 
 router.get(
+  '/:id/history/admin',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      const itemId = Number(req.params.id);
+      if (!Number.isInteger(itemId) || itemId <= 0) {
+        return res.status(400).json({ error: 'Invalid cost item id' });
+      }
+
+      const [rows] = await db.query(
+        `SELECT h.id, h.old_cost_per, h.new_cost_per, h.change_source, h.changed_at,
+                u.email AS changed_by_email
+         FROM cost_item_cost_history h
+         LEFT JOIN users u ON u.id = h.changed_by
+         WHERE h.cost_item_id = ?
+         ORDER BY h.changed_at DESC, h.id DESC
+         LIMIT 200`,
+        [itemId]
+      );
+
+      res.json(rows.map((row) => ({
+        id: row.id,
+        old_cost_per: Number(row.old_cost_per),
+        new_cost_per: Number(row.new_cost_per),
+        change_source: row.change_source,
+        changed_at: row.changed_at,
+        changed_by_email: row.changed_by_email || null
+      })));
+    } catch (error) {
+      console.error('Error fetching history admin list:', error);
+      res.status(500).json({ error: error.message || 'Failed to fetch history' });
+    }
+  }
+);
+
+router.get(
   '/settings/thresholds',
   authenticate,
   authorizeRoles('super_admin', 'admin'),
@@ -310,6 +347,140 @@ router.post(
     } catch (error) {
       console.error('Error creating cost item:', error);
       res.status(400).json({ error: error.message || 'Failed to create cost item' });
+    }
+  }
+);
+
+router.put(
+  '/history/:historyId',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      const historyId = Number(req.params.historyId);
+      if (!Number.isInteger(historyId) || historyId <= 0) {
+        return res.status(400).json({ error: 'Invalid history id' });
+      }
+
+      const [[existing]] = await db.query(
+        'SELECT * FROM cost_item_cost_history WHERE id = ?',
+        [historyId]
+      );
+      if (!existing) {
+        return res.status(404).json({ error: 'History entry not found' });
+      }
+
+      const fields = [];
+      const params = [];
+      const updates = {};
+
+      const { new_cost_per: newCostRaw, old_cost_per: oldCostRaw, changed_at: changedAtRaw } = req.body || {};
+
+      if (newCostRaw !== undefined) {
+        const v = Number(newCostRaw);
+        if (!Number.isFinite(v) || v < 0) {
+          return res.status(400).json({ error: 'new_cost_per must be a valid non-negative number' });
+        }
+        fields.push('new_cost_per = ?');
+        params.push(Number(v.toFixed(2)));
+        updates.new_cost_per = Number(v.toFixed(2));
+      }
+
+      if (oldCostRaw !== undefined) {
+        const v = Number(oldCostRaw);
+        if (!Number.isFinite(v) || v < 0) {
+          return res.status(400).json({ error: 'old_cost_per must be a valid non-negative number' });
+        }
+        fields.push('old_cost_per = ?');
+        params.push(Number(v.toFixed(2)));
+        updates.old_cost_per = Number(v.toFixed(2));
+      }
+
+      if (changedAtRaw !== undefined) {
+        const d = new Date(changedAtRaw);
+        if (Number.isNaN(d.getTime())) {
+          return res.status(400).json({ error: 'changed_at must be a valid date' });
+        }
+        fields.push('changed_at = ?');
+        params.push(d);
+        updates.changed_at = d;
+      }
+
+      if (!fields.length) {
+        return res.status(400).json({ error: 'No fields to update' });
+      }
+
+      params.push(historyId);
+      await db.query(
+        `UPDATE cost_item_cost_history SET ${fields.join(', ')} WHERE id = ?`,
+        params
+      );
+
+      await logAudit({
+        table_name: 'cost_item_cost_history',
+        record_id: historyId,
+        action: 'UPDATE_HISTORY_ENTRY',
+        old_data: {
+          id: existing.id,
+          old_cost_per: Number(existing.old_cost_per),
+          new_cost_per: Number(existing.new_cost_per),
+          changed_at: existing.changed_at
+        },
+        new_data: updates,
+        changed_by: req.user.id,
+        req
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error updating history entry:', error);
+      res.status(400).json({ error: error.message || 'Failed to update history entry' });
+    }
+  }
+);
+
+router.delete(
+  '/history/:historyId',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      const historyId = Number(req.params.historyId);
+      if (!Number.isInteger(historyId) || historyId <= 0) {
+        return res.status(400).json({ error: 'Invalid history id' });
+      }
+
+      const [[existing]] = await db.query(
+        'SELECT * FROM cost_item_cost_history WHERE id = ?',
+        [historyId]
+      );
+      if (!existing) {
+        return res.status(404).json({ error: 'History entry not found' });
+      }
+
+      await db.query('DELETE FROM cost_item_cost_history WHERE id = ?', [historyId]);
+
+      await logAudit({
+        table_name: 'cost_item_cost_history',
+        record_id: historyId,
+        action: 'DELETE_HISTORY_ENTRY',
+        old_data: {
+          id: existing.id,
+          cost_item_id: existing.cost_item_id,
+          old_cost_per: Number(existing.old_cost_per),
+          new_cost_per: Number(existing.new_cost_per),
+          change_source: existing.change_source,
+          changed_at: existing.changed_at
+        },
+        new_data: null,
+        changed_by: req.user.id,
+        req
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting history entry:', error);
+      res.status(400).json({ error: error.message || 'Failed to delete history entry' });
     }
   }
 );

@@ -48,7 +48,7 @@
 }
 
 .comparison-table {
-  min-width: 860px;
+  width: 100%;
 }
 
 .comparison-table th,
