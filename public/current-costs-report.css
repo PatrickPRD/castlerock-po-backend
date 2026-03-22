@@ -1,0 +1,254 @@
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.summary-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #f8fafc;
+}
+
+.summary-label {
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.summary-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.chart-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.chart-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.chart-toggle-label {
+  font-size: 0.9rem;
+  color: #334155;
+  user-select: none;
+}
+
+.chart-head small {
+  font-size: 0.95rem;
+}
+
+.trend-chart-wrap {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 10px;
+  min-height: 450px;
+  position: relative;
+}
+
+.trend-line-tooltip {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  background: rgba(15, 23, 42, 0.9);
+  color: #f8fafc;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 6px 8px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
+  white-space: nowrap;
+}
+
+.trend-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  min-height: 375px;
+}
+
+.trend-chart {
+  width: 100%;
+  height: 425px;
+}
+
+.axis-line {
+  stroke: #cbd5e1;
+  stroke-width: 1;
+}
+
+.grid-line {
+  stroke: #e5e7eb;
+  stroke-width: 1;
+}
+
+.axis-label {
+  fill: #64748b;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.overlay-line {
+  fill: none;
+  stroke-width: 2;
+  opacity: 0.72;
+  transition: stroke-width 0.12s ease, opacity 0.12s ease;
+}
+
+.overlay-line.is-hovered {
+  stroke-width: 3.5;
+  opacity: 1;
+}
+
+.average-line {
+  fill: none;
+  stroke: #0f172a;
+  stroke-width: 2.4;
+  stroke-dasharray: 8 5;
+}
+
+.current-costs-table-wrap {
+  overflow: visible;
+}
+
+.current-costs-table {
+  min-width: 100%;
+}
+
+.current-costs-table tbody tr.group-row {
+  background: #eef4f8;
+}
+
+.current-costs-table tbody tr.group-row td {
+  font-weight: 700;
+  color: #1f2937;
+  border-top: 1px solid #d7e1ea;
+  border-bottom: 1px solid #d7e1ea;
+  padding: 10px 12px;
+}
+
+.group-toggle {
+  border: none;
+  background: none;
+  color: #0f172a;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.current-costs-table .status-pill {
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.status-pill.green {
+  background: #d1e7dd;
+  color: #0f5132;
+}
+
+.status-pill.yellow {
+  background: #fff3cd;
+  color: #7a5a00;
+}
+
+.status-pill.red {
+  background: #f8d7da;
+  color: #842029;
+}
+
+.delta-up {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.delta-down {
+  color: #166534;
+  font-weight: 700;
+}
+
+.line-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.line-swatch {
+  width: 22px;
+  height: 0;
+  border-top: 3px solid #0ea5e9;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+#exitChartOnlyBtn {
+  display: none;
+}
+
+body.chart-only-mode #openChartOnlyBtn {
+  display: none;
+}
+
+body.chart-only-mode #exitChartOnlyBtn {
+  display: inline-block;
+}
+
+body.chart-only-mode main.container > .card:not(.chart-only-card) {
+  display: none;
+}
+
+body.chart-only-mode main.container {
+  max-width: 100%;
+  width: 100%;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+body.chart-only-mode .chart-only-card {
+  margin-top: 18px;
+}
+
+body.chart-only-mode .trend-chart-wrap {
+  min-height: 90vh;
+}
+
+body.chart-only-mode .trend-chart {
+  height: 85vh;
+}
+
+@media (max-width: 992px) {
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .chart-controls {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+}

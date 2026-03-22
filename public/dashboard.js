@@ -206,6 +206,12 @@ function initLineItemsManager({
 
   let lineItemsMode = false;
   let searchTimeout = null;
+  const costItemLookup = window.createCostItemLookup
+    ? window.createCostItemLookup({
+        suggestionsElement: suggestions,
+        authFetch: authenticatedFetch
+      })
+    : null;
 
   function setLineItemsMode(enabled) {
     lineItemsMode = enabled;
@@ -299,25 +305,14 @@ function initLineItemsManager({
   }
 
   function fetchLineItemSuggestions(query) {
-    if (!suggestions) return;
-    if (!query) {
-      suggestions.innerHTML = '';
+    if (!suggestions || !costItemLookup || !query) {
+      if (suggestions) {
+        suggestions.innerHTML = '';
+      }
       return;
     }
 
-    authenticatedFetch(`/purchase-orders/line-items/search?q=${encodeURIComponent(query)}`)
-      .then(res => {
-        if (res.ok) return res.json();
-        throw new Error('Failed to fetch suggestions');
-      })
-      .then(items => {
-        suggestions.innerHTML = '';
-        items.forEach(item => {
-          const opt = document.createElement('option');
-          opt.value = item;
-          suggestions.appendChild(opt);
-        });
-      })
+    costItemLookup.fetchSuggestions(query)
       .catch(() => {
         suggestions.innerHTML = '';
       });
@@ -333,6 +328,9 @@ function initLineItemsManager({
           <div class="line-item-card-desc">
             <label class="line-item-label" style="font-size:11px; color:#888; margin-bottom:2px; display:block; text-align:left;">Description</label>
             <input class="line-item-input line-item-desc" data-field="description" type="text" list="${suggestions ? suggestions.id : ''}" value="${item.description || ''}" placeholder="Description">
+            <input data-field="costItemId" type="hidden" value="${item.cost_item_id || item.costItemId || ''}">
+            <input data-field="costItemCode" type="hidden" value="${item.cost_item_code || item.costItemCode || ''}">
+            <input data-field="costItemType" type="hidden" value="${item.cost_item_type || item.costItemType || ''}">
           </div>
           <div class="line-item-card-fields">
             <div style="display:flex; flex-direction:column; align-items:flex-start; gap:2px;">
@@ -355,11 +353,15 @@ function initLineItemsManager({
     `;
 
     const descriptionField = cardRow.querySelector('[data-field="description"]');
+    const unitField = cardRow.querySelector('[data-field="unit"]');
     const qtyField = cardRow.querySelector('[data-field="quantity"]');
     const unitPriceField = cardRow.querySelector('[data-field="unitPrice"]');
     const removeBtn = cardRow.querySelector('[data-field="remove"]');
 
     descriptionField.addEventListener('input', () => {
+      if (costItemLookup) {
+        costItemLookup.clearSelectionForRow(cardRow);
+      }
       clearTimeout(searchTimeout);
       const query = descriptionField.value.trim();
       searchTimeout = setTimeout(() => {
@@ -371,8 +373,25 @@ function initLineItemsManager({
       }, 200);
     });
 
+    descriptionField.addEventListener('change', () => {
+      if (costItemLookup && costItemLookup.applySelectionFromInput(cardRow)) {
+        handleLineItemInput(cardRow);
+      }
+    });
+
+    descriptionField.addEventListener('blur', () => {
+      if (costItemLookup && costItemLookup.applySelectionFromInput(cardRow)) {
+        handleLineItemInput(cardRow);
+      }
+    });
+
     qtyField.addEventListener('input', () => handleLineItemInput(cardRow, descriptionField));
     unitPriceField.addEventListener('input', () => handleLineItemInput(cardRow, descriptionField));
+    unitField.addEventListener('input', () => {
+      if (costItemLookup) {
+        costItemLookup.clearSelectionForRow(cardRow);
+      }
+    });
 
     removeBtn.addEventListener('click', () => {
       cardRow.remove();
@@ -417,7 +436,10 @@ function initLineItemsManager({
         description: descriptionValue,
         quantity,
         unit: unitValue || null,
-        unitPrice
+        unitPrice,
+        costItemId: Number(row.querySelector('[data-field="costItemId"]').value) || null,
+        costItemCode: row.querySelector('[data-field="costItemCode"]').value || null,
+        costItemType: row.querySelector('[data-field="costItemType"]').value || null
       });
     });
 

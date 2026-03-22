@@ -17,13 +17,19 @@ function normalizeLineItems(lineItems) {
       const quantity = Number(item.quantity) || 0;
       const unit = item.unit ? String(item.unit).trim() : null;
       const unitPrice = Number(item.unitPrice ?? item.unit_price) || 0;
+      const costItemId = Number(item.costItemId ?? item.cost_item_id) || null;
+      const costItemCode = item.costItemCode ? String(item.costItemCode).trim().toUpperCase() : (item.cost_item_code ? String(item.cost_item_code).trim().toUpperCase() : null);
+      const costItemType = item.costItemType ? String(item.costItemType).trim() : (item.cost_item_type ? String(item.cost_item_type).trim() : null);
 
       return {
         line_number: index + 1,
         description,
         quantity,
         unit,
-        unit_price: unitPrice
+        unit_price: unitPrice,
+        cost_item_id: Number.isInteger(costItemId) && costItemId > 0 ? costItemId : null,
+        cost_item_code: costItemCode || null,
+        cost_item_type: costItemType || null
       };
     })
     .filter(item => item.description && item.quantity > 0 && item.unit_price >= 0);
@@ -189,6 +195,9 @@ router.get(
         id,
         line_number,
         description,
+        cost_item_id,
+        cost_item_code,
+        cost_item_type,
         quantity,
         unit,
         unit_price,
@@ -294,6 +303,9 @@ router.post(
         if (normalizedLineItems.length) {
           const values = normalizedLineItems.map((item, index) => [
             result.insertId,
+            item.cost_item_id,
+            item.cost_item_code,
+            item.cost_item_type,
             index + 1,
             item.description,
             item.quantity,
@@ -304,7 +316,7 @@ router.post(
           await conn.query(
             `
             INSERT INTO po_line_items
-              (po_id, line_number, description, quantity, unit, unit_price)
+              (po_id, cost_item_id, cost_item_code, cost_item_type, line_number, description, quantity, unit, unit_price)
             VALUES ?
             `,
             [values]
@@ -468,6 +480,9 @@ router.put(
       if (normalizedLineItems.length) {
         const values = normalizedLineItems.map((item, index) => [
           id,
+          item.cost_item_id,
+          item.cost_item_code,
+          item.cost_item_type,
           index + 1,
           item.description,
           item.quantity,
@@ -478,7 +493,7 @@ router.put(
         await conn.query(
           `
           INSERT INTO po_line_items
-            (po_id, line_number, description, quantity, unit, unit_price)
+            (po_id, cost_item_id, cost_item_code, cost_item_type, line_number, description, quantity, unit, unit_price)
           VALUES ?
           `,
           [values]

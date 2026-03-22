@@ -23,6 +23,14 @@ function normalizeLeaveYearStart(value) {
   return `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
+function requireStoredThreshold(settings, key) {
+  const value = Number(settings[key]);
+  if (!Number.isFinite(value)) {
+    throw new Error(`${key} is not configured`);
+  }
+  return value;
+}
+
 /**
  * GET /settings/public
  * Public read-only header branding settings used by shared navbar
@@ -199,13 +207,17 @@ router.get(
       const audit_log_retention = Number.isFinite(Number(settings.audit_log_retention))
         ? Number(settings.audit_log_retention)
         : 300;
+      const cost_warning_yellow_threshold = requireStoredThreshold(settings, 'cost_warning_yellow_threshold');
+      const cost_warning_red_threshold = requireStoredThreshold(settings, 'cost_warning_red_threshold');
 
       res.json({
-        audit_log_retention
+        audit_log_retention,
+        cost_warning_yellow_threshold,
+        cost_warning_red_threshold
       });
     } catch (error) {
       console.error('Error fetching system settings:', error);
-      res.status(500).json({ error: 'Failed to fetch system settings' });
+      res.status(500).json({ error: error.message || 'Failed to fetch system settings' });
     }
   }
 );
@@ -328,7 +340,11 @@ router.put(
   authorizeRoles('super_admin'),
   async (req, res) => {
     try {
-      const { auditLogRetention } = req.body || {};
+      const {
+        auditLogRetention,
+        costWarningYellowThreshold,
+        costWarningRedThreshold
+      } = req.body || {};
 
       // Validate audit log retention
       const retention = Number(auditLogRetention);
@@ -338,11 +354,29 @@ router.put(
         });
       }
 
+      const yellowThreshold = Number(costWarningYellowThreshold);
+      if (!Number.isFinite(yellowThreshold) || yellowThreshold < 0 || yellowThreshold > 100) {
+        return res.status(400).json({
+          error: 'costWarningYellowThreshold must be a number between 0 and 100'
+        });
+      }
+
+      const redThreshold = Number(costWarningRedThreshold);
+      if (!Number.isFinite(redThreshold) || redThreshold < 0 || redThreshold > 100) {
+        return res.status(400).json({
+          error: 'costWarningRedThreshold must be a number between 0 and 100'
+        });
+      }
+
       await SettingsService.updateSetting('audit_log_retention', retention);
+      await SettingsService.updateSetting('cost_warning_yellow_threshold', Number(yellowThreshold.toFixed(2)));
+      await SettingsService.updateSetting('cost_warning_red_threshold', Number(redThreshold.toFixed(2)));
 
       res.json({
         success: true,
-        audit_log_retention: retention
+        audit_log_retention: retention,
+        cost_warning_yellow_threshold: Number(yellowThreshold.toFixed(2)),
+        cost_warning_red_threshold: Number(redThreshold.toFixed(2))
       });
     } catch (error) {
       console.error('Error updating system settings:', error);
@@ -576,6 +610,56 @@ router.get(
  * GET /settings/:key
  * Get a specific setting
  */
+router.get(
+  '/cost-thresholds',
+  authenticate,
+  authorizeRoles('super_admin', 'admin', 'staff', 'viewer'),
+  async (req, res) => {
+    try {
+      const settings = await SettingsService.getSettings();
+      const yellow_threshold = requireStoredThreshold(settings, 'cost_warning_yellow_threshold');
+      const red_threshold = requireStoredThreshold(settings, 'cost_warning_red_threshold');
+
+      res.json({ yellow_threshold, red_threshold });
+    } catch (error) {
+      console.error('Error fetching cost thresholds:', error);
+      res.status(500).json({ error: error.message || 'Failed to fetch cost thresholds' });
+    }
+  }
+);
+
+router.put(
+  '/cost-thresholds',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    try {
+      const yellowThreshold = Number(req.body?.yellowThreshold);
+      const redThreshold = Number(req.body?.redThreshold);
+
+      if (!Number.isFinite(yellowThreshold) || yellowThreshold < 0 || yellowThreshold > 100) {
+        return res.status(400).json({ error: 'yellowThreshold must be a number between 0 and 100' });
+      }
+
+      if (!Number.isFinite(redThreshold) || redThreshold < 0 || redThreshold > 100) {
+        return res.status(400).json({ error: 'redThreshold must be a number between 0 and 100' });
+      }
+
+      await SettingsService.updateSetting('cost_warning_yellow_threshold', Number(yellowThreshold.toFixed(2)));
+      await SettingsService.updateSetting('cost_warning_red_threshold', Number(redThreshold.toFixed(2)));
+
+      res.json({
+        success: true,
+        yellow_threshold: Number(yellowThreshold.toFixed(2)),
+        red_threshold: Number(redThreshold.toFixed(2))
+      });
+    } catch (error) {
+      console.error('Error updating cost thresholds:', error);
+      res.status(500).json({ error: 'Failed to update cost thresholds' });
+    }
+  }
+);
+
 router.get(
   '/:key',
   authenticate,

@@ -65,9 +65,11 @@ app.get('/invoice-report.html', (req, res) => res.render('invoice-report', { pag
 app.get('/workers-information.html', (req, res) => res.render('workers-information', { pageTitle: 'Workers Information' }));
 app.get('/leave-report.html', (req, res) => res.redirect('/workers-information.html'));
 app.get('/labour-costs.html', (req, res) => res.render('labour-costs', { pageTitle: 'Labour Costs' }));
+app.get('/construction-cost-comparison.html', (req, res) => res.render('construction-cost-comparison', { pageTitle: 'Construction Cost Comparison' }));
 app.get('/cashflow-setup.html', (req, res) => res.render('cashflow-setup', { pageTitle: 'Cashflow Setup' }));
 app.get('/cashflow-template-builder.html', (req, res) => res.render('cashflow-template-builder', { pageTitle: 'Cashflow Template Builder' }));
 app.get('/cashflow-report.html', (req, res) => res.render('cashflow-report', { pageTitle: 'Cashflow Report' }));
+app.get('/current-costs-report.html', (req, res) => res.render('current-costs-report', { pageTitle: 'Current Costs Report' }));
 app.get('/gdpr.html', (req, res) => res.render('gdpr', { pageTitle: 'GDPR Privacy Notice' }));
 app.get('/audit-log.html', (req, res) => res.render('audit-log', { pageTitle: 'Audit Log' }));
 
@@ -133,6 +135,10 @@ app.use('/invoices', invoiceRoutes);
 // Reports
 const reportRoutes = require('./routes/reports');
 app.use('/reports', reportRoutes);
+
+// Construction Cost Comparison / Cost Items
+const costItemRoutes = require('./routes/costItems');
+app.use('/cost-items', costItemRoutes);
 
 // PDFs
 const pdfRoutes = require('./routes/pdfs');

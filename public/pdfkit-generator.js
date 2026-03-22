@@ -937,9 +937,618 @@ async function generateGDPRPDF(settings = {}, action = 'download') {
   return doc;
 }
 
+async function svgToPngDataUrl(svgMarkup) {
+  if (!svgMarkup) return null;
+
+  const svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(svgBlob);
+
+  try {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+      img.src = url;
+    });
+
+    const baseWidth = img.naturalWidth || 1200;
+    const baseHeight = img.naturalHeight || 340;
+    const scale = 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(baseWidth * scale));
+    canvas.height = Math.max(1, Math.round(baseHeight * scale));
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/png');
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function hslToRgb(hue, saturationPct, lightnessPct) {
+  const s = saturationPct / 100;
+  const l = lightnessPct / 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs((hue / 60) % 2 - 1));
+  const m = l - c / 2;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+
+  if (hue < 60) {
+    r = c; g = x; b = 0;
+  } else if (hue < 120) {
+    r = x; g = c; b = 0;
+  } else if (hue < 180) {
+    r = 0; g = c; b = x;
+  } else if (hue < 240) {
+    r = 0; g = x; b = c;
+  } else if (hue < 300) {
+    r = x; g = 0; b = c;
+  } else {
+    r = c; g = 0; b = x;
+  }
+
+  return [
+    Math.round((r + m) * 255),
+    Math.round((g + m) * 255),
+    Math.round((b + m) * 255)
+  ];
+}
+
+function parseColorToRgb(colorValue) {
+  const value = String(colorValue || '').trim();
+  if (!value) return [15, 23, 42];
+
+  const hexMatch = value.match(/^#([0-9a-f]{6})$/i);
+  if (hexMatch) {
+    return hexToRgb(`#${hexMatch[1]}`);
+  }
+
+  const hslMatch = value.match(/^hsl\((\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)%\s+(\d+(?:\.\d+)?)%\)$/i);
+  if (hslMatch) {
+    return hslToRgb(Number(hslMatch[1]) % 360, Number(hslMatch[2]), Number(hslMatch[3]));
+  }
+
+  return [15, 23, 42];
+}
+
+function getSvgDimensions(svgMarkup) {
+  const fallback = { width: 1200, height: 340 };
+  const markup = String(svgMarkup || '');
+
+  const viewBoxMatch = markup.match(/viewBox\s*=\s*"([^"]+)"/i);
+  if (viewBoxMatch) {
+    const parts = viewBoxMatch[1].trim().split(/\s+/).map(Number);
+    if (parts.length === 4 && Number.isFinite(parts[2]) && Number.isFinite(parts[3]) && parts[2] > 0 && parts[3] > 0) {
+      return { width: parts[2], height: parts[3] };
+    }
+  }
+
+  const widthMatch = markup.match(/\swidth\s*=\s*"([0-9.]+)"/i);
+  const heightMatch = markup.match(/\sheight\s*=\s*"([0-9.]+)"/i);
+  const width = widthMatch ? Number(widthMatch[1]) : NaN;
+  const height = heightMatch ? Number(heightMatch[1]) : NaN;
+  if (Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0) {
+    return { width, height };
+  }
+
+  return fallback;
+}
+
+async function buildLogoAsset(logoPath) {
+  const safePath = String(logoPath || '').trim();
+  const domLogoSrc = document.getElementById('headerBrandImage')?.getAttribute('src') || '';
+
+  const candidates = [];
+  const pushCandidate = (value) => {
+    const v = String(value || '').trim();
+    if (!v) return;
+    if (!candidates.includes(v)) {
+      candidates.push(v);
+    }
+  };
+
+  if (safePath) {
+    pushCandidate(safePath);
+    pushCandidate(encodeURI(safePath));
+    if (!safePath.startsWith('http')) {
+      pushCandidate(`${window.location.origin}${safePath}`);
+      pushCandidate(`${window.location.origin}${encodeURI(safePath)}`);
+    }
+  }
+
+  if (domLogoSrc) {
+    pushCandidate(domLogoSrc);
+  }
+
+  pushCandidate('/assets/Logo.png');
+  pushCandidate(`${window.location.origin}/assets/Logo.png`);
+
+  const blobToDataUrl = (blob) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+
+  const loadImageFromSrc = (src) => new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+
+  for (const candidate of candidates) {
+    try {
+      const response = await fetch(candidate, {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store'
+      });
+
+      if (!response.ok) {
+        continue;
+      }
+
+      const blob = await response.blob();
+      if (!String(blob.type || '').startsWith('image/')) {
+        continue;
+      }
+
+      const dataUrl = await blobToDataUrl(blob);
+      const img = await loadImageFromSrc(dataUrl);
+      const width = img.naturalWidth || img.width || 1;
+      const height = img.naturalHeight || img.height || 1;
+
+      return {
+        dataUrl,
+        format: 'PNG',
+        width,
+        height
+      };
+    } catch (_) {
+      // Try next candidate URL.
+    }
+  }
+
+  return null;
+}
+
+function drawCurrentCostsPageHeader(doc, pageWidth, settings, headerData) {
+  const headerHeight = 15;
+  const headerColor = settings.header_color || '#212529';
+  const headerRGB = hexToRgb(headerColor);
+  const logoText = settings.header_logo_text || settings.company_name || 'Castlerock Homes';
+
+  doc.setFillColor(headerRGB[0], headerRGB[1], headerRGB[2]);
+  doc.rect(0, 0, pageWidth, headerHeight, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  if (headerData.logoAsset) {
+    const maxLogoHeight = 10;
+    const maxLogoWidth = 38;
+    const ratio = headerData.logoAsset.width / Math.max(1, headerData.logoAsset.height);
+    let drawWidth = maxLogoWidth;
+    let drawHeight = drawWidth / Math.max(0.01, ratio);
+    if (drawHeight > maxLogoHeight) {
+      drawHeight = maxLogoHeight;
+      drawWidth = drawHeight * ratio;
+    }
+
+    const logoX = 8;
+    const logoY = (headerHeight - drawHeight) / 2;
+    doc.addImage(headerData.logoAsset.dataUrl, headerData.logoAsset.format, logoX, logoY, drawWidth, drawHeight);
+  } else {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text(logoText, 8, 9.6);
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text(headerData.title, pageWidth - 8, 6.6, { align: 'right' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text(headerData.generatedAt, pageWidth - 8, 11.6, { align: 'right' });
+
+  doc.setTextColor(0, 0, 0);
+  return headerHeight + 8;
+}
+
+function drawLegendBlock(doc, legendItems, startX, startY, maxWidth, maxHeight) {
+  const lineHeight = 5.2;
+  const swatchWidth = 9;
+  let y = startY;
+  const safeItems = Array.isArray(legendItems) ? legendItems : [];
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(0, 0, 0);
+  doc.text('Legend', startX, y);
+  y += 5;
+
+  if (!safeItems.length) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text('No line series available', startX, y);
+    return;
+  }
+
+  const maxY = startY + maxHeight;
+  const maxItems = Math.max(1, Math.floor((maxHeight - 8) / lineHeight));
+  const visibleItems = safeItems.slice(0, maxItems);
+
+  visibleItems.forEach((item) => {
+    if (y > maxY - lineHeight) {
+      return;
+    }
+
+    const rgb = parseColorToRgb(item.color);
+    doc.setDrawColor(rgb[0], rgb[1], rgb[2]);
+    doc.setLineWidth(1.4);
+    doc.line(startX, y - 1.5, startX + swatchWidth, y - 1.5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(30, 41, 59);
+    const label = String(item.label || 'Series');
+    const clipped = doc.splitTextToSize(label, Math.max(20, maxWidth - swatchWidth - 3))[0] || label;
+    doc.text(clipped, startX + swatchWidth + 2, y);
+    y += lineHeight;
+  });
+
+  if (safeItems.length > visibleItems.length) {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`+ ${safeItems.length - visibleItems.length} more`, startX, Math.min(maxY, y + 1));
+  }
+}
+
+function drawLegendColumns(doc, legendItems, startX, startY, areaWidth, maxHeight, columnCount = 4) {
+  const items = Array.isArray(legendItems) ? legendItems : [];
+  if (!items.length) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text('No line series available', startX, startY + 5);
+    return;
+  }
+
+  const columns = Math.max(1, Math.min(columnCount, items.length));
+  const columnWidth = areaWidth / columns;
+  const rowHeight = 5.5;
+  const maxRowsPerColumn = Math.max(1, Math.floor(maxHeight / rowHeight));
+  const maxItems = columns * maxRowsPerColumn;
+  const visibleItems = items.slice(0, maxItems);
+  const rows = Math.ceil(visibleItems.length / columns);
+
+  for (let index = 0; index < visibleItems.length; index += 1) {
+    const col = Math.floor(index / rows);
+    const row = index % rows;
+    const item = visibleItems[index];
+    const x = startX + col * columnWidth;
+    const y = startY + row * rowHeight;
+
+    const rgb = parseColorToRgb(item.color);
+    doc.setDrawColor(rgb[0], rgb[1], rgb[2]);
+    doc.setLineWidth(1.6);
+    doc.line(x, y, x + 10, y);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(30, 41, 59);
+    const label = String(item.label || 'Series');
+    const clipped = doc.splitTextToSize(label, Math.max(20, columnWidth - 13))[0] || label;
+    doc.text(clipped, x + 12, y + 1);
+  }
+
+  if (items.length > visibleItems.length) {
+    const yMore = startY + maxRowsPerColumn * rowHeight + 2;
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`+ ${items.length - visibleItems.length} more`, startX, yMore);
+  }
+}
+
+function summarizeCurrentCostFilters(filters = {}) {
+  const parts = [];
+  if (filters.type) parts.push(`Type: ${filters.type}`);
+  if (filters.status) parts.push(`Status: ${filters.status}`);
+  if (filters.dateFrom || filters.dateTo) {
+    parts.push(`Range: ${filters.dateFrom || 'Any'} to ${filters.dateTo || 'Any'}`);
+  }
+  if (filters.search) parts.push(`Search: ${filters.search}`);
+  if (!parts.length) return 'All records';
+  return parts.join(' | ');
+}
+
+async function generateCurrentCostsReportPDF(reportData = {}, settings = {}, options = {}, action = 'download') {
+  await loadPDFKitLibraries();
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  const headerColor = settings.header_color || '#212529';
+  const headerRGB = hexToRgb(headerColor);
+  const logoMode = settings.header_logo_mode || 'text';
+  const logoText = settings.header_logo_text || settings.company_name || 'Castlerock Homes';
+  const logoPath = settings.logo_path || '';
+  const companyName = settings.company_name || 'Castlerock Homes';
+  const currencySymbol = settings.currency_symbol || '€';
+  const generatedAt = new Date().toLocaleString('en-GB');
+
+  let logoAsset = null;
+  try {
+    logoAsset = await buildLogoAsset(logoPath);
+  } catch (err) {
+    console.warn('Unable to load header logo from app settings:', err);
+    logoAsset = null;
+  }
+
+  const headerData = {
+    title: 'Current Costs Report',
+    generatedAt,
+    logoAsset
+  };
+
+  const firstPageWidth = doc.internal.pageSize.getWidth();
+  const firstPageMargin = 10;
+  const firstPageColumnGap = 6;
+  const firstPageColumnWidth = (firstPageWidth - (firstPageMargin * 2) - firstPageColumnGap) / 2;
+
+  let y = drawCurrentCostsPageHeader(doc, firstPageWidth, settings, headerData);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(companyName, firstPageWidth - 10, y - 3.5, { align: 'right' });
+  doc.setTextColor(0, 0, 0);
+
+  const filtersText = summarizeCurrentCostFilters(options.filters || {});
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Applied Filters', 10, y);
+  y += 5;
+  doc.setFont('helvetica', 'normal');
+  const filterLines = doc.splitTextToSize(filtersText, firstPageWidth - 20);
+  doc.text(filterLines, 10, y);
+  y += filterLines.length * 4 + 3;
+
+  const summary = reportData.summary || {};
+  const items = Array.isArray(reportData.items) ? reportData.items : [];
+  const pageOneItemsSource = Array.isArray(reportData.top_movers) && reportData.top_movers.length
+    ? reportData.top_movers
+    : items;
+
+  const summaryRows = [
+    ['Tracked Items', `${Number(summary.tracked_items || 0)}/${Number(summary.total_items || 0)}`],
+    ['Average Delta', `${Number(summary.avg_delta_percent || 0).toFixed(2)}%`],
+    ['Rising / Falling', `${Number(summary.rising_count || 0)} / ${Number(summary.falling_count || 0)}`],
+    ['Red / Yellow / Green', `${Number(summary.red_count || 0)} / ${Number(summary.yellow_count || 0)} / ${Number(summary.green_count || 0)}`],
+    ['Stable', `${Number(summary.stable_count || 0)}`],
+    ['Overlay Points', `${(reportData.overlay_points || []).length}`]
+  ];
+
+  const pageOneItemRows = pageOneItemsSource.slice(0, 10).map((item) => {
+    const cmp = item.comparison || {};
+    return [
+      item.code || '',
+      item.description || '',
+      formatCurrency(item.cost_per || 0, currencySymbol),
+      `${Number(cmp.delta_percent || 0).toFixed(2)}%`
+    ];
+  });
+
+  const pageOneStartY = y;
+
+  doc.autoTable({
+    startY: pageOneStartY,
+    head: [['Metric', 'Value']],
+    body: summaryRows,
+    theme: 'grid',
+    tableWidth: firstPageColumnWidth,
+    margin: { left: firstPageMargin },
+    styles: { fontSize: 9, cellPadding: 2 },
+    headStyles: { fillColor: headerRGB },
+    didDrawPage: () => {
+      drawCurrentCostsPageHeader(doc, doc.internal.pageSize.getWidth(), settings, headerData);
+    }
+  });
+
+  const summaryEndY = doc.lastAutoTable?.finalY || pageOneStartY;
+
+  doc.autoTable({
+    startY: pageOneStartY,
+    head: [['Code', 'Item', 'Current', 'Delta %']],
+    body: pageOneItemRows,
+    theme: 'grid',
+    tableWidth: firstPageColumnWidth,
+    margin: { left: firstPageMargin + firstPageColumnWidth + firstPageColumnGap, right: firstPageMargin },
+    styles: { fontSize: 8, cellPadding: 1.8, overflow: 'linebreak' },
+    columnStyles: {
+      0: { cellWidth: 16 },
+      1: { cellWidth: 46 },
+      2: { cellWidth: 16, halign: 'right' },
+      3: { cellWidth: 14, halign: 'right' }
+    },
+    headStyles: { fillColor: headerRGB },
+    pageBreak: 'avoid',
+    rowPageBreak: 'avoid',
+    didDrawPage: () => {
+      drawCurrentCostsPageHeader(doc, doc.internal.pageSize.getWidth(), settings, headerData);
+    }
+  });
+
+  const pageOneItemsEndY = doc.lastAutoTable?.finalY || pageOneStartY;
+  y = Math.max(summaryEndY, pageOneItemsEndY) + 4;
+
+  const chartSvg = options.chartSvg || '';
+  const legendItems = Array.isArray(options.legendItems) ? options.legendItems : [];
+  if (chartSvg) {
+    doc.addPage('a3', 'landscape');
+    y = drawCurrentCostsPageHeader(doc, doc.internal.pageSize.getWidth(), settings, headerData);
+
+    const chartPageWidth = doc.internal.pageSize.getWidth();
+    const chartPageHeight = doc.internal.pageSize.getHeight();
+    const marginX = 12;
+    const chartAreaTop = y + 2;
+    const legendAreaHeight = 54;
+    const chartAreaBottomGap = 6;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(15, 23, 42);
+    doc.text('Trend Chart', marginX, y);
+
+    try {
+      const chartPng = await svgToPngDataUrl(chartSvg);
+      if (chartPng) {
+        const svgSize = getSvgDimensions(chartSvg);
+        const maxChartWidth = chartPageWidth - (marginX * 2);
+        const maxChartHeight = chartPageHeight - chartAreaTop - legendAreaHeight - chartAreaBottomGap;
+        const aspect = svgSize.width / Math.max(1, svgSize.height);
+
+        let chartWidth = maxChartWidth;
+        let chartHeight = chartWidth / aspect;
+
+        if (chartHeight > maxChartHeight) {
+          chartHeight = maxChartHeight;
+          chartWidth = chartHeight * aspect;
+        }
+
+        const chartX = marginX + ((maxChartWidth - chartWidth) / 2);
+        const chartY = chartAreaTop;
+
+        doc.addImage(chartPng, 'PNG', chartX, chartY, chartWidth, chartHeight);
+
+        const legendTop = chartY + chartHeight + 8;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 0);
+        doc.text('Legend', marginX, legendTop);
+
+        drawLegendColumns(
+          doc,
+          legendItems,
+          marginX,
+          legendTop + 6,
+          maxChartWidth,
+          Math.max(24, chartPageHeight - (legendTop + 12)),
+          4
+        );
+      }
+    } catch (err) {
+      console.warn('Unable to embed chart in Current Costs PDF:', err);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Chart could not be rendered.', marginX, y + 8);
+    }
+
+    doc.addPage('a4', 'portrait');
+    y = drawCurrentCostsPageHeader(doc, doc.internal.pageSize.getWidth(), settings, headerData);
+  } else {
+    doc.addPage('a4', 'portrait');
+    y = drawCurrentCostsPageHeader(doc, doc.internal.pageSize.getWidth(), settings, headerData);
+  }
+
+  const bodyRows = items.map((item) => {
+    const cmp = item.comparison || {};
+    const avg = cmp.average_cost === null || cmp.average_cost === undefined
+      ? '-'
+      : formatCurrency(cmp.average_cost, currencySymbol);
+    return [
+      item.code || '',
+      item.description || '',
+      item.type || '',
+      formatCurrency(item.cost_per || 0, currencySymbol),
+      avg,
+      `${Number(cmp.delta_percent || 0).toFixed(2)}%`,
+      String(cmp.status || '').toUpperCase(),
+      String(Number(cmp.sample_count || 0))
+    ];
+  });
+
+  const detailPageWidth = doc.internal.pageSize.getWidth();
+  const detailPageHeight = doc.internal.pageSize.getHeight();
+  const detailIsPortrait = detailPageHeight > detailPageWidth;
+  const detailColumnStyles = detailIsPortrait
+    ? {
+      0: { cellWidth: 16 },
+      1: { cellWidth: 62 },
+      2: { cellWidth: 20 },
+      3: { cellWidth: 22, halign: 'right' },
+      4: { cellWidth: 20, halign: 'right' },
+      5: { cellWidth: 14, halign: 'right' },
+      6: { cellWidth: 14, halign: 'center' },
+      7: { cellWidth: 12, halign: 'right' }
+    }
+    : {
+      0: { cellWidth: 24 },
+      1: { cellWidth: 86 },
+      2: { cellWidth: 28 },
+      3: { cellWidth: 28, halign: 'right' },
+      4: { cellWidth: 24, halign: 'right' },
+      5: { cellWidth: 18, halign: 'right' },
+      6: { cellWidth: 18, halign: 'center' },
+      7: { cellWidth: 16, halign: 'right' }
+    };
+  const detailFontSize = detailIsPortrait ? 7 : 8;
+
+  if (y > 185) {
+    doc.addPage();
+    y = drawCurrentCostsPageHeader(doc, doc.internal.pageSize.getWidth(), settings, headerData);
+  }
+
+  doc.autoTable({
+    startY: y,
+    head: [['Code', 'Description', 'Type', 'Current Cost', '3M Avg', 'Delta %', 'Status', 'Samples']],
+    body: bodyRows,
+    theme: 'grid',
+    styles: { fontSize: detailFontSize, cellPadding: 1.6, overflow: 'linebreak' },
+    columnStyles: detailColumnStyles,
+    headStyles: { fillColor: headerRGB },
+    margin: { left: 10, right: 10 },
+    didDrawPage: () => {
+      drawCurrentCostsPageHeader(doc, doc.internal.pageSize.getWidth(), settings, headerData);
+    }
+  });
+
+  const totalPages = doc.getNumberOfPages();
+  for (let page = 1; page <= totalPages; page += 1) {
+    doc.setPage(page);
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    doc.text(`Page ${page} of ${totalPages}`, pageWidth - 10, pageHeight - 5, { align: 'right' });
+  }
+
+  const datePart = new Date().toISOString().slice(0, 10);
+  const fileName = `Current-Costs-Report-${datePart}.pdf`;
+  if (action === 'download') {
+    doc.save(fileName);
+  } else if (action === 'view') {
+    window.open(doc.output('bloburl'), '_blank');
+  }
+
+  return doc;
+}
+
 // Export functions
 window.generatePOPDF = generatePOPDF;
 window.generateWorkerPDF = generateWorkerPDF;
 window.generateGDPRPDF = generateGDPRPDF;
+window.generateCurrentCostsReportPDF = generateCurrentCostsReportPDF;
 window.loadPDFKitLibraries = loadPDFKitLibraries;
 
