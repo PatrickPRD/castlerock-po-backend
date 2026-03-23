@@ -1,4 +1,30 @@
 (function() {
+  // Module-level delegated handler for unlink badge button — works regardless of which
+  // page/modal the badge lives in, before any lookup instance is created.
+  document.addEventListener('click', function(e) {
+    const btn = e.target.closest('[data-badge-unlink]');
+    if (!btn) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const badge = btn.closest('[data-field="costItemBadge"]');
+    if (!badge) return;
+    // Walk up to find the row container that holds the hidden cost item fields.
+    let container = badge.parentElement;
+    while (container && !container.querySelector('[data-field="costItemId"]')) {
+      container = container.parentElement;
+    }
+    if (!container) return;
+    const idField = container.querySelector('[data-field="costItemId"]');
+    const codeField = container.querySelector('[data-field="costItemCode"]');
+    const typeField = container.querySelector('[data-field="costItemType"]');
+    const descField = container.querySelector('[data-field="description"]');
+    if (idField) idField.value = '';
+    if (codeField) codeField.value = '';
+    if (typeField) typeField.value = '';
+    if (descField) delete descField.dataset.selectedCostItemCode;
+    badge.hidden = true;
+  }, true);
+
   function createCostItemLookup(options) {
     const suggestionsElement = options?.suggestionsElement;
     const authFetch = options?.authFetch || window.fetch.bind(window);
@@ -42,6 +68,7 @@
       items.forEach((item) => {
         suggestionMap.set(String(item.label || '').trim(), item);
         suggestionMap.set(String(item.code || '').trim().toUpperCase(), item);
+        suggestionMap.set(String(item.description || '').trim(), item);
       });
 
       return items;
@@ -63,6 +90,8 @@
       if (descriptionField) {
         delete descriptionField.dataset.selectedCostItemCode;
       }
+      const badge = row.querySelector('[data-field="costItemBadge"]');
+      if (badge) badge.hidden = true;
     }
 
     function applyItemToRow(row, item) {
@@ -95,6 +124,13 @@
       }
       if (typeField) {
         typeField.value = item.type || '';
+      }
+
+      const badge = row.querySelector('[data-field="costItemBadge"]');
+      if (badge) {
+        const codeSpan = badge.querySelector('[data-badge-code]');
+        if (codeSpan) codeSpan.textContent = item.code || '';
+        badge.hidden = false;
       }
 
       return true;

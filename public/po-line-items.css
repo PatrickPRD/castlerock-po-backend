@@ -283,6 +283,49 @@
   min-width: 0;
 }
 
+/* Cost item linked badge */
+.cost-item-linked-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 8px;
+  background: rgba(52, 211, 153, 0.1);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  border-radius: 12px;
+  font-size: 11px;
+  color: #059669;
+  margin-top: 5px;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.cost-item-linked-badge[hidden] {
+  display: none;
+}
+
+.cost-item-badge-text {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.cost-item-badge-unlink {
+  background: none;
+  border: none;
+  padding: 0 0 0 2px;
+  margin: 0;
+  line-height: 1;
+  font-size: 13px;
+  color: #9ca3af;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.cost-item-badge-unlink:hover {
+  color: #dc2626;
+}
+
 
 .line-items-table td {
   vertical-align: middle;

@@ -12,7 +12,52 @@ function normalizeCode(value) {
 }
 
 function toMoney(value) {
-  const numeric = Number(value);
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  let candidate = value;
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    // Support common spreadsheet/user-entered formats like 1,234.56, 1.234,56 or €1,234.56.
+    let normalized = trimmed
+      .replace(/^\((.*)\)$/, '-$1')
+      .replace(/[\s$€£]/g, '');
+
+    const hasComma = normalized.includes(',');
+    const hasDot = normalized.includes('.');
+
+    if (hasComma && hasDot) {
+      if (normalized.lastIndexOf(',') > normalized.lastIndexOf('.')) {
+        // Example: 1.234,56 -> 1234.56
+        normalized = normalized.replace(/\./g, '').replace(',', '.');
+      } else {
+        // Example: 1,234.56 -> 1234.56
+        normalized = normalized.replace(/,/g, '');
+      }
+    } else if (hasComma) {
+      if (/^-?\d{1,3}(,\d{3})+$/.test(normalized)) {
+        // Example: 1,234,567 -> 1234567
+        normalized = normalized.replace(/,/g, '');
+      } else {
+        // Example: 12,34 -> 12.34
+        normalized = normalized.replace(',', '.');
+      }
+    }
+
+    candidate = normalized;
+
+    if (!/^-?\d+(\.\d+)?$/.test(candidate)) {
+      return null;
+    }
+  }
+
+  const numeric = Number(candidate);
   return Number.isFinite(numeric) ? Number(numeric.toFixed(2)) : null;
 }
 
@@ -637,7 +682,7 @@ async function getCostItemHistory(id, { limit = 24 } = {}) {
 
   const [rows] = await db.query(
     `
-    SELECT point_cost, point_at, source
+    SELECT point_cost, point_at, source, point_id
     FROM (
       SELECT
         pli.unit_price AS point_cost,
@@ -671,7 +716,44 @@ async function getCostItemHistory(id, { limit = 24 } = {}) {
     [itemId, item.code, itemId, safeLimit]
   );
 
-  const historyRows = rows.slice().reverse();
+  // Ensure the latest uploaded/manual change is visible even when PO points consume the merged limit.
+  const [latestManualRows] = await db.query(
+    `
+    SELECT
+      h.new_cost_per AS point_cost,
+      h.changed_at AS point_at,
+      'manual' AS source,
+      h.id AS point_id
+    FROM cost_item_cost_history h
+    WHERE h.cost_item_id = ?
+      AND h.changed_at >= DATE_SUB(CURDATE(), INTERVAL ${THREE_MONTH_COMPARISON_WINDOW} MONTH)
+      AND h.change_source <> 'seed_po'
+    ORDER BY h.changed_at DESC, h.id DESC
+    LIMIT 1
+    `,
+    [itemId]
+  );
+
+  const mergedRows = rows.slice();
+  const latestManual = latestManualRows[0];
+  if (latestManual) {
+    const manualKey = `manual:${latestManual.point_id}`;
+    const hasLatestManual = mergedRows.some((row) => `manual:${row.point_id}` === manualKey);
+    if (!hasLatestManual) {
+      mergedRows.push(latestManual);
+    }
+  }
+
+  mergedRows.sort((a, b) => {
+    const aTime = new Date(a.point_at).getTime();
+    const bTime = new Date(b.point_at).getTime();
+    if (aTime !== bTime) {
+      return aTime - bTime;
+    }
+    return Number(a.point_id) - Number(b.point_id);
+  });
+
+  const historyRows = mergedRows;
   const points = [];
 
   if (historyRows.length > 0) {
@@ -796,8 +878,62 @@ async function getCurrentCostsReport({
     [fromDate, toDate, itemIds, fromDate, toDate, itemIds]
   );
 
+  // Keep report charts consistent with item history by ensuring the latest manual/uploaded
+  // point per item is present, even when it falls outside the currently queried PO-heavy set.
+  const [manualRows] = await db.query(
+    `
+    SELECT
+      h.cost_item_id,
+      h.new_cost_per AS point_cost,
+      h.changed_at AS point_at,
+      'manual' AS source,
+      h.id AS point_id
+    FROM cost_item_cost_history h
+    WHERE h.cost_item_id IN (?)
+      AND h.changed_at >= DATE_SUB(CURDATE(), INTERVAL ${THREE_MONTH_COMPARISON_WINDOW} MONTH)
+      AND h.change_source <> 'seed_po'
+    ORDER BY h.cost_item_id ASC, h.changed_at DESC, h.id DESC
+    `,
+    [itemIds]
+  );
+
+  const latestManualByItem = new Map();
+  manualRows.forEach((row) => {
+    const id = Number(row.cost_item_id);
+    if (!latestManualByItem.has(id)) {
+      latestManualByItem.set(id, row);
+    }
+  });
+
+  const combinedRows = pointRows.slice();
+  const seenKeys = new Set(
+    combinedRows.map((row) => `${row.source}:${row.cost_item_id}:${row.point_id}`)
+  );
+
+  latestManualByItem.forEach((row) => {
+    const key = `${row.source}:${row.cost_item_id}:${row.point_id}`;
+    if (!seenKeys.has(key)) {
+      combinedRows.push(row);
+      seenKeys.add(key);
+    }
+  });
+
+  combinedRows.sort((a, b) => {
+    const itemCompare = Number(a.cost_item_id) - Number(b.cost_item_id);
+    if (itemCompare !== 0) {
+      return itemCompare;
+    }
+
+    const timeCompare = new Date(a.point_at).getTime() - new Date(b.point_at).getTime();
+    if (timeCompare !== 0) {
+      return timeCompare;
+    }
+
+    return Number(a.point_id) - Number(b.point_id);
+  });
+
   const pointMap = new Map();
-  pointRows.forEach((row) => {
+  combinedRows.forEach((row) => {
     const id = Number(row.cost_item_id);
     if (!pointMap.has(id)) {
       pointMap.set(id, []);
@@ -810,7 +946,7 @@ async function getCurrentCostsReport({
   });
 
   const overlayBuckets = new Map();
-  pointRows.forEach((row) => {
+  combinedRows.forEach((row) => {
     const key = new Date(row.point_at).toISOString().slice(0, 10);
     if (!overlayBuckets.has(key)) {
       overlayBuckets.set(key, { sum: 0, count: 0 });

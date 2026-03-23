@@ -100,8 +100,19 @@ function getCellValue(row, columnNumber) {
     return null;
   }
 
-  if (typeof value === 'object' && value.text !== undefined) {
-    return value.text;
+  if (typeof value === 'object') {
+    // Excel formula cells are objects; use the computed result when present.
+    if (value.result !== undefined && value.result !== null) {
+      return value.result;
+    }
+
+    if (value.text !== undefined) {
+      return value.text;
+    }
+
+    if (Array.isArray(value.richText)) {
+      return value.richText.map((part) => part?.text || '').join('');
+    }
   }
 
   return value;

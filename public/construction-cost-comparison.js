@@ -407,7 +407,7 @@ ensureAuthenticated();
         rows.push(`
           <tr class="cost-item-row status-row-${status} ${item.is_deleted ? 'is-deleted' : ''}">
             <td class="code-cell">
-              <button class="expand-toggle" type="button" data-expand-toggle="${safeId}" aria-expanded="${isExpanded ? 'true' : 'false'}">
+              <button class="expand-toggle" type="button" data-expand-toggle="${safeId}" data-expand-group="${escapeHtml(type)}" aria-expanded="${isExpanded ? 'true' : 'false'}">
                 ${isExpanded ? '-' : '+'}
               </button>
               <span>${escapeHtml(item.code)}</span>
@@ -890,29 +890,92 @@ ensureAuthenticated();
     }
   }
 
+  function escapeSelectorValue(value) {
+    if (window.CSS && typeof window.CSS.escape === 'function') {
+      return window.CSS.escape(String(value));
+    }
+
+    return String(value).replace(/"/g, '\\"');
+  }
+
+  function scrollToTableRow(selector) {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const row = tableBody.querySelector(selector);
+        if (row) {
+          row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+    });
+  }
+
   tableBody.addEventListener('click', (event) => {
     const toggle = event.target.closest('[data-group-toggle]');
     if (toggle) {
       const group = toggle.getAttribute('data-group-toggle');
+      let openedGroup = null;
       if (collapsedGroups.has(group)) {
+        // Close current open group.
         collapsedGroups.delete(group);
+        expandedItems.clear();
+        openedGroup = group;
       } else {
+        // Open only one group at a time.
+        collapsedGroups.clear();
         collapsedGroups.add(group);
+        expandedItems.clear();
       }
       renderTable();
+      if (openedGroup) {
+        scrollToTableRow(`[data-group-toggle="${escapeSelectorValue(openedGroup)}"]`);
+      }
       return;
     }
 
     const expandToggle = event.target.closest('[data-expand-toggle]');
     if (expandToggle) {
       const itemId = Number(expandToggle.getAttribute('data-expand-toggle'));
+      const group = expandToggle.getAttribute('data-expand-group');
+      let openedItemId = null;
       if (expandedItems.has(itemId)) {
         expandedItems.delete(itemId);
       } else {
+        // Keep only one group open and one item expanded at a time.
+        if (group) {
+          collapsedGroups.clear();
+          collapsedGroups.add(group);
+        }
+        expandedItems.clear();
         expandedItems.add(itemId);
+        openedItemId = itemId;
       }
       renderTable();
+      if (openedItemId) {
+        scrollToTableRow(`[data-expanded-row="${openedItemId}"]`);
+      }
       return;
+    }
+
+    // Clicking anywhere on a type or item row toggles it, excluding interactive controls.
+    const clickedInteractive = event.target.closest('button, a, input, select, textarea, label');
+    if (!clickedInteractive) {
+      const groupRow = event.target.closest('tr.group-row');
+      if (groupRow) {
+        const groupToggle = groupRow.querySelector('[data-group-toggle]');
+        if (groupToggle) {
+          groupToggle.click();
+          return;
+        }
+      }
+
+      const itemRow = event.target.closest('tr.cost-item-row');
+      if (itemRow) {
+        const itemToggle = itemRow.querySelector('[data-expand-toggle]');
+        if (itemToggle) {
+          itemToggle.click();
+          return;
+        }
+      }
     }
 
     const actionButton = event.target.closest('[data-action]');

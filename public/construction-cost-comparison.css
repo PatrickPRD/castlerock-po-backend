@@ -79,6 +79,13 @@
   border-bottom: 1px solid #d7e1ea;
 }
 
+.comparison-table tbody tr.group-row:hover,
+.comparison-table tbody tr.group-row:hover td,
+.comparison-table tbody tr.cost-item-row:hover,
+.comparison-table tbody tr.cost-item-row:hover td {
+  cursor: pointer;
+}
+
 .group-toggle {
   border: none;
   background: none;

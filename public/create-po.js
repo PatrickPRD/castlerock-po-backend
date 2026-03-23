@@ -236,6 +236,10 @@ function addLineItemRow(item = {}) {
       <input data-field="costItemId" type="hidden" value="${item.cost_item_id || item.costItemId || ''}">
       <input data-field="costItemCode" type="hidden" value="${item.cost_item_code || item.costItemCode || ''}">
       <input data-field="costItemType" type="hidden" value="${item.cost_item_type || item.costItemType || ''}">
+      <span data-field="costItemBadge"${(item.cost_item_id || item.costItemId || item.cost_item_code || item.costItemCode) ? '' : ' hidden'} class="cost-item-linked-badge">
+        <span class="cost-item-badge-text">Cost DB: <span data-badge-code>${item.cost_item_code || item.costItemCode || ''}</span></span>
+        <button type="button" data-badge-unlink class="cost-item-badge-unlink" aria-label="Unlink cost item" title="Remove link to cost database">&times;</button>
+      </span>
     </td>
     <td><input class="line-item-input line-item-qty" data-field="quantity" type="number" step="0.01" min="0" value="${item.quantity || ''}" placeholder="0"></td>
     <td><input class="line-item-input line-item-unit" data-field="unit" type="text" value="${item.unit || ''}" placeholder="Unit"></td>
