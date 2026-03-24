@@ -1,7 +1,7 @@
 # PDF Generation Module - Documentation
 
 ## Overview
-The PDF generation module provides professional PO (Purchase Order) PDF generation with dynamic branding based on admin-configured site settings. The module uses Puppeteer for high-quality HTML-to-PDF conversion.
+The PDF generation module provides professional PO (Purchase Order), worker, and GDPR PDFs with dynamic branding based on admin-configured site settings. PDF rendering is browser-side using PDFKit, while the backend provides authenticated JSON data via `/pdf-data/*` endpoints.
 
 ## Features
 - **Professional Design**: Clean, modern PO template with company branding
@@ -33,18 +33,34 @@ npm run migrate
 
 ## API Endpoints
 
-### Download PO as PDF (Attachment)
+### Get PO Data for PDF Rendering
 ```
-GET /pdfs/po/:poId
+GET /pdf-data/po/:poId
 Headers: Authorization: Bearer <token>
-Response: PDF file (attachment)
+Response: { poData, invoices, settings }
 ```
 
-### View PO as PDF (Inline)
+### Get Worker Data for PDF Rendering
 ```
-GET /pdfs/po-preview/:poId
+GET /pdf-data/worker/:workerId
 Headers: Authorization: Bearer <token>
-Response: PDF file (inline in browser)
+Role: super_admin or admin
+Response: { workerData, leaveSummary, settings, userRole }
+```
+
+### Get Blank Worker Data for PDF Rendering
+```
+GET /pdf-data/worker-blank
+Headers: Authorization: Bearer <token>
+Role: super_admin or admin
+Response: { workerData, leaveSummary, settings, isBlank, userRole }
+```
+
+### Get GDPR Data for PDF Rendering
+```
+GET /pdf-data/gdpr
+Headers: Authorization: Bearer <token>
+Response: { settings }
 ```
 
 ### Get All Settings
@@ -89,6 +105,7 @@ Response: { success, message, updates }
 ### 1. Include the Utility Script
 Add this to any page where you want PDF functionality:
 ```html
+<script src="/pdfkit-generator.js"></script>
 <script src="/pdf-utils.js"></script>
 ```
 
@@ -203,7 +220,7 @@ await fetch('/settings/bulk', {
 ### Customizing the PDF Template
 To modify the PDF template design, edit the `generatePOHTML()` function in:
 ```
-src/services/pdfService.js
+public/pdfkit-generator.js
 ```
 
 You can customize:
@@ -244,49 +261,15 @@ try {
 ## Troubleshooting
 
 ### "Failed to generate PDF"
-- Check that Puppeteer is installed: `npm list puppeteer`
+
+- Ensure `/pdfkit-generator.js` is included before `/pdf-utils.js`
+- Ensure PDFKit CDN scripts load successfully in browser dev tools
+- Ensure `/pdf-data/*` requests return `200` and valid JSON
 - Ensure database connection is working
-- Check server logs for detailed error messages
 
-### EC2 (Amazon Linux 2023) - Missing Chromium Dependencies
-If you see errors about missing Chrome/Chromium on EC2, install the
-dependencies on the server:
-```bash
-sudo dnf update -y
-sudo dnf install -y \
-  atk \
-  cairo \
-  cups-libs \
-  dbus-glib \
-  expat \
-  fontconfig \
-  freetype \
-  glib2 \
-  gtk3 \
-  libX11 \
-  libXcomposite \
-  libXcursor \
-  libXdamage \
-  libXext \
-  libXfixes \
-  libXi \
-  libXrandr \
-  libXrender \
-  libXScrnSaver \
-  libXtst \
-  nss \
-  pango \
-  alsa-lib \
-  xorg-x11-fonts-Type1 \
-  xorg-x11-fonts-misc \
-  xorg-x11-utils
-
-# Optional: add more fonts
-sudo dnf install -y google-noto-sans-fonts
-
-# If running as non-root, ensure Puppeteer cache is writable
-export PUPPETEER_CACHE_DIR=/home/ec2-user/.cache/puppeteer
-```
+### EC2 (Amazon Linux 2023) - PDF Dependencies
+No Chromium/Puppeteer server dependencies are required.
+PDF rendering runs in the browser using PDFKit.
 
 ### PDF renders incorrectly
 - Verify logo path exists: `/assets/logo.png`

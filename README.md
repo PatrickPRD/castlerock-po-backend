@@ -114,7 +114,7 @@ npm run cleanup-test-data# Remove test data
 - **Express.js** - Web framework
 - **MySQL2** - Database driver
 - **ExcelJS** - Excel generation
-- **Puppeteer** - PDF generation
+- **PDFKit (Browser-Side)** - Client-side PDF generation via `/pdf-data` APIs
 - **JWT** - Authentication
 - **Bcrypt** - Password hashing
 - **Nodemailer** - Email sending
@@ -183,15 +183,11 @@ For production deployment to AWS:
 3. **Multi-App Installation**:
    Deploy multiple versions of the application on the same EC2 instance with separate ports, databases, and systemd services.
 
-### Puppeteer / PDF Generation
-If using PDF features on EC2, install Chromium dependencies:
+### PDF Generation
+PDFs are generated in the browser using PDFKit and data from `/pdf-data/*` endpoints.
 
-```bash
-sudo dnf update -y
-sudo dnf install -y chromium
-```
-
-See [AWS_EC2_RDS_DEPLOYMENT.md](AWS_EC2_RDS_DEPLOYMENT.md#step-2-prepare-ec2-environment) for full dependency list.
+- No server-side Puppeteer dependency
+- No Chromium system packages required on EC2 for PDF features
 
 ## 🏗 Architecture
 
@@ -211,7 +207,6 @@ See [AWS_EC2_RDS_DEPLOYMENT.md](AWS_EC2_RDS_DEPLOYMENT.md#step-2-prepare-ec2-env
 │   │   └── ...                     # Other routes
 │   ├── services/
 │   │   ├── setupWizardService.js   # Setup wizard logic
-│   │   ├── pdfService.js           # PDF generation
 │   │   └── ...                     # Other services
 │   └── views/                      # EJS templates
 ├── public/
@@ -233,7 +228,7 @@ See [AWS_EC2_RDS_DEPLOYMENT.md](AWS_EC2_RDS_DEPLOYMENT.md#step-2-prepare-ec2-env
 - **Backend**: Express.js 5.x (Node.js)
 - **Database**: MySQL 5.7+
 - **Frontend**: EJS templates + Bootstrap 5 + Vanilla JS
-- **PDF**: Puppeteer + Chromium
+- **PDF**: Browser-side PDFKit + `/pdf-data` endpoints
 - **Excel**: ExcelJS
 - **Auth**: JWT + bcrypt
 - **Email**: Nodemailer

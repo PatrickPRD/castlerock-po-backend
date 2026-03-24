@@ -139,11 +139,6 @@ app.use('/reports', reportRoutes);
 // Construction Cost Comparison / Cost Items
 const costItemRoutes = require('./routes/costItems');
 app.use('/cost-items', costItemRoutes);
-
-// PDFs
-const pdfRoutes = require('./routes/pdfs');
-app.use('/pdfs', pdfRoutes);
-
 // PDF Data (for browser-based PDFKit generation)
 const pdfDataRoutes = require('./routes/pdfData');
 app.use('/pdf-data', pdfDataRoutes);

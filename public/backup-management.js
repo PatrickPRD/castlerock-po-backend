@@ -81,7 +81,7 @@ async function loadBackups() {
   try {
     spinner.style.display = 'block';
     const response = await api('/backups/list');
-    allBackups = response.backups || [];
+    allBackups = Array.isArray(response.backups) ? response.backups : [];
 
     const totalPages = Math.max(1, Math.ceil(allBackups.length / ITEMS_PER_PAGE));
     currentPage = Math.min(Math.max(1, currentPage), totalPages);
@@ -117,6 +117,30 @@ async function loadBackups() {
   }
 }
 
+function updatePaginationSummary(totalItems, page) {
+  const startEl = document.getElementById('paginationStart');
+  const endEl = document.getElementById('paginationEnd');
+  const totalEl = document.getElementById('paginationTotal');
+
+  if (!startEl || !endEl || !totalEl) return;
+
+  if (!totalItems || totalItems <= 0) {
+    startEl.textContent = '0';
+    endEl.textContent = '0';
+    totalEl.textContent = '0';
+    return;
+  }
+
+  const safePage = Math.max(1, page || 1);
+  const startIndex = (safePage - 1) * ITEMS_PER_PAGE;
+  const start = Math.min(totalItems, startIndex + 1);
+  const end = Math.min(totalItems, startIndex + ITEMS_PER_PAGE);
+
+  startEl.textContent = String(start);
+  endEl.textContent = String(end);
+  totalEl.textContent = String(totalItems);
+}
+
 // Render a specific page of backups
 function renderPage(page) {
   const tableBody = document.getElementById('backupsTableBody');
@@ -125,6 +149,7 @@ function renderPage(page) {
   const pageBackups = allBackups.slice(startIndex, endIndex);
   
   tableBody.innerHTML = pageBackups.map(backup => {
+    const escapedFilename = escapeHtml(backup.filename || '');
     const formatBadge = backup.type === 'ctbackup' 
       ? '<span class="badge bg-success"><i class="bi bi-shield-check me-1"></i>CTBackup</span>'
       : '<span class="badge bg-secondary"><i class="bi bi-file-earmark-code me-1"></i>SQL</span>';
@@ -137,7 +162,7 @@ function renderPage(page) {
       <tr>
         <td>
           <i class="bi bi-file-earmark-arrow-down me-2"></i>
-          <span class="font-monospace">${backup.filename}</span>
+          <span class="font-monospace">${escapedFilename}</span>
           ${metaInfo}
         </td>
         <td>${formatBadge}</td>
@@ -145,13 +170,13 @@ function renderPage(page) {
         <td>${formatFileSize(backup.size)}</td>
         <td>
           <div class="btn-group btn-group-sm" role="group">
-            <button class="btn btn-outline-primary" onclick="downloadBackup('${backup.filename}')" title="Download">
+            <button class="btn btn-outline-primary" data-backup-action="download" data-filename="${escapedFilename}" title="Download">
               <i class="bi bi-download"></i>
           </button>
-          <button class="btn btn-outline-success" onclick="openRestoreConfirmation('${backup.filename}')" title="Restore">
+          <button class="btn btn-outline-success" data-backup-action="restore" data-filename="${escapedFilename}" title="Restore">
             <i class="bi bi-arrow-clockwise"></i>
           </button>
-          <button class="btn btn-outline-danger" onclick="deleteBackupConfirm('${backup.filename}')" title="Delete">
+          <button class="btn btn-outline-danger" data-backup-action="delete" data-filename="${escapedFilename}" title="Delete">
             <i class="bi bi-trash"></i>
           </button>
         </div>
@@ -165,18 +190,14 @@ function renderPage(page) {
 
 // Render pagination controls
 function renderPagination() {
-  const totalPages = Math.ceil(allBackups.length / ITEMS_PER_PAGE);
+  const totalItems = Array.isArray(allBackups) ? allBackups.length : 0;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
   const paginationButtons = document.getElementById('paginationButtons');
   const paginationControls = document.getElementById('paginationControls');
 
-  if (allBackups.length === 0) {
+  if (totalItems === 0) {
     if (paginationButtons) paginationButtons.innerHTML = '';
-    const startEl = document.getElementById('paginationStart');
-    const endEl = document.getElementById('paginationEnd');
-    const totalEl = document.getElementById('paginationTotal');
-    if (startEl) startEl.textContent = '0';
-    if (endEl) endEl.textContent = '0';
-    if (totalEl) totalEl.textContent = '0';
+    updatePaginationSummary(0, 1);
     if (paginationControls) paginationControls.style.display = 'none';
     return;
   }
@@ -184,7 +205,7 @@ function renderPagination() {
   if (paginationControls) paginationControls.style.display = 'flex';
   
   if (totalPages <= 1) {
-    paginationButtons.innerHTML = '';
+    if (paginationButtons) paginationButtons.innerHTML = '';
   } else {
     let buttonsHtml = '';
     
@@ -219,15 +240,10 @@ function renderPagination() {
       </li>
     `;
     
-    paginationButtons.innerHTML = buttonsHtml;
+    if (paginationButtons) paginationButtons.innerHTML = buttonsHtml;
   }
-  
-  // Update pagination info
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, allBackups.length);
-  document.getElementById('paginationStart').textContent = allBackups.length > 0 ? startIndex + 1 : 0;
-  document.getElementById('paginationEnd').textContent = endIndex;
-  document.getElementById('paginationTotal').textContent = allBackups.length;
+
+  updatePaginationSummary(totalItems, currentPage);
 }
 
 // Navigate to a specific page
@@ -1175,6 +1191,26 @@ document.addEventListener('DOMContentLoaded', () => {
   resetConfirmInput.addEventListener('input', (e) => {
     confirmResetBtn.disabled = e.target.value !== 'RESET TO WIZARD';
   });
+
+  const backupsTableBody = document.getElementById('backupsTableBody');
+  if (backupsTableBody) {
+    backupsTableBody.addEventListener('click', async event => {
+      const button = event.target.closest('button[data-backup-action]');
+      if (!button) return;
+
+      const action = button.getAttribute('data-backup-action');
+      const filename = button.getAttribute('data-filename');
+      if (!filename) return;
+
+      if (action === 'download') {
+        await downloadBackup(filename);
+      } else if (action === 'restore') {
+        await openRestoreConfirmation(filename);
+      } else if (action === 'delete') {
+        await deleteBackupConfirm(filename);
+      }
+    });
+  }
   
   // Load initial backups
   loadBackups();

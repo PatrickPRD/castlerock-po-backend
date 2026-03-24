@@ -432,11 +432,11 @@ sudo yum install -y git
 sudo yum install -y gcc g++ make python3
 ```
 
-### 2.2 Install Puppeteer Dependencies (for PDF generation)
+### 2.2 PDF Dependencies
 
-```bash
-sudo yum install -y chromium
-```
+No extra server packages are required for PDF generation.
+
+PDFs are generated in the browser (client-side PDFKit) using `/pdf-data/*` endpoints.
 
 ## Step 3: Deploy Application
 
