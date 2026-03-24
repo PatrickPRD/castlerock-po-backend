@@ -64,8 +64,6 @@ async function logAudit({
 }) {
   const parsedRecordId = Number(record_id);
   const normalizedRecordId = Number.isInteger(parsedRecordId) && parsedRecordId >= 0 ? parsedRecordId : 0;
-
-  console.log('🔍 logAudit called with:', { table_name, record_id: normalizedRecordId, action, changed_by });
   
   try {
     // Extract IP and user agent from request if available
@@ -80,8 +78,6 @@ async function logAudit({
                    null;
     }
     const user_agent = req ? (req.get?.('user-agent') || null) : null;
-    
-    console.log('🔍 Inserting into audit_log:', { changed_by, action, table_name, record_id: normalizedRecordId, ip_address });
     
     await pool.query(
       `
@@ -100,7 +96,6 @@ async function logAudit({
         user_agent
       ]
     );
-    console.log(`✓ Audit log: ${action} on ${table_name}#${normalizedRecordId} by user ${changed_by}`);
 
     // Run cleanup asynchronously without blocking
     cleanupOldAuditLogs().catch(err => {
