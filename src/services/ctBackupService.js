@@ -12,6 +12,7 @@ const path = require('path');
 
 const gzip = promisify(zlib.gzip);
 const gunzip = promisify(zlib.gunzip);
+const storage = require('./backupStorageService');
 
 // Get backup secret from environment (should be set in .env)
 const BACKUP_SECRET = process.env.BACKUP_SECRET || 'default-insecure-secret-change-me';
@@ -213,8 +214,6 @@ async function createCTBackup(backupData, user = {}) {
  */
 async function saveCTBackupFile(backup, filename = null) {
   try {
-    await fs.mkdir(BACKUP_DIR, { recursive: true });
-
     // Generate filename with timestamp
     const timestamp = new Date()
       .toISOString()
@@ -223,25 +222,25 @@ async function saveCTBackupFile(backup, filename = null) {
       .slice(0, 19);
 
     const backupFilename = filename || `backup_${timestamp}.CTBackup`;
-    const filePath = path.join(BACKUP_DIR, backupFilename);
 
     // Serialize and compress
     const jsonData = JSON.stringify(backup);
     const compressed = await gzip(jsonData);
 
-    // Write to file
-    await fs.writeFile(filePath, compressed);
+    // Store via storage abstraction (S3 on EC2, local disk otherwise)
+    await storage.saveFile(backupFilename, compressed);
 
-    const stats = await fs.stat(filePath);
+    const compressedSize = compressed.length;
+    const originalSize = Buffer.byteLength(jsonData);
 
     return {
       filename: backupFilename,
-      path: filePath,
-      size: stats.size,
-      originalSize: Buffer.byteLength(jsonData),
-      compressionRatio: ((1 - stats.size / Buffer.byteLength(jsonData)) * 100).toFixed(2),
-      created: stats.mtime,
-      type: 'ctbackup'
+      size: compressedSize,
+      originalSize,
+      compressionRatio: ((1 - compressedSize / originalSize) * 100).toFixed(2),
+      created: new Date(),
+      type: 'ctbackup',
+      storage: storage.isS3Enabled() ? 's3' : 'local'
     };
   } catch (err) {
     throw new Error(`Failed to save CTBackup file: ${err.message}`);
@@ -256,13 +255,9 @@ async function saveCTBackupFile(backup, filename = null) {
 async function loadCTBackupFile(filename) {
   try {
     const safeName = path.basename(filename);
-    const filePath = path.join(BACKUP_DIR, safeName);
 
-    // Verify file exists
-    await fs.access(filePath);
-
-    // Read and decompress
-    const compressed = await fs.readFile(filePath);
+    // Load via storage abstraction (S3 on EC2, local disk otherwise)
+    const compressed = await storage.loadFile(safeName);
     const jsonData = await gunzip(compressed);
     const backup = JSON.parse(jsonData.toString());
 

@@ -8,6 +8,7 @@ const {
   loadCTBackupFile,
   getCTBackupMetadata
 } = require('./ctBackupService');
+const storage = require('./backupStorageService');
 
 const BACKUP_DIR = path.join(__dirname, '../../backups');
 
@@ -807,47 +808,42 @@ module.exports = {
 };
 
 /**
- * List all backup files in the backups directory (both SQL and CTBackup formats)
+ * List all backup files in the configured storage (local disk or S3).
  */
 async function listBackups() {
   try {
-    await fs.mkdir(BACKUP_DIR, { recursive: true });
-    const files = await fs.readdir(BACKUP_DIR);
-    
+    const files = await storage.listFiles();
+
     const backups = [];
-    for (const file of files) {
-      // Support both old SQL and new CTBackup formats
-      if (!file.endsWith('.sql') && !file.endsWith('.CTBackup')) continue;
-      
-      const filePath = path.join(BACKUP_DIR, file);
-      const stats = await fs.stat(filePath);
-      
+    for (const { filename, size, created } of files) {
+      if (!filename.endsWith('.sql') && !filename.endsWith('.CTBackup')) continue;
+
       const backup = {
-        filename: file,
-        size: stats.size,
-        created: stats.mtime,
-        type: file.endsWith('.CTBackup') ? 'ctbackup' : 'sql'
+        filename,
+        size,
+        created,
+        type: filename.endsWith('.CTBackup') ? 'ctbackup' : 'sql'
       };
 
       // For CTBackup files, try to load metadata
       if (backup.type === 'ctbackup') {
         try {
-          const metadata = await getCTBackupMetadata(file);
+          const metadata = await getCTBackupMetadata(filename);
           backup.metadata = metadata.metadata;
           backup.tableCount = metadata.tableCount;
           backup.formatVersion = metadata.version;
         } catch (err) {
-          console.warn(`Could not read metadata for ${file}:`, err.message);
+          console.warn(`Could not read metadata for ${filename}:`, err.message);
           backup.metadata = null;
         }
       }
-      
+
       backups.push(backup);
     }
-    
+
     // Sort by creation date, newest first
     backups.sort((a, b) => b.created - a.created);
-    
+
     return backups;
   } catch (err) {
     console.error('Error listing backups:', err);
@@ -856,83 +852,71 @@ async function listBackups() {
 }
 
 /**
- * Get a specific backup file content (handles both SQL and CTBackup formats)
+ * Get a specific backup file content (handles both SQL and CTBackup formats).
  */
 async function getBackupFile(filename) {
   // Sanitize filename to prevent directory traversal
   const safeName = path.basename(filename);
-  const filePath = path.join(BACKUP_DIR, safeName);
-  
-  // Check if file exists
-  try {
-    await fs.access(filePath);
-  } catch (err) {
+
+  const exists = await storage.fileExists(safeName);
+  if (!exists) {
     throw new Error('Backup file not found');
   }
 
   // Handle CTBackup format
   if (safeName.endsWith('.CTBackup')) {
-    const backup = await loadCTBackupFile(safeName);
-    return backup;
+    return await loadCTBackupFile(safeName);
   }
 
-  // Handle SQL format (backward compatibility)
-  const content = await fs.readFile(filePath, 'utf-8');
-  return content;
+  // Handle SQL format
+  const buffer = await storage.loadFile(safeName);
+  return buffer.toString('utf-8');
 }
 
 /**
- * Delete a backup file
+ * Delete a backup file.
  */
 async function deleteBackup(filename) {
   // Sanitize filename to prevent directory traversal
   const safeName = path.basename(filename);
-  const filePath = path.join(BACKUP_DIR, safeName);
-  
-  // Check if file exists
-  try {
-    await fs.access(filePath);
-  } catch (err) {
+
+  const exists = await storage.fileExists(safeName);
+  if (!exists) {
     throw new Error('Backup file not found');
   }
-  
-  await fs.unlink(filePath);
+
+  await storage.deleteFile(safeName);
   return { success: true, message: `Backup ${safeName} deleted` };
 }
 
 /**
- * Save a backup to disk
- * @param {string} sqlContent - SQL backup content
- * @returns {Object} result - Object with filename and deletedOldest flag
+ * Save a SQL backup to the configured storage.
+ * @param {string} sqlContent - SQL backup content.
+ * @returns {Object} result - Object with filename and deletedOldest flag.
  */
 async function saveBackup(sqlContent) {
   try {
-    await fs.mkdir(BACKUP_DIR, { recursive: true });
-    
-    // Check if we need to delete oldest backup (max 20 backups)
     const MAX_BACKUPS = 20;
     const existingBackups = await listBackups();
     let deletedOldest = null;
-    
+
     if (existingBackups.length >= MAX_BACKUPS) {
-      // Delete the oldest backup
       const oldestBackup = existingBackups[existingBackups.length - 1];
       await deleteBackup(oldestBackup.filename);
       deletedOldest = oldestBackup.filename;
       console.log(`🗑️ Deleted oldest backup to maintain limit: ${oldestBackup.filename}`);
     }
-    
+
     const timestamp = new Date().toISOString()
       .replace(/[:.]/g, '-')
       .replace('T', '_')
       .slice(0, 19);
     const filename = `backup_${timestamp}.sql`;
-    const filePath = path.join(BACKUP_DIR, filename);
-    
-    await fs.writeFile(filePath, sqlContent, 'utf-8');
-    
-    return { 
-      filename, 
+
+    await storage.saveFile(filename, sqlContent);
+
+    return {
+      filename,
       deletedOldest,
       isAtLimit: existingBackups.length >= MAX_BACKUPS
     };
