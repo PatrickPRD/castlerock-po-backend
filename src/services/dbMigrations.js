@@ -96,7 +96,7 @@ function getMigrationFiles() {
   return fs
     .readdirSync(migrationsDir)
     .filter((file) => file.endsWith('.sql'))
-    .sort();
+    .sort((a, b) => a.localeCompare(b));
 }
 
 function splitSqlStatements(sql) {
@@ -208,6 +208,96 @@ function extractCreatedTables(sql) {
   return Array.from(tableNames);
 }
 
+function extractReferencedTables(sql) {
+  const tableNames = new Set();
+  const foreignKeyRegex = /REFERENCES\s+`?([a-zA-Z0-9_]+)`?/gi;
+
+  let match;
+  while ((match = foreignKeyRegex.exec(sql)) !== null) {
+    tableNames.add(match[1]);
+  }
+
+  return Array.from(tableNames);
+}
+
+function getSortedMigrationFiles() {
+  const files = getMigrationFiles();
+
+  if (files.length <= 1) {
+    return files;
+  }
+
+  const migrationMeta = files.map((file) => {
+    const filePath = path.join(__dirname, '../../database/migrations', file);
+    const sql = fs.readFileSync(filePath, 'utf8');
+
+    return {
+      file,
+      createdTables: extractCreatedTables(sql),
+      referencedTables: extractReferencedTables(sql)
+    };
+  });
+
+  const tableToFile = new Map();
+  for (const meta of migrationMeta) {
+    for (const tableName of meta.createdTables) {
+      if (!tableToFile.has(tableName)) {
+        tableToFile.set(tableName, meta.file);
+      }
+    }
+  }
+
+  const dependentsByFile = new Map();
+  const incomingCount = new Map();
+
+  for (const meta of migrationMeta) {
+    dependentsByFile.set(meta.file, new Set());
+    incomingCount.set(meta.file, 0);
+  }
+
+  for (const meta of migrationMeta) {
+    for (const referencedTable of meta.referencedTables) {
+      const dependencyFile = tableToFile.get(referencedTable);
+      if (!dependencyFile || dependencyFile === meta.file) {
+        continue;
+      }
+
+      const dependents = dependentsByFile.get(dependencyFile);
+      if (dependents.has(meta.file)) {
+        continue;
+      }
+
+      dependents.add(meta.file);
+      incomingCount.set(meta.file, (incomingCount.get(meta.file) || 0) + 1);
+    }
+  }
+
+  const available = files.filter((file) => (incomingCount.get(file) || 0) === 0);
+  const sorted = [];
+
+  while (available.length > 0) {
+    available.sort((a, b) => a.localeCompare(b));
+    const nextFile = available.shift();
+    sorted.push(nextFile);
+
+    const dependents = dependentsByFile.get(nextFile) || new Set();
+    for (const dependent of dependents) {
+      const nextCount = (incomingCount.get(dependent) || 0) - 1;
+      incomingCount.set(dependent, nextCount);
+
+      if (nextCount === 0) {
+        available.push(dependent);
+      }
+    }
+  }
+
+  if (sorted.length !== files.length) {
+    return files;
+  }
+
+  return sorted;
+}
+
 async function getMissingCreatedTables(sql) {
   const expectedTables = extractCreatedTables(sql);
   if (expectedTables.length === 0) {
@@ -275,7 +365,7 @@ async function executeMigrationStatements(file, sql, mode = 'apply') {
 async function reconcileAppliedMigrationsAgainstSchema(hasLegacyMigrationName) {
   const [appliedRows] = await pool.query('SELECT filename FROM schema_migrations');
   const applied = new Set(appliedRows.map((row) => row.filename));
-  const files = getMigrationFiles();
+  const files = getSortedMigrationFiles();
 
   if (!files.length || applied.size === 0) {
     return;
@@ -330,7 +420,7 @@ async function applyPendingSqlMigrations() {
 
   const [appliedRows] = await pool.query('SELECT filename FROM schema_migrations');
   const applied = new Set(appliedRows.map((row) => row.filename));
-  const files = getMigrationFiles();
+  const files = getSortedMigrationFiles();
 
   if (!files.length) {
     console.log('ℹ️  No SQL migration files found.');
