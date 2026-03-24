@@ -1,0 +1,57 @@
+.cashflow-calendar-table .calendar-month-row td {
+  vertical-align: middle;
+  font-weight: 600;
+}
+
+.cashflow-calendar-table .calendar-month-label {
+  font-weight: 700;
+}
+
+.cashflow-calendar-table .calendar-month-details td {
+  background: #f8f9fa;
+  border-top: none;
+}
+
+.calendar-week-panel {
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.calendar-week-panel .table {
+  margin-bottom: 0;
+}
+
+.calendar-week-panel th {
+  font-size: 12px;
+  color: #6c757d;
+  font-weight: 600;
+}
+
+.calendar-week-panel td {
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+.variance-savings {
+  color: #198754;
+}
+
+.variance-overspend {
+  color: #dc3545;
+}
+
+.variance-neutral {
+  color: #6c757d;
+}
+
+@media (max-width: 768px) {
+  .cashflow-calendar-table {
+    min-width: 720px;
+  }
+
+  .calendar-week-panel {
+    padding: 8px;
+  }
+}

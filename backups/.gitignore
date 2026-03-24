@@ -1,6 +1,7 @@
 # Ignore all backup files
 *.sql
 *.json
+*.CTBackup
 
 # But keep the folder
 !.gitignore

@@ -34,6 +34,12 @@ const lineItemsSection = document.getElementById('lineItemsSection');
 const lineItemsBody = document.getElementById('lineItemsBody');
 const addLineItemBtn = document.getElementById('addLineItem');
 const lineItemSuggestions = document.getElementById('lineItemSuggestions');
+const costItemLookup = window.createCostItemLookup
+  ? window.createCostItemLookup({
+      suggestionsElement: lineItemSuggestions,
+      headers: { Authorization: 'Bearer ' + token }
+    })
+  : null;
 
 let lineItemsMode = false;
 let lineItemSearchTimeout = null;
@@ -210,23 +216,12 @@ function handleLineItemInput(row) {
 }
 
 function fetchLineItemSuggestions(query) {
-  if (!query) {
+  if (!costItemLookup || !query) {
     lineItemSuggestions.innerHTML = '';
     return;
   }
 
-  fetch(`/purchase-orders/line-items/search?q=${encodeURIComponent(query)}`, {
-    headers: { Authorization: 'Bearer ' + token }
-  })
-    .then(res => res.json())
-    .then(items => {
-      lineItemSuggestions.innerHTML = '';
-      items.forEach(item => {
-        const opt = document.createElement('option');
-        opt.value = item;
-        lineItemSuggestions.appendChild(opt);
-      });
-    })
+  costItemLookup.fetchSuggestions(query)
     .catch(() => {
       lineItemSuggestions.innerHTML = '';
     });
@@ -236,7 +231,16 @@ function addLineItemRow(item = {}) {
   const row = document.createElement('tr');
 
   row.innerHTML = `
-    <td><input class="line-item-input line-item-desc" data-field="description" type="text" list="lineItemSuggestions" value="${item.description || ''}" placeholder="Description"></td>
+    <td>
+      <input class="line-item-input line-item-desc" data-field="description" type="text" list="lineItemSuggestions" value="${item.description || ''}" placeholder="Description">
+      <input data-field="costItemId" type="hidden" value="${item.cost_item_id || item.costItemId || ''}">
+      <input data-field="costItemCode" type="hidden" value="${item.cost_item_code || item.costItemCode || ''}">
+      <input data-field="costItemType" type="hidden" value="${item.cost_item_type || item.costItemType || ''}">
+      <span data-field="costItemBadge"${(item.cost_item_id || item.costItemId || item.cost_item_code || item.costItemCode) ? '' : ' hidden'} class="cost-item-linked-badge">
+        <span class="cost-item-badge-text">Cost DB: <span data-badge-code>${item.cost_item_code || item.costItemCode || ''}</span></span>
+        <button type="button" data-badge-unlink class="cost-item-badge-unlink" aria-label="Unlink cost item" title="Remove link to cost database">&times;</button>
+      </span>
+    </td>
     <td><input class="line-item-input line-item-qty" data-field="quantity" type="number" step="0.01" min="0" value="${item.quantity || ''}" placeholder="0"></td>
     <td><input class="line-item-input line-item-unit" data-field="unit" type="text" value="${item.unit || ''}" placeholder="Unit"></td>
     <td><input class="line-item-input line-item-cost" data-field="unitPrice" type="number" step="0.01" min="0" value="${item.unit_price || item.unitPrice || ''}" placeholder="0.00"></td>
@@ -245,11 +249,15 @@ function addLineItemRow(item = {}) {
   `;
 
   const descriptionInput = row.querySelector('[data-field="description"]');
+  const unitInput = row.querySelector('[data-field="unit"]');
   const qtyInput = row.querySelector('[data-field="quantity"]');
   const unitPriceInput = row.querySelector('[data-field="unitPrice"]');
   const removeBtn = row.querySelector('[data-field="remove"]');
 
   descriptionInput.addEventListener('input', () => {
+    if (costItemLookup) {
+      costItemLookup.clearSelectionForRow(row);
+    }
     clearTimeout(lineItemSearchTimeout);
     const query = descriptionInput.value.trim();
     lineItemSearchTimeout = setTimeout(() => {
@@ -261,8 +269,25 @@ function addLineItemRow(item = {}) {
     }, 200);
   });
 
+  descriptionInput.addEventListener('change', () => {
+    if (costItemLookup && costItemLookup.applySelectionFromInput(row)) {
+      handleLineItemInput(row);
+    }
+  });
+
+  descriptionInput.addEventListener('blur', () => {
+    if (costItemLookup && costItemLookup.applySelectionFromInput(row)) {
+      handleLineItemInput(row);
+    }
+  });
+
   qtyInput.addEventListener('input', () => handleLineItemInput(row));
   unitPriceInput.addEventListener('input', () => handleLineItemInput(row));
+  unitInput.addEventListener('input', () => {
+    if (costItemLookup) {
+      costItemLookup.clearSelectionForRow(row);
+    }
+  });
 
   removeBtn.addEventListener('click', () => {
     row.remove();
@@ -301,7 +326,10 @@ function collectLineItems() {
       description: descriptionValue,
       quantity,
       unit: unitValue || null,
-      unitPrice
+      unitPrice,
+      costItemId: Number(row.querySelector('[data-field="costItemId"]').value) || null,
+      costItemCode: row.querySelector('[data-field="costItemCode"]').value || null,
+      costItemType: row.querySelector('[data-field="costItemType"]').value || null
     });
   });
 

@@ -23,17 +23,6 @@ async function generatePONumber(conn, siteId) {
     [siteId, year, month]
   );
 
-  await conn.query(
-    `
-    UPDATE po_sequences
-    SET last_number = last_number + 1
-    WHERE site_id = ?
-      AND year = ?
-      AND month = ?
-    `,
-    [siteId, year, month]
-  );
-
   const [[seq]] = await conn.query(
     `
     SELECT last_number
@@ -46,11 +35,37 @@ async function generatePONumber(conn, siteId) {
     [siteId, year, month]
   );
 
+  const prefix = site.site_letter + yearDigit + String(month);
+  const likePattern = `${prefix}%`;
+  const suffixStartPos = prefix.length + 1;
+
+  const [[maxRow]] = await conn.query(
+    `
+    SELECT MAX(CAST(SUBSTRING(po_number, ?) AS UNSIGNED)) AS max_number
+    FROM purchase_orders
+    WHERE po_number LIKE ?
+    `,
+    [suffixStartPos, likePattern]
+  );
+
+  const maxExistingNumber = Number(maxRow?.max_number || 0);
+  const currentSequence = Number(seq?.last_number || 0);
+  const nextNumber = Math.max(currentSequence, maxExistingNumber) + 1;
+
+  await conn.query(
+    `
+    UPDATE po_sequences
+    SET last_number = ?
+    WHERE site_id = ?
+      AND year = ?
+      AND month = ?
+    `,
+    [nextNumber, siteId, year, month]
+  );
+
   return (
-    site.site_letter +
-    yearDigit +
-    String(month) +
-    String(seq.last_number).padStart(3, '0')
+    prefix +
+    String(nextNumber).padStart(3, '0')
   );
 }
 

@@ -1,0 +1,89 @@
+<%- include('partials/head', { pageTitle: 'Current Costs Report', styles: ['admin.css', 'current-costs-report.css?v=20260322g'] }) %>
+<%- include('partials/header', { pageTitle: 'Current Costs Report' }) %>
+
+<main class="container">
+  <div class="card p-4 mb-4">
+    <h3 style="margin: 0 0 1rem 0;">Current Costs Report</h3>
+    <div class="report-controls row g-3 align-items-end">
+      <div class="col-12 col-md-3">
+        <label for="typeFilter" class="form-label">Type</label>
+        <select id="typeFilter" class="form-select">
+          <option value="">All Types</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-2">
+        <label for="statusFilter" class="form-label">Status</label>
+        <select id="statusFilter" class="form-select">
+          <option value="">All</option>
+          <option value="green">Green</option>
+          <option value="yellow">Yellow</option>
+          <option value="red">Red</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-2">
+        <label for="dateFrom" class="form-label">From</label>
+        <input id="dateFrom" type="date" class="form-control">
+      </div>
+      <div class="col-12 col-md-2">
+        <label for="dateTo" class="form-label">To</label>
+        <input id="dateTo" type="date" class="form-control">
+      </div>
+      <div class="col-12 col-md-3">
+        <label for="searchInput" class="form-label">Search</label>
+        <input id="searchInput" type="text" class="form-control" placeholder="Code, type, description...">
+      </div>
+      <div class="col-12 d-flex gap-2 flex-wrap">
+        <button id="applyFiltersBtn" class="btn btn-primary">Apply Filters</button>
+        <button id="resetFiltersBtn" class="btn btn-outline-secondary">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-4 mb-4">
+    <div class="summary-grid" id="summaryGrid"></div>
+  </div>
+
+  <div class="card p-4 mb-4 chart-only-card">
+    <div class="chart-head">
+      <h5 class="mb-0">Overlay Trend Chart</h5>
+      <div class="chart-controls">
+        <button id="downloadCurrentCostsPdfBtn" type="button" class="btn btn-outline-dark btn-sm">Download PDF</button>
+        <button id="openChartOnlyBtn" type="button" class="btn btn-outline-secondary btn-sm">Full Screen</button>
+        <button id="exitChartOnlyBtn" type="button" class="btn btn-secondary btn-sm">Exit Full Screen</button>
+        <label class="form-check-label chart-toggle-label" for="showOverallTrend">
+          <input class="form-check-input me-1" type="checkbox" id="showOverallTrend" checked>
+          Show Overall Trend
+        </label>
+        <label class="form-check-label chart-toggle-label" for="showGridLines">
+          <input class="form-check-input me-1" type="checkbox" id="showGridLines" checked>
+          Show Grid
+        </label>
+        <small class="text-muted" id="chartMeta"></small>
+      </div>
+    </div>
+    <div id="trendChartWrap" class="trend-chart-wrap"></div>
+    <div id="trendLineTooltip" class="trend-line-tooltip" style="display:none;"></div>
+  </div>
+
+  <div class="card p-0 overflow-hidden">
+    <div class="current-costs-table-wrap">
+      <table class="po-table current-costs-table mb-0">
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Description</th>
+            <th>Type</th>
+            <th class="text-end">Current Cost</th>
+            <th class="text-end">3M Avg</th>
+            <th class="text-end">Delta %</th>
+            <th>Status</th>
+            <th class="text-end">Samples</th>
+          </tr>
+        </thead>
+        <tbody id="topMoversTable"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/footer', { scripts: ['/ui.js', '/pdfkit-generator.js', 'current-costs-report.js?v=20260322h'], includeNavScript: true }) %>

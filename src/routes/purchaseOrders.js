@@ -6,6 +6,7 @@ const authorizeRoles = require('../middleware/authorizeRoles');
 const db = require('../db');
 const { generatePONumber } = require('../services/poService');
 const logAudit = require('../services/auditService');
+const { captureAuditFailure } = require('../middleware/auditFailureLogger');
 
 function normalizeLineItems(lineItems) {
   if (!Array.isArray(lineItems)) return [];
@@ -16,13 +17,19 @@ function normalizeLineItems(lineItems) {
       const quantity = Number(item.quantity) || 0;
       const unit = item.unit ? String(item.unit).trim() : null;
       const unitPrice = Number(item.unitPrice ?? item.unit_price) || 0;
+      const costItemId = Number(item.costItemId ?? item.cost_item_id) || null;
+      const costItemCode = item.costItemCode ? String(item.costItemCode).trim().toUpperCase() : (item.cost_item_code ? String(item.cost_item_code).trim().toUpperCase() : null);
+      const costItemType = item.costItemType ? String(item.costItemType).trim() : (item.cost_item_type ? String(item.cost_item_type).trim() : null);
 
       return {
         line_number: index + 1,
         description,
         quantity,
         unit,
-        unit_price: unitPrice
+        unit_price: unitPrice,
+        cost_item_id: Number.isInteger(costItemId) && costItemId > 0 ? costItemId : null,
+        cost_item_code: costItemCode || null,
+        cost_item_type: costItemType || null
       };
     })
     .filter(item => item.description && item.quantity > 0 && item.unit_price >= 0);
@@ -33,6 +40,117 @@ function calculateLineItemsNet(lineItems) {
     (sum, item) => sum + item.quantity * item.unit_price,
     0
   );
+}
+
+async function syncCostItemsFromLineItems(connection, lineItems, changedBy, poId) {
+  if (!Array.isArray(lineItems) || lineItems.length === 0) {
+    return;
+  }
+
+  const latestByKey = new Map();
+
+  lineItems.forEach((item) => {
+    const unitPrice = Number(item.unit_price);
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      return;
+    }
+
+    const normalizedPrice = Number(unitPrice.toFixed(2));
+    const key = item.cost_item_id
+      ? `id:${item.cost_item_id}`
+      : (item.cost_item_code ? `code:${item.cost_item_code}` : null);
+
+    if (!key) {
+      return;
+    }
+
+    latestByKey.set(key, {
+      cost_item_id: item.cost_item_id || null,
+      cost_item_code: item.cost_item_code || null,
+      unit_price: normalizedPrice,
+      line_number: item.line_number || null
+    });
+  });
+
+  if (latestByKey.size === 0) {
+    return;
+  }
+
+  const targetIds = [...new Set(
+    [...latestByKey.values()]
+      .map((item) => Number(item.cost_item_id))
+      .filter((id) => Number.isInteger(id) && id > 0)
+  )];
+
+  const targetCodes = [...new Set(
+    [...latestByKey.values()]
+      .map((item) => String(item.cost_item_code || '').trim().toUpperCase())
+      .filter(Boolean)
+  )];
+
+  const whereParts = [];
+  const params = [];
+
+  if (targetIds.length > 0) {
+    whereParts.push('id IN (?)');
+    params.push(targetIds);
+  }
+
+  if (targetCodes.length > 0) {
+    whereParts.push('code IN (?)');
+    params.push(targetCodes);
+  }
+
+  if (whereParts.length === 0) {
+    return;
+  }
+
+  const [existingRows] = await connection.query(
+    `
+    SELECT id, code, cost_per
+    FROM cost_items
+    WHERE is_deleted = 0
+      AND (${whereParts.join(' OR ')})
+    `,
+    params
+  );
+
+  const byId = new Map();
+  const byCode = new Map();
+  existingRows.forEach((row) => {
+    byId.set(Number(row.id), row);
+    byCode.set(String(row.code || '').toUpperCase(), row);
+  });
+
+  for (const item of latestByKey.values()) {
+    const matched = item.cost_item_id
+      ? byId.get(Number(item.cost_item_id))
+      : byCode.get(String(item.cost_item_code || '').toUpperCase());
+
+    if (!matched) {
+      continue;
+    }
+
+    const oldCost = Number(matched.cost_per);
+    const newCost = Number(item.unit_price);
+
+    if (!Number.isFinite(oldCost) || !Number.isFinite(newCost) || oldCost === newCost) {
+      continue;
+    }
+
+    await connection.query(
+      'UPDATE cost_items SET cost_per = ?, last_updated = CURRENT_TIMESTAMP WHERE id = ?',
+      [newCost, matched.id]
+    );
+
+    await connection.query(
+      `
+      INSERT INTO cost_item_cost_history (cost_item_id, old_cost_per, new_cost_per, changed_by, change_source, po_id, po_line_number)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+      [matched.id, oldCost, newCost, changedBy || null, 'po_line_item', poId || null, item.line_number || null]
+    );
+  }
 }
 
 /* ======================================================
@@ -188,6 +306,9 @@ router.get(
         id,
         line_number,
         description,
+        cost_item_id,
+        cost_item_code,
+        cost_item_type,
         quantity,
         unit,
         unit_price,
@@ -240,6 +361,8 @@ router.post(
     if (!stageId) {
       return res.status(400).json({ error: 'Stage is required' });
     }
+
+    let poNumberForError = null;
     try {
       const normalizedLineItems = normalizeLineItems(lineItems);
       const net = normalizedLineItems.length
@@ -254,6 +377,7 @@ router.post(
         await conn.beginTransaction();
 
         const poNumber = await generatePONumber(conn, siteId);
+        poNumberForError = poNumber;
 
         const [result] = await conn.query(`
           INSERT INTO purchase_orders
@@ -290,6 +414,9 @@ router.post(
         if (normalizedLineItems.length) {
           const values = normalizedLineItems.map((item, index) => [
             result.insertId,
+            item.cost_item_id,
+            item.cost_item_code,
+            item.cost_item_type,
             index + 1,
             item.description,
             item.quantity,
@@ -300,11 +427,13 @@ router.post(
           await conn.query(
             `
             INSERT INTO po_line_items
-              (po_id, line_number, description, quantity, unit, unit_price)
+              (po_id, cost_item_id, cost_item_code, cost_item_type, line_number, description, quantity, unit, unit_price)
             VALUES ?
             `,
             [values]
           );
+
+          await syncCostItemsFromLineItems(conn, normalizedLineItems, req.user.id, result.insertId);
         }
 
         await conn.commit();
@@ -345,6 +474,15 @@ router.post(
         });
       } catch (error) {
         await conn.rollback();
+        captureAuditFailure(req, error, {
+          operation: 'purchase_order_create',
+          supplierId,
+          siteId,
+          locationId,
+          poDate,
+          stageId,
+          lineItemsCount: Array.isArray(lineItems) ? lineItems.length : 0
+        });
         throw error;
       } finally {
         conn.release();
@@ -352,6 +490,31 @@ router.post(
 
     } catch (err) {
       console.error('CREATE PO ERROR:', err);
+      if (err && err.code === 'ER_DUP_ENTRY') {
+        captureAuditFailure(req, err, {
+          operation: 'purchase_order_create',
+          supplierId,
+          siteId,
+          locationId,
+          poDate,
+          stageId,
+          poNumber: poNumberForError,
+          lineItemsCount: Array.isArray(lineItems) ? lineItems.length : 0,
+          reason: 'duplicate_po_number'
+        });
+        return res.status(409).json({ error: 'PO number collision detected. Please retry.' });
+      }
+
+      captureAuditFailure(req, err, {
+        operation: 'purchase_order_create',
+        supplierId,
+        siteId,
+        locationId,
+        poDate,
+        stageId,
+        poNumber: poNumberForError,
+        lineItemsCount: Array.isArray(lineItems) ? lineItems.length : 0
+      });
       res.status(500).json({ error: 'Failed to create purchase order' });
     }
   }
@@ -430,6 +593,9 @@ router.put(
       if (normalizedLineItems.length) {
         const values = normalizedLineItems.map((item, index) => [
           id,
+          item.cost_item_id,
+          item.cost_item_code,
+          item.cost_item_type,
           index + 1,
           item.description,
           item.quantity,
@@ -440,11 +606,13 @@ router.put(
         await conn.query(
           `
           INSERT INTO po_line_items
-            (po_id, line_number, description, quantity, unit, unit_price)
+            (po_id, cost_item_id, cost_item_code, cost_item_type, line_number, description, quantity, unit, unit_price)
           VALUES ?
           `,
           [values]
         );
+
+        await syncCostItemsFromLineItems(conn, normalizedLineItems, req.user.id, id);
       }
 
       await conn.commit();
@@ -499,6 +667,16 @@ router.put(
     } catch (error) {
       await conn.rollback();
       console.error('UPDATE PO ERROR:', error);
+      captureAuditFailure(req, error, {
+        operation: 'purchase_order_update',
+        purchaseOrderId: id,
+        supplierId,
+        siteId,
+        locationId,
+        poDate,
+        stageId,
+        lineItemsCount: Array.isArray(lineItems) ? lineItems.length : 0
+      });
       res.status(500).json({ error: 'Failed to save changes' });
     } finally {
       conn.release();

@@ -1,0 +1,332 @@
+<%- include('partials/head', { pageTitle: 'Cashflow Setup', styles: ['admin.css', 'cashflow-setup.css?v=20260304i'] }) %>
+<%- include('partials/header', { pageTitle: 'Cashflow Setup' }) %>
+
+<main class="container py-4">
+  <div class="card p-4 mb-4">
+    <h3 class="mb-2">Cashflow Setup</h3>
+    <p class="text-muted mb-0">Configure locations and planning assumptions for cashflow forecasting.</p>
+  </div>
+
+  <div class="card p-4">
+    <form id="cashflowSetupForm" class="d-grid gap-3">
+      <div>
+        <label for="overallStartValue" class="form-label">Overall Cashflow Start Point (<span data-currency-symbol>€</span>)</label>
+        <input id="overallStartValue" type="number" step="0.01" min="0" class="form-control" placeholder="e.g. 100000" />
+      </div>
+
+      <hr class="my-2">
+
+      <div class="wizard-box">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0">Locations</h5>
+          <span id="wizardProgress" class="text-muted small">0 locations configured</span>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="button" id="openWizardModalBtn" class="btn btn-outline-primary">Add Location</button>
+          <button type="button" id="openBulkUploadModalBtn" class="btn btn-outline-secondary">Bulk Upload</button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-striped align-middle mb-0" id="configuredLocationsTable">
+          <thead>
+            <tr>
+              <th style="width: 44px;"></th>
+              <th style="min-width: 220px;">Configured Location</th>
+              <th style="min-width: 190px;">Template</th>
+              <th style="min-width: 170px;">Est. Construction Cost (<span data-currency-symbol>€</span>)</th>
+            </tr>
+          </thead>
+          <tbody id="configuredLocationsBody">
+            <tr>
+              <td colspan="4" class="text-center text-muted py-4">No configured locations yet. Use Add Location above.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <hr class="my-2">
+
+      <div class="wizard-box">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0">Capital Costs</h5>
+          <div class="d-flex gap-2 align-items-center">
+            <span id="capitalCostsSummary" class="text-muted small">Total (inc VAT): <span data-currency-symbol>€</span>0.00</span>
+            <button type="button" id="openCapitalCostModalBtn" class="btn btn-outline-primary btn-sm">Add Capital Cost</button>
+          </div>
+        </div>
+        <div class="d-flex gap-2 mb-2">
+          <span id="capitalCostsStatus" class="align-self-center text-muted small"></span>
+        </div>
+
+        <div class="table-responsive mt-3">
+          <table class="table table-striped align-middle mb-0" id="capitalCostsTable">
+            <thead>
+              <tr>
+                <th style="width: 44px;"></th>
+                <th>Title</th>
+                <th class="text-end">Total inc VAT (<span data-currency-symbol>€</span>)</th>
+                <th>Date Applied</th>
+              </tr>
+            </thead>
+            <tbody id="capitalCostsBody">
+              <tr>
+                <td colspan="4" class="text-center text-muted py-3">No capital costs added.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mt-2">
+        <span id="cashflowSetupStatus" class="align-self-center text-muted small">Changes save automatically.</span>
+      </div>
+    </form>
+  </div>
+
+  <div id="cashflowWizardModal" class="modal" style="display:none;">
+    <div class="modal-content cashflow-wizard-modal">
+      <div class="modal-header">
+        <h3 id="wizardModalTitle">Add Location</h3>
+        <button class="modal-close" type="button" id="closeWizardModalBtn">×</button>
+      </div>
+
+      <div class="wizard-step" data-step="1">
+        <label for="wizardSiteSelect" class="form-label">Select Site</label>
+        <select id="wizardSiteSelect" class="form-select mb-3">
+          <option value="">Select site</option>
+        </select>
+
+        <label for="wizardLocationSelect" class="form-label">Select Location</label>
+        <select id="wizardLocationSelect" class="form-select mb-3">
+          <option value="">Select location</option>
+        </select>
+
+        <div id="wizardTemplateSelectWrapper">
+          <label for="wizardTemplateSelect" class="form-label">Select Template</label>
+          <select id="wizardTemplateSelect" class="form-select mb-3">
+            <option value="">Select template</option>
+          </select>
+        </div>
+
+        <label for="wizardEstimatedCost" class="form-label">Est. Construction Cost (<span data-currency-symbol>€</span>)</label>
+        <input id="wizardEstimatedCost" type="number" step="0.01" min="0" class="form-control mb-3" />
+
+        <label for="wizardSellingPrice" class="form-label">Location Selling Price (<span data-currency-symbol>€</span>)</label>
+        <input id="wizardSellingPrice" type="number" step="0.01" min="0" class="form-control mb-3" />
+
+        <label for="wizardStartOnSiteDate" class="form-label">Start on Site Date</label>
+        <input id="wizardStartOnSiteDate" type="date" class="form-control mb-3" />
+
+        <label for="wizardCompletionDate" class="form-label">Completion Date (Auto)</label>
+        <input id="wizardCompletionDate" type="date" class="form-control mb-3" readonly />
+
+        <label for="wizardHouseHandoverDate" class="form-label">House Handover Date</label>
+        <input id="wizardHouseHandoverDate" type="date" class="form-control mb-3" />
+        <div class="text-muted small mb-3">Defaults to 7 days after Completion Date (editable).</div>
+
+        <label for="wizardRemoveFeesPercentage" class="form-label">Prof. Fees (%)</label>
+        <input id="wizardRemoveFeesPercentage" type="number" step="0.01" min="0" max="100" class="form-control mb-3" placeholder="e.g. 2.50" />
+
+        <label for="wizardRemoveVatRate" class="form-label">VAT (%)</label>
+        <select id="wizardRemoveVatRate" class="form-select mb-3">
+          <option value="">Select VAT rate</option>
+        </select>
+
+        <label for="wizardCalculatedIncome" class="form-label">Calculated Income (<span data-currency-symbol>€</span>)</label>
+        <input id="wizardCalculatedIncome" type="text" class="form-control" readonly />
+        <div class="text-muted small mt-1">Income = Selling Price − VAT amount − Fees (Fees are calculated on selling price before VAT).</div>
+      </div>
+
+      <div class="wizard-actions d-flex justify-content-end gap-2 mt-3">
+        <button type="button" id="wizardCancelBtn" class="btn btn-outline-secondary">Cancel</button>
+        <button type="button" id="wizardSaveLocationBtn" class="btn btn-primary">Add Location</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="capitalCostModal" class="modal" style="display:none;">
+    <div class="modal-content cashflow-capital-cost-modal">
+      <div class="modal-header">
+        <h3 id="capitalCostModalTitle">Add Capital Cost</h3>
+        <button class="modal-close" type="button" id="closeCapitalCostModalBtn">×</button>
+      </div>
+
+      <div class="row g-2">
+        <div class="col-12">
+          <label for="capitalCostTitle" class="form-label">Title</label>
+          <input id="capitalCostTitle" type="text" class="form-control" maxlength="200" placeholder="e.g. Site crane setup" />
+        </div>
+        <div class="col-12">
+          <label for="capitalCostDescription" class="form-label">Description</label>
+          <textarea id="capitalCostDescription" class="form-control" maxlength="500" rows="3" placeholder="Optional details"></textarea>
+        </div>
+
+        <div class="col-12 col-md-4">
+          <label for="capitalCostCostExVat" class="form-label">Cost ex VAT (<span data-currency-symbol>€</span>)</label>
+          <input id="capitalCostCostExVat" type="number" step="0.01" min="0" class="form-control" />
+        </div>
+        <div class="col-12 col-md-4">
+          <label for="capitalCostVatRate" class="form-label">VAT Rate (%)</label>
+          <select id="capitalCostVatRate" class="form-select">
+            <option value="">Select VAT rate</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-4">
+          <label for="capitalCostTotalIncVat" class="form-label">Total inc VAT (<span data-currency-symbol>€</span>)</label>
+          <input id="capitalCostTotalIncVat" type="text" class="form-control" readonly />
+        </div>
+
+        <div class="col-12 col-md-7">
+          <label for="capitalCostDateApplied" class="form-label">Date Applied</label>
+          <input id="capitalCostDateApplied" type="date" class="form-control" />
+        </div>
+        <div class="col-12 col-md-5 d-flex align-items-end">
+          <div class="form-check mb-2">
+            <input id="capitalCostUseProjectStart" class="form-check-input" type="checkbox" checked />
+            <label class="form-check-label" for="capitalCostUseProjectStart">Use project start date</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="wizard-actions d-flex justify-content-end gap-2 mt-3">
+        <button type="button" id="capitalCostModalCancelBtn" class="btn btn-outline-secondary">Cancel</button>
+        <button type="button" id="capitalCostSaveBtn" class="btn btn-primary">Add Capital Cost</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="capitalCostDeleteModal" class="modal" style="display:none;">
+    <div class="modal-content cashflow-capital-delete-modal">
+      <div class="modal-header">
+        <h3>Delete Capital Cost</h3>
+        <button class="modal-close" type="button" id="closeCapitalCostDeleteModalBtn">×</button>
+      </div>
+      <p class="mb-3">Are you sure you want to delete <strong id="capitalCostDeleteTitle">this capital cost</strong>?</p>
+      <div class="wizard-actions d-flex justify-content-end gap-2 mt-2">
+        <button type="button" id="capitalCostDeleteCancelBtn" class="btn btn-outline-secondary">Cancel</button>
+        <button type="button" id="capitalCostDeleteConfirmBtn" class="btn btn-danger">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="deleteLocationModal" class="modal" style="display:none;">
+    <div class="modal-content cashflow-delete-location-modal">
+      <div class="modal-header">
+        <h3>Remove Location from Cashflow</h3>
+        <button class="modal-close" type="button" id="closeDeleteLocationModalBtn">×</button>
+      </div>
+      <p class="mb-3">Are you sure you want to remove <strong id="deleteLocationName">this location</strong> from the cashflow plan?</p>
+      <div class="wizard-actions d-flex justify-content-end gap-2 mt-2">
+        <button type="button" id="deleteLocationCancelBtn" class="btn btn-outline-secondary">Cancel</button>
+        <button type="button" id="deleteLocationConfirmBtn" class="btn btn-danger">Remove</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="bulkUploadModal" class="modal" style="display:none;">
+    <div class="modal-content cashflow-bulk-upload-modal" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3>Bulk Upload</h3>
+        <button class="modal-close" type="button" id="closeBulkUploadModalBtn">×</button>
+      </div>
+
+      <div class="nav nav-tabs mb-3" id="bulkUploadTabs">
+        <button type="button" class="nav-link active" data-tab="locations">Locations</button>
+        <button type="button" class="nav-link" data-tab="templates">Templates</button>
+      </div>
+
+      <div id="locationsTab" class="bulk-upload-tab" style="display:block;">
+        <div class="mb-3">
+          <label for="bulkLocationSiteFilter" class="form-label">Filter by Site</label>
+          <select id="bulkLocationSiteFilter" class="form-select">
+            <option value="">All sites</option>
+          </select>
+        </div>
+
+        <div class="row g-2 mb-3">
+          <div class="col-12">
+            <div class="text-muted small border rounded p-2 bg-light">
+              Templates are assigned automatically using each location's <strong>Location Type</strong> mapping.
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <label for="bulkLocationStartDate" class="form-label">Start on Site Date</label>
+            <input id="bulkLocationStartDate" type="date" class="form-control" />
+          </div>
+          <div class="col-12 col-md-6">
+            <label for="bulkLocationEstimatedCost" class="form-label">Default Est. Construction Cost (<span data-currency-symbol>€</span>)</label>
+            <input id="bulkLocationEstimatedCost" type="number" min="0" step="0.01" class="form-control" value="0" />
+          </div>
+          <div class="col-12 col-md-6">
+            <label for="bulkLocationSellingPrice" class="form-label">Default Location Selling Price (<span data-currency-symbol>€</span>)</label>
+            <input id="bulkLocationSellingPrice" type="number" min="0" step="0.01" class="form-control" value="0" />
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">Available Locations</h6>
+          <button type="button" id="bulkLocationSelectAllBtn" class="btn btn-sm btn-outline-secondary">Select Visible</button>
+        </div>
+
+        <div id="bulkLocationList" class="bulk-location-list border rounded p-2 mb-3">
+          <div class="text-muted small">No available locations to add.</div>
+        </div>
+
+        <div id="locationsStatus" class="text-muted small mb-3"></div>
+        <div class="d-flex justify-content-end gap-2">
+          <button type="button" id="bulkUploadLocationsCancel" class="btn btn-outline-secondary">Cancel</button>
+          <button type="button" id="bulkUploadLocationsBtn" class="btn btn-primary" disabled>Add Selected Locations</button>
+        </div>
+      </div>
+
+      <div id="templatesTab" class="bulk-upload-tab" style="display:none;">
+        <div class="mb-3">
+          <label class="form-label">Upload Templates Excel File</label>
+          <input type="file" id="templatesFileInput" class="form-control" accept=".xlsx,.xls" />
+          <p class="text-muted small mt-2">Upload an Excel file with template data. Recommended columns: Template Name, Stage, Percent, Start Week, Duration Weeks. Legacy sheets with a Weeks column still work.</p>
+          <button type="button" id="downloadTemplateTemplate" class="btn btn-sm btn-outline-secondary mt-2">Download Template</button>
+        </div>
+        <div id="templatesPreview" class="mb-3"></div>
+        <div id="templatesStatus" class="text-muted small mb-3"></div>
+        <div class="d-flex justify-content-end gap-2">
+          <button type="button" id="bulkUploadTemplatesCancel" class="btn btn-outline-secondary">Cancel</button>
+          <button type="button" id="bulkUploadTemplatesBtn" class="btn btn-primary" disabled>Upload Templates</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-4 mt-4" id="templateManagerCard">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="mb-0">Template Manager</h5>
+      <div class="d-flex gap-2 align-items-center">
+        <span class="text-muted small">Manage template CRUD</span>
+        <a id="openTemplateDraftModalBtn" href="/cashflow-template-builder.html" class="btn btn-outline-primary btn-sm">Create Template</a>
+      </div>
+    </div>
+
+    <h6 class="mb-2">Templates</h6>
+    <div class="table-responsive">
+      <table class="table table-sm table-striped mb-0">
+        <thead>
+          <tr>
+            <th style="width: 40px;"></th>
+            <th>Name</th>
+            <th>Weeks</th>
+            <th>Percent Total</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="templateAccordionBody">
+          <tr>
+            <td colspan="5" class="text-muted text-center py-3">No templates available.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<%- include('partials/footer', { scripts: ['cashflow-setup.js?v=20260304q'], includeNavScript: true }) %>

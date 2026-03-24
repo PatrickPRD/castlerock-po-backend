@@ -3,3 +3,9 @@ node_modules/
 .env.*
 *.log
 .DS_Store
+# Ignore all backup files
+*.CTBackup
+# Ignore root-level SQL dumps and JSON exports, but not migrations or package files
+/*.sql
+/*.json
+backups/

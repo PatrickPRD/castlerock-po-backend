@@ -62,7 +62,8 @@ async function logAudit({
   changed_by,
   req
 }) {
-  console.log('🔍 logAudit called with:', { table_name, record_id, action, changed_by });
+  const parsedRecordId = Number(record_id);
+  const normalizedRecordId = Number.isInteger(parsedRecordId) && parsedRecordId >= 0 ? parsedRecordId : 0;
   
   try {
     // Extract IP and user agent from request if available
@@ -78,8 +79,6 @@ async function logAudit({
     }
     const user_agent = req ? (req.get?.('user-agent') || null) : null;
     
-    console.log('🔍 Inserting into audit_log:', { changed_by, action, table_name, record_id, ip_address });
-    
     await pool.query(
       `
       INSERT INTO audit_log
@@ -90,14 +89,13 @@ async function logAudit({
         changed_by,
         action,
         table_name,
-        record_id,
+        normalizedRecordId,
         old_data ? JSON.stringify(old_data) : null,
         new_data ? JSON.stringify(new_data) : null,
         ip_address,
         user_agent
       ]
     );
-    console.log(`✓ Audit log: ${action} on ${table_name}#${record_id} by user ${changed_by}`);
 
     // Run cleanup asynchronously without blocking
     cleanupOldAuditLogs().catch(err => {
@@ -106,7 +104,7 @@ async function logAudit({
   } catch (error) {
     console.error('❌ Audit log failed:', error.message);
     console.error('❌ Audit error:', error);
-    console.error('Audit data:', { table_name, record_id, action, changed_by });
+    console.error('Audit data:', { table_name, record_id: normalizedRecordId, action, changed_by });
     // Don't throw - we don't want audit failures to break the application
   }
 }

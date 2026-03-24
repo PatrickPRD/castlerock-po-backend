@@ -220,6 +220,21 @@
         <small class="text-muted">Number of audit log entries to keep (100-999). Oldest entries are deleted when limit is exceeded.</small>
       </div>
 
+      <div class="row g-3">
+        <div class="col-12 col-md-6">
+          <label for="costWarningYellowThreshold" class="form-label">Cost Warning Yellow Threshold (%)</label>
+          <input id="costWarningYellowThreshold" type="number" min="0" max="100" step="0.01" class="form-control" placeholder="e.g. 3" />
+          <small class="text-muted">If the current cost is above the 3-month average by less than this value, it is marked yellow.</small>
+        </div>
+        <div class="col-12 col-md-6">
+          <label for="costWarningRedThreshold" class="form-label">Cost Warning Red Threshold (%)</label>
+          <input id="costWarningRedThreshold" type="number" min="0" max="100" step="0.01" class="form-control" placeholder="e.g. 3" />
+          <small class="text-muted">If the current cost is above the 3-month average by this value or more, it is marked red.</small>
+        </div>
+      </div>
+
+      <div class="system-settings-note">Threshold changes save immediately when you leave the field.</div>
+
       <div class="d-flex gap-2 mt-2">
         <button type="submit" class="btn btn-primary">Save System Settings</button>
         <button type="button" class="btn btn-outline-secondary" id="systemResetBtn">Reset</button>

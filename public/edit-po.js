@@ -1,10 +1,34 @@
+let token;
+let role;
+let poVatRate = null;
+let poId;
+let supplierSelect;
+let siteSelect;
+let locationSelect;
+let stageSelect;
+let poNumberInput;
+let poDateInput;
+let descriptionInp;
+let netAmountInp;
+let vatRateSelect;
+let vatAmountSpan;
+let totalAmountSpan;
+let saveBtn;
+let toggleLineItemsBtn;
+let lineItemsSection;
+let lineItemsBody;
+let addLineItemBtn;
+let lineItemSuggestions;
+let costItemLookup;
+let lineItemsMode = false;
+let lineItemSearchTimeout = null;
+let availableVatRates = [];
 
 (function() {
   // Prevent global scope pollution and redeclaration errors
   console.log('[setLineItemsMode] called with enabled =', typeof enabled !== 'undefined' ? enabled : '(not set)');
-  const token = localStorage.getItem('token');
-  const role  = localStorage.getItem('role');
-  let poVatRate = null;
+  token = localStorage.getItem('token');
+  role  = localStorage.getItem('role');
 
   /* =========================
      Auth guard
@@ -21,7 +45,7 @@
      Params
      ========================= */
   const params = new URLSearchParams(window.location.search);
-  const poId = params.get('id');
+  poId = params.get('id');
 
   if (!poId) {
     showToast('No Purchase Order selected', 'error');
@@ -31,28 +55,30 @@
   /* =========================
      Elements
      ========================= */
-  const supplierSelect = document.getElementById('supplier');
-  const siteSelect     = document.getElementById('site');
-  const locationSelect = document.getElementById('location');
-  const stageSelect = document.getElementById('stage');
+  supplierSelect = document.getElementById('supplier');
+  siteSelect = document.getElementById('site');
+  locationSelect = document.getElementById('location');
+  stageSelect = document.getElementById('stage');
 
-  const poNumberInput  = document.getElementById('poNumber');
-  const poDateInput    = document.getElementById('poDate');
-  const descriptionInp = document.getElementById('description');
-  const netAmountInp   = document.getElementById('netAmount');
-  const vatRateSelect  = document.getElementById('vatRate');
-  const vatAmountSpan  = document.getElementById('vatAmount');
-  const totalAmountSpan= document.getElementById('totalAmount');
-  const saveBtn        = document.getElementById('saveBtn');
-  const toggleLineItemsBtn = document.getElementById('editPOToggleLineItems');
-  const lineItemsSection = document.getElementById('lineItemsSection');
-  const lineItemsBody = document.getElementById('lineItemsBody');
-  const addLineItemBtn = document.getElementById('addLineItem');
-  const lineItemSuggestions = document.getElementById('lineItemSuggestions');
-
-  let lineItemsMode = false;
-  let lineItemSearchTimeout = null;
-  let availableVatRates = [];
+  poNumberInput = document.getElementById('poNumber');
+  poDateInput = document.getElementById('poDate');
+  descriptionInp = document.getElementById('description');
+  netAmountInp = document.getElementById('netAmount');
+  vatRateSelect = document.getElementById('vatRate');
+  vatAmountSpan = document.getElementById('vatAmount');
+  totalAmountSpan = document.getElementById('totalAmount');
+  saveBtn = document.getElementById('saveBtn');
+  toggleLineItemsBtn = document.getElementById('editPOToggleLineItems');
+  lineItemsSection = document.getElementById('lineItemsSection');
+  lineItemsBody = document.getElementById('lineItemsBody');
+  addLineItemBtn = document.getElementById('addLineItem');
+  lineItemSuggestions = document.getElementById('lineItemSuggestions');
+  costItemLookup = window.createCostItemLookup
+    ? window.createCostItemLookup({
+        suggestionsElement: lineItemSuggestions,
+        headers: { Authorization: 'Bearer ' + token }
+      })
+    : null;
 
   /* =========================
      Viewer restrictions
@@ -269,23 +295,12 @@ function handleLineItemInput(row) {
 }
 
 function fetchLineItemSuggestions(query) {
-  if (!query) {
+  if (!costItemLookup || !query) {
     lineItemSuggestions.innerHTML = '';
     return;
   }
 
-  fetch(`/purchase-orders/line-items/search?q=${encodeURIComponent(query)}`, {
-    headers: { Authorization: 'Bearer ' + token }
-  })
-    .then(res => res.json())
-    .then(items => {
-      lineItemSuggestions.innerHTML = '';
-      items.forEach(item => {
-        const opt = document.createElement('option');
-        opt.value = item;
-        lineItemSuggestions.appendChild(opt);
-      });
-    })
+  costItemLookup.fetchSuggestions(query)
     .catch(() => {
       lineItemSuggestions.innerHTML = '';
     });
@@ -310,15 +325,26 @@ function addLineItemRow(item = {}) {
   descRow.innerHTML = `
     <td colspan="6" style="padding-top:0;border-top:none;">
       <input class="line-item-input line-item-desc" data-field="description" type="text" list="lineItemSuggestions" value="${item.description || ''}" placeholder="Description" style="width:99%;margin-top:-2px;">
+      <input data-field="costItemId" type="hidden" value="${item.cost_item_id || item.costItemId || ''}">
+      <input data-field="costItemCode" type="hidden" value="${item.cost_item_code || item.costItemCode || ''}">
+      <input data-field="costItemType" type="hidden" value="${item.cost_item_type || item.costItemType || ''}">
+      <span data-field="costItemBadge"${(item.cost_item_id || item.costItemId || item.cost_item_code || item.costItemCode) ? '' : ' hidden'} class="cost-item-linked-badge">
+        <span class="cost-item-badge-text">Cost DB: <span data-badge-code>${item.cost_item_code || item.costItemCode || ''}</span></span>
+        <button type="button" data-badge-unlink class="cost-item-badge-unlink" aria-label="Unlink cost item" title="Remove link to cost database">&times;</button>
+      </span>
     </td>
   `;
 
   const descriptionInput = descRow.querySelector('[data-field="description"]');
+  const unitInput = row.querySelector('[data-field="unit"]');
   const qtyInput = row.querySelector('[data-field="quantity"]');
   const unitPriceInput = row.querySelector('[data-field="unitPrice"]');
   const removeBtn = row.querySelector('[data-field="remove"]');
 
   descriptionInput.addEventListener('input', () => {
+    if (costItemLookup) {
+      costItemLookup.clearSelectionForRow(descRow);
+    }
     clearTimeout(lineItemSearchTimeout);
     const query = descriptionInput.value.trim();
     lineItemSearchTimeout = setTimeout(() => {
@@ -330,8 +356,25 @@ function addLineItemRow(item = {}) {
     }, 200);
   });
 
+  descriptionInput.addEventListener('change', () => {
+    if (costItemLookup && costItemLookup.applySelectionFromInput(descRow)) {
+      handleLineItemInput(row, descriptionInput);
+    }
+  });
+
+  descriptionInput.addEventListener('blur', () => {
+    if (costItemLookup && costItemLookup.applySelectionFromInput(descRow)) {
+      handleLineItemInput(row, descriptionInput);
+    }
+  });
+
   qtyInput.addEventListener('input', () => handleLineItemInput(row, descriptionInput));
   unitPriceInput.addEventListener('input', () => handleLineItemInput(row, descriptionInput));
+  unitInput.addEventListener('input', () => {
+    if (costItemLookup) {
+      costItemLookup.clearSelectionForRow(descRow);
+    }
+  });
 
   removeBtn.addEventListener('click', () => {
     row.remove();
@@ -378,7 +421,10 @@ function collectLineItems() {
       description: descriptionValue,
       quantity,
       unit: unitValue || null,
-      unitPrice
+      unitPrice,
+      costItemId: Number(row.querySelector('[data-field="costItemId"]')?.value || row.nextElementSibling?.querySelector('[data-field="costItemId"]')?.value) || null,
+      costItemCode: row.querySelector('[data-field="costItemCode"]')?.value || row.nextElementSibling?.querySelector('[data-field="costItemCode"]')?.value || null,
+      costItemType: row.querySelector('[data-field="costItemType"]')?.value || row.nextElementSibling?.querySelector('[data-field="costItemType"]')?.value || null
     });
   });
 

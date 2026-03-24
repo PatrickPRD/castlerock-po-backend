@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../db');
 const { authenticate, authorizeRoles } = require('../middleware/auth');
 const logAudit = require('../services/auditService');
+const { captureAuditFailure } = require('../middleware/auditFailureLogger');
 
 /* ======================================================
    GET invoices for PO
@@ -116,9 +117,19 @@ router.post(
       res.json({ success: true });
     } catch (err) {
       if (err && err.code === 'ER_DUP_ENTRY') {
+        captureAuditFailure(req, err, {
+          operation: 'invoice_create',
+          reason: 'duplicate_invoice_number_per_po'
+        });
         return res.status(409).json({ error: 'Invoice number already exists for this purchase order' });
       }
       console.error('Create invoice error:', err);
+      captureAuditFailure(req, err, {
+        operation: 'invoice_create',
+        purchaseOrderId: req.body.purchaseOrderId,
+        invoiceNumber: req.body.invoiceNumber,
+        invoiceDate: req.body.invoiceDate
+      });
       res.status(500).json({ error: 'Failed to save invoice' });
     }
   }
@@ -219,9 +230,20 @@ router.put(
       res.json({ success: true });
     } catch (err) {
       if (err && err.code === 'ER_DUP_ENTRY') {
+        captureAuditFailure(req, err, {
+          operation: 'invoice_update',
+          invoiceId: req.params.id,
+          reason: 'duplicate_invoice_number_per_po'
+        });
         return res.status(409).json({ error: 'Invoice number already exists for this purchase order' });
       }
       console.error('Update invoice error:', err);
+      captureAuditFailure(req, err, {
+        operation: 'invoice_update',
+        invoiceId: req.params.id,
+        invoiceNumber: req.body.invoiceNumber,
+        invoiceDate: req.body.invoiceDate
+      });
       res.status(500).json({ error: 'Failed to save invoice' });
     }
   }

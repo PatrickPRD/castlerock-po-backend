@@ -1,0 +1,230 @@
+<%- include('partials/head', { pageTitle: 'Current Costs', styles: ['admin.css', 'construction-cost-comparison.css?v=20260322e'] }) %>
+<%- include('partials/header', { pageTitle: 'Current Costs' }) %>
+
+<main class="container">
+  <div id="filterPanel" class="card dashboard-filters" style="display:none">
+    <div class="filter-row">
+      <label>Type</label>
+      <select id="typeFilter">
+        <option value="">All Types</option>
+      </select>
+    </div>
+
+    <div class="filter-row">
+      <label>Status</label>
+      <select id="statusFilter">
+        <option value="">All Statuses</option>
+        <option value="green">Green</option>
+        <option value="yellow">Yellow</option>
+        <option value="red">Red</option>
+      </select>
+    </div>
+
+    <div class="filter-actions">
+      <button id="closeFiltersBtn" type="button" class="btn btn-outline-secondary">Close</button>
+      <button id="clearFiltersBtn" type="button" class="btn btn-outline-secondary">Clear Filters</button>
+    </div>
+  </div>
+
+  <div class="card p-4 mb-4">
+    <h3 style="margin: 0 0 1rem 0;">Current Costs</h3>
+    <div class="comparison-search mb-3">
+      <input id="costItemSearch" type="text" class="form-control" placeholder="Search cost items, codes, types, descriptions..." aria-label="Search construction cost items">
+      <button type="button" id="costItemSearchClear" class="comparison-search-clear" aria-label="Clear search">&times;</button>
+    </div>
+    <div class="comparison-actions">
+      <button id="addCostItemBtn" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i>Add Cost Item</button>
+      <button id="exportBtn" class="btn btn-outline-secondary"><i class="bi bi-download me-1"></i>Export Excel</button>
+      <button id="importBtn" class="btn btn-outline-secondary"><i class="bi bi-upload me-1"></i>Import Excel</button>
+      <button id="openThresholdsBtn" class="btn btn-outline-secondary super-admin-only" style="display:none;"><i class="bi bi-sliders me-1"></i>Warning Thresholds</button>
+      <button id="mergeTypesBtn" class="btn btn-outline-secondary super-admin-only" style="display:none;"><i class="bi bi-diagram-3 me-1"></i>Merge Types</button>
+      <button id="toggleDeletedBtn" class="btn btn-outline-secondary super-admin-only" style="display:none;"><i class="bi bi-archive me-1"></i>Show Deleted</button>
+      <button id="toggleFiltersBtn" class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filters</button>
+    </div>
+  </div>
+
+  <div class="card p-0 overflow-hidden">
+    <table class="po-table comparison-table mb-0">
+      <thead>
+        <tr>
+          <th style="width: 160px;">Code</th>
+          <th>Description</th>
+          <th style="width: 160px;" class="text-end">Current Cost</th>
+          <th style="width: 140px;">Unit</th>
+        </tr>
+      </thead>
+      <tbody id="costItemsTable"></tbody>
+    </table>
+  </div>
+</main>
+
+<div class="modal fade" id="costItemModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="costItemModalTitle">Add Cost Item</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="costItemForm">
+        <div class="modal-body">
+          <input id="costItemId" type="hidden" />
+          <div id="costUpdateHint" class="alert alert-info py-2 px-3 mb-3 d-none">Only cost can be updated here. Type, unit, and description are locked.</div>
+          <div class="row g-3">
+            <div class="col-12 col-md-4 cost-metadata-field">
+              <label for="costItemCode" class="form-label">Code</label>
+              <input id="costItemCode" type="text" class="form-control" readonly />
+              <small class="text-muted">Generated automatically from the type.</small>
+            </div>
+            <div class="col-12 col-md-4 cost-metadata-field">
+              <label for="costItemType" class="form-label">Type</label>
+              <input id="costItemType" type="text" class="form-control" list="costItemTypeOptions" required />
+              <datalist id="costItemTypeOptions"></datalist>
+            </div>
+            <div class="col-12 col-md-4 cost-metadata-field">
+              <label for="costItemUnit" class="form-label">Unit</label>
+              <input id="costItemUnit" type="text" class="form-control" list="costItemUnitOptions" required />
+              <datalist id="costItemUnitOptions"></datalist>
+            </div>
+            <div class="col-12 cost-metadata-field">
+              <label for="costItemDescription" class="form-label">Description</label>
+              <textarea id="costItemDescription" class="form-control" rows="3" required></textarea>
+            </div>
+            <div class="col-12 col-md-4">
+              <label for="costItemCostPer" class="form-label">Cost Per</label>
+              <input id="costItemCostPer" type="number" min="0" step="0.01" class="form-control" required />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button id="costItemSubmitBtn" type="submit" class="btn btn-primary">Save Cost Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="thresholdsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Warning Thresholds</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="threshold-grid">
+          <div>
+            <p class="text-muted mb-0">Used to calculate live green, yellow, and red warning states.</p>
+          </div>
+          <div>
+            <label for="yellowThresholdInput" class="form-label">Yellow Threshold (%)</label>
+            <input id="yellowThresholdInput" type="number" min="0" max="100" step="0.01" class="form-control" />
+          </div>
+          <div>
+            <label for="redThresholdInput" class="form-label">Red Threshold (%)</label>
+            <input id="redThresholdInput" type="number" min="0" max="100" step="0.01" class="form-control" />
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button id="saveThresholdsBtn" type="button" class="btn btn-primary">Save Thresholds</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="mergeTypesModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Merge Types</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="mergeTypesForm">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="mergeSourceType" class="form-label">Merge Type</label>
+            <input id="mergeSourceType" type="text" class="form-control" list="mergeSourceTypeOptions" required />
+            <datalist id="mergeSourceTypeOptions"></datalist>
+          </div>
+          <div>
+            <label for="mergeTargetType" class="form-label">Keep Type</label>
+            <input id="mergeTargetType" type="text" class="form-control" list="mergeTargetTypeOptions" required />
+            <datalist id="mergeTargetTypeOptions"></datalist>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Merge Types</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Import Cost Items</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="importForm">
+        <div class="modal-body">
+          <label for="importFile" class="form-label">Excel File</label>
+          <input id="importFile" type="file" class="form-control" accept=".xlsx" required />
+          <small class="text-muted">The file must include Type, Description, Cost Per, and Unit columns.</small>
+          <div id="importValidationResult" class="mt-3 d-none"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button id="importSubmitBtn" type="submit" class="btn btn-primary">Validate</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="historyEditModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="historyEditModalTitle">Cost History</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0" id="historyEditModalBody">
+        <div class="p-3 text-muted small">Loading...</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="permanentDeleteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Permanent Delete</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="permanentDeleteForm">
+        <div class="modal-body">
+          <input id="permanentDeleteId" type="hidden" />
+          <p class="mb-2">This permanently deletes the selected cost item. Enter the code to confirm.</p>
+          <p class="fw-semibold" id="permanentDeleteCodeHint"></p>
+          <label for="permanentDeleteCode" class="form-label">Confirmation Code</label>
+          <input id="permanentDeleteCode" type="text" class="form-control" required />
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger">Delete Permanently</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer', { scripts: ['/ui.js', 'construction-cost-comparison.js?v=20260322f'], includeNavScript: true }) %>

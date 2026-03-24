@@ -5,7 +5,9 @@ const path = require('path');
 const pool = require('./db');
 const { setupDatabase } = require('../database/setup');
 const { ensureLeaveDefaults } = require('./services/leaveService');
+const { runStartupMigrations } = require('./services/dbMigrations');
 const { checkSetupRequired } = require('./middleware/setupCheck');
+const { auditFailureLogger } = require('./middleware/auditFailureLogger');
 const dynamicTitle = require('./middleware/dynamicTitle');
 
 const app = express();
@@ -27,6 +29,9 @@ app.use(checkSetupRequired);
 
 // Add dynamic title support (Company Name | CostTracker | Page Title)
 app.use(dynamicTitle);
+
+// Capture diagnostics for failed mutating requests (POST/PUT/PATCH/DELETE)
+app.use(auditFailureLogger);
 
 // Root route → login page
 app.get('/', (req, res) => {
@@ -60,6 +65,11 @@ app.get('/invoice-report.html', (req, res) => res.render('invoice-report', { pag
 app.get('/workers-information.html', (req, res) => res.render('workers-information', { pageTitle: 'Workers Information' }));
 app.get('/leave-report.html', (req, res) => res.redirect('/workers-information.html'));
 app.get('/labour-costs.html', (req, res) => res.render('labour-costs', { pageTitle: 'Labour Costs' }));
+app.get('/construction-cost-comparison.html', (req, res) => res.render('construction-cost-comparison', { pageTitle: 'Construction Cost Comparison' }));
+app.get('/cashflow-setup.html', (req, res) => res.render('cashflow-setup', { pageTitle: 'Cashflow Setup' }));
+app.get('/cashflow-template-builder.html', (req, res) => res.render('cashflow-template-builder', { pageTitle: 'Cashflow Template Builder' }));
+app.get('/cashflow-report.html', (req, res) => res.render('cashflow-report', { pageTitle: 'Cashflow Report' }));
+app.get('/current-costs-report.html', (req, res) => res.render('current-costs-report', { pageTitle: 'Current Costs Report' }));
 app.get('/gdpr.html', (req, res) => res.render('gdpr', { pageTitle: 'GDPR Privacy Notice' }));
 app.get('/audit-log.html', (req, res) => res.render('audit-log', { pageTitle: 'Audit Log' }));
 
@@ -126,10 +136,9 @@ app.use('/invoices', invoiceRoutes);
 const reportRoutes = require('./routes/reports');
 app.use('/reports', reportRoutes);
 
-// PDFs
-const pdfRoutes = require('./routes/pdfs');
-app.use('/pdfs', pdfRoutes);
-
+// Construction Cost Comparison / Cost Items
+const costItemRoutes = require('./routes/costItems');
+app.use('/cost-items', costItemRoutes);
 // PDF Data (for browser-based PDFKit generation)
 const pdfDataRoutes = require('./routes/pdfData');
 app.use('/pdf-data', pdfDataRoutes);
@@ -141,6 +150,14 @@ app.use('/settings', settingsRoutes);
 // Timesheets
 const timesheetRoutes = require('./routes/timesheets');
 app.use('/timesheets', timesheetRoutes);
+
+// Cashflow
+const cashflowRoutes = require('./routes/cashflow');
+app.use('/cashflow', cashflowRoutes);
+
+// Cashflow Bulk Import
+const cashflowBulkImportRoutes = require('./routes/cashflow-bulk-import');
+app.use('/cashflow', cashflowBulkImportRoutes);
 
 // ✅ EXPORTS — THIS IS THE CRITICAL PART
 const exportRoutes = require('./routes/exports');
@@ -213,6 +230,7 @@ const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
 async function startServer() {
   console.log('🔧 Starting server initialization...');
   await ensureSchemaReady();
+  await runStartupMigrations();
   await ensureInvoiceUniquenessPerPO();
   console.log('✅ Schema ready, starting HTTP listener...');
 

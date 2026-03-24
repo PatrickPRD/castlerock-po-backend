@@ -1,4 +1,4 @@
-const AWS = require('aws-sdk');
+const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
 
 /**
  * Create an AWS SES email transporter
@@ -14,8 +14,8 @@ function createSESTransporter() {
     throw new Error('SES_FROM_EMAIL is not set');
   }
 
-  // Configure AWS SDK to use IAM role from EC2 instance
-  const ses = new AWS.SES({
+  // The v3 client will use the default AWS credential provider chain, including EC2 IAM roles.
+  const ses = new SESClient({
     region: process.env.AWS_REGION
   });
 
@@ -51,7 +51,7 @@ async function sendEmail({ to, subject, html, from }) {
   };
 
   try {
-    const result = await ses.sendEmail(params).promise();
+    const result = await ses.send(new SendEmailCommand(params));
     console.log(`Email sent to ${to}. Message ID: ${result.MessageId}`);
     return result;
   } catch (error) {

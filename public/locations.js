@@ -16,8 +16,13 @@ if (!["admin", "super_admin"].includes(role)) {
    ============================ */
 const locationTable = document.getElementById("locationTable");
 const siteSelect = document.getElementById("siteSelect");
+const siteFilterSelect = document.getElementById("siteFilterSelect");
 
 let editingLocationId = null;
+let allLocations = [];
+let selectedSiteFilter = "";
+let sortColumn = "name";
+let sortDirection = "asc";
 
 /* ============================
    HELPERS
@@ -57,15 +62,54 @@ async function loadSitesForLocations() {
   });
 }
 
+async function loadSiteFilterOptions() {
+  if (!siteFilterSelect) return;
+
+  const sites = await api("/admin/sites");
+  siteFilterSelect.innerHTML = '<option value="">All Sites</option>';
+
+  sites.forEach((s) => {
+    const opt = document.createElement("option");
+    opt.value = s.id;
+    opt.textContent = s.name;
+    siteFilterSelect.appendChild(opt);
+  });
+}
+
 /* ============================
    LOCATIONS
    ============================ */
 async function loadLocations() {
   const locations = await api("/admin/locations");
   locations.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base', numeric: true }));
+  
+  allLocations = locations;
+  await loadSiteFilterOptions();
+  renderFilteredLocations();
+}
+
+function renderFilteredLocations() {
   locationTable.innerHTML = "";
 
-  locations.forEach((l) => {
+  const filtered = selectedSiteFilter 
+    ? allLocations.filter(l => String(l.site_id) === String(selectedSiteFilter))
+    : allLocations;
+
+  // Apply sorting
+  const sorted = [...filtered].sort((a, b) => {
+    let aVal = a[sortColumn] || '';
+    let bVal = b[sortColumn] || '';
+    
+    // Convert to strings for comparison
+    aVal = String(aVal).toLowerCase();
+    bVal = String(bVal).toLowerCase();
+    
+    if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  sorted.forEach((l) => {
     const escapedName = (l.name || '').replace(/'/g, "\\'");
     const escapedType = (l.type || '').replace(/'/g, "\\'");
     
@@ -340,3 +384,50 @@ async function confirmMergeLocations() {
     showToast(`Failed to merge locations: ${err.message}`, 'error');
   }
 }
+
+/* ============================
+   SORTING
+   ============================ */
+function updateSortIndicators() {
+  document.querySelectorAll('.sortable').forEach(th => {
+    const indicator = th.querySelector('.sort-indicator');
+    if (th.dataset.sort === sortColumn) {
+      indicator.textContent = sortDirection === 'asc' ? ' ▲' : ' ▼';
+    } else {
+      indicator.textContent = '';
+    }
+  });
+}
+
+function handleSort(column) {
+  if (sortColumn === column) {
+    sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortColumn = column;
+    sortDirection = 'asc';
+  }
+  updateSortIndicators();
+  renderFilteredLocations();
+}
+
+/* ============================
+   INITIALIZATION
+   ============================ */
+if (siteFilterSelect) {
+  siteFilterSelect.addEventListener('change', (e) => {
+    selectedSiteFilter = e.target.value;
+    renderFilteredLocations();
+  });
+}
+
+// Add click handlers to sortable headers
+document.querySelectorAll('.sortable').forEach(th => {
+  th.addEventListener('click', () => handleSort(th.dataset.sort));
+});
+
+// Load initial data on page load
+document.addEventListener('DOMContentLoaded', () => {
+  loadSitesForLocations();
+  loadLocations();
+  updateSortIndicators();
+});

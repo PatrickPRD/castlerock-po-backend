@@ -22,7 +22,7 @@
     <div class="card-body">
       <div class="alert alert-info">
         <i class="bi bi-info-circle me-2"></i>
-        <strong>Note:</strong> Backups include all POs, invoices, sites, locations, and suppliers. User accounts are excluded.
+        <strong>Note:</strong> Backups include operational data (POs, invoices, sites, locations, suppliers, workers, and timesheets) plus cashflow data (cashflow settings, templates, and location cashflow settings). User accounts are excluded. Older backups created before this update may not include cashflow tables.
       </div>
       
       <div id="loadingSpinner" class="text-center py-5" style="display: none;">
@@ -197,6 +197,15 @@
               <table class="table table-sm table-bordered">
                 <thead class="table-light">
                   <tr>
+                    <th class="text-center" style="width: 56px;">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        id="restoreSelectAll"
+                        title="Select all restorable tables"
+                        onchange="toggleAllRestoreTables(this.checked)"
+                      >
+                    </th>
                     <th>Table Name</th>
                     <th class="text-end">Records</th>
                     <th>Status</th>
@@ -206,18 +215,21 @@
                 </tbody>
               </table>
             </div>
+            <small id="restoreSelectionSummary" class="text-muted d-block mt-2">
+              Select tables from the analysed list to run a selective restore.
+            </small>
           </div>
           
           <div id="sqlFileInfo" style="display: none;" class="alert alert-info">
             <i class="bi bi-info-circle me-2"></i>
-            <strong>SQL Backup:</strong> This is a direct SQL export. Full validation is not available, but all tables will be reset to the backup state.
+            <strong>SQL Backup:</strong> This is a direct SQL export. Full validation is not available, and all application tables (including cashflow tables) will be reset to the backup state.
           </div>
           
           <div class="alert alert-danger mt-3">
             <i class="bi bi-exclamation-triangle-fill me-2"></i>
-            <strong>WARNING:</strong> This will delete all existing data and replace it with the backup data.
+            <strong>WARNING:</strong> Selected tables will be cleared and replaced with backup data (or all tables if none are selected).
             <ul class="mb-0 mt-2">
-              <li>All current POs, invoices, and data will be lost</li>
+              <li>All current operational and cashflow data will be lost (POs, invoices, sites, locations, suppliers, workers, timesheets, cashflow settings, and cashflow templates)</li>
               <li>User accounts will NOT be affected</li>
               <li>This action CANNOT be undone</li>
             </ul>
@@ -247,7 +259,7 @@
           <i class="bi bi-exclamation-triangle-fill me-2"></i>
           <strong>WARNING:</strong> This will delete all existing data and replace it with the backup data.
           <ul class="mb-0 mt-2">
-            <li>All current POs, invoices, and data will be lost</li>
+            <li>All current operational and cashflow data will be lost (POs, invoices, sites, locations, suppliers, workers, timesheets, cashflow settings, and cashflow templates)</li>
             <li>User accounts will NOT be affected</li>
             <li>This action CANNOT be undone</li>
           </ul>

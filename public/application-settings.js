@@ -52,6 +52,8 @@ const vatList = document.getElementById('vatList');
 const financialResetBtn = document.getElementById('financialResetBtn');
 const systemSettingsForm = document.getElementById('systemSettingsForm');
 const auditLogRetentionInput = document.getElementById('auditLogRetention');
+const costWarningYellowThresholdInput = document.getElementById('costWarningYellowThreshold');
+const costWarningRedThresholdInput = document.getElementById('costWarningRedThreshold');
 const systemResetBtn = document.getElementById('systemResetBtn');
 
 const brandPreviewBar = document.getElementById('brandPreviewBar');
@@ -265,6 +267,24 @@ async function loadSystemSettings() {
       ? Number(settings.audit_log_retention)
       : 300;
   }
+  if (costWarningYellowThresholdInput) {
+    costWarningYellowThresholdInput.value = Number.isFinite(Number(settings.cost_warning_yellow_threshold))
+      ? Number(settings.cost_warning_yellow_threshold)
+      : '';
+  }
+  if (costWarningRedThresholdInput) {
+    costWarningRedThresholdInput.value = Number.isFinite(Number(settings.cost_warning_red_threshold))
+      ? Number(settings.cost_warning_red_threshold)
+      : '';
+  }
+}
+
+function normalizeThresholdInput(input) {
+  const numeric = Number(input?.value);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  return Math.min(100, Math.max(0, Number(numeric.toFixed(2))));
 }
 
 function renderVatList() {
@@ -332,12 +352,38 @@ async function saveFinancialSettings() {
 }
 
 async function saveSystemSettings() {
+  const yellowThreshold = normalizeThresholdInput(costWarningYellowThresholdInput);
+  const redThreshold = normalizeThresholdInput(costWarningRedThresholdInput);
+  if (yellowThreshold === null || redThreshold === null) {
+    throw new Error('Cost warning thresholds must be valid numbers between 0 and 100');
+  }
+
   const payload = {
-    auditLogRetention: Number(auditLogRetentionInput?.value || 300)
+    auditLogRetention: Number(auditLogRetentionInput?.value || 300),
+    costWarningYellowThreshold: yellowThreshold,
+    costWarningRedThreshold: redThreshold
   };
   await api('/settings/system', 'PUT', payload);
   showToast('System settings updated', 'success');
   await loadSystemSettings();
+}
+
+async function saveCostThresholdsImmediately() {
+  const yellowThreshold = normalizeThresholdInput(costWarningYellowThresholdInput);
+  const redThreshold = normalizeThresholdInput(costWarningRedThresholdInput);
+
+  if (yellowThreshold === null || redThreshold === null) {
+    throw new Error('Cost warning thresholds must be valid numbers between 0 and 100');
+  }
+
+  costWarningYellowThresholdInput.value = yellowThreshold;
+  costWarningRedThresholdInput.value = redThreshold;
+
+  await api('/settings/cost-thresholds', 'PUT', {
+    yellowThreshold,
+    redThreshold
+  });
+  showToast('Cost warning thresholds updated', 'success');
 }
 
 async function handleDeleteVat(rate) {
@@ -516,6 +562,18 @@ if (systemResetBtn) {
     });
   });
 }
+
+[costWarningYellowThresholdInput, costWarningRedThresholdInput].forEach((input) => {
+  if (!input) return;
+  input.addEventListener('change', async () => {
+    try {
+      await saveCostThresholdsImmediately();
+    } catch (err) {
+      showToast(err.message || 'Failed to update cost warning thresholds', 'error');
+      await loadSystemSettings();
+    }
+  });
+});
 
 logoModeSelect.addEventListener('change', () => {
   toggleLogoSections();
