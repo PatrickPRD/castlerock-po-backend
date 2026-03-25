@@ -37,7 +37,8 @@ const BACKUP_TABLES = [
   'po_sequences',
   'workers',
   'timesheets',
-  'timesheet_entries'
+  'timesheet_entries',
+  'system_updates'
 ];
 
 const RESTORE_ORDER = [
@@ -63,7 +64,8 @@ const RESTORE_ORDER = [
   'po_sequences',
   'workers',
   'timesheets',
-  'timesheet_entries'
+  'timesheet_entries',
+  'system_updates'
 ];
 
 const CLEAR_ORDER_PREFERENCE = [

@@ -11,6 +11,7 @@
     "setup-multi-app": "node setup-multi-app.js",
     "deploy": "node deploy-to-ec2.js",
     "migrate": "node database/migrate.js",
+    "generate-update": "node generate-update.js",
     "test-db": "node database/test-connection.js",
     "reset-db": "node database/reset-db.js",
     "import-data": "node database/import-data.js",

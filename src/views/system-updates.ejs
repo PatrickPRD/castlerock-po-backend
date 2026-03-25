@@ -1,0 +1,177 @@
+<%- include('partials/head', { pageTitle: 'System Updates', styles: ['admin.css'] }) %>
+<%- include('partials/header', { pageTitle: 'System Updates' }) %>
+
+<main class="container mt-4">
+
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h3 class="mb-0"><i class="bi bi-arrow-up-circle me-2"></i>System Updates</h3>
+      <div class="d-flex align-items-center gap-3">
+        <span class="text-muted small">
+          Installed version: <strong id="currentVersion" class="text-primary">—</strong>
+        </span>
+        <button class="btn btn-sm btn-primary" onclick="openUploadModal()">
+          <i class="bi bi-upload me-1"></i> Install Update
+        </button>
+      </div>
+    </div>
+
+    <div class="card-body">
+
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>
+        <strong>How it works:</strong> Upload a <code>.CTUpdate</code> package generated from the latest source code.
+        You will be shown a preview of all changes before anything is written to disk.
+        Only files in <code>src/</code>, <code>public/</code>, and <code>database/migrations/</code> can be updated.
+        <code>.env</code>, <code>package.json</code>, and sensitive configuration are always protected.
+      </div>
+
+      <!-- Update history table -->
+      <div id="loadingSpinner" class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2">Loading update history…</p>
+      </div>
+
+      <div id="updatesTable" style="display:none;">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Version</th>
+              <th>Description</th>
+              <th>Files</th>
+              <th>Status</th>
+              <th>Applied</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="updatesTableBody">
+            <tr>
+              <td colspan="6" class="text-center text-muted py-4">
+                No updates have been installed yet.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<!-- ============================================================
+     UPLOAD / PREVIEW MODAL
+     ============================================================ -->
+<div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="uploadModalLabel">
+          <i class="bi bi-upload me-2"></i>Install System Update
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Step 1: file selection -->
+        <div id="stepUpload">
+          <p class="text-muted">Select a <code>.CTUpdate</code> package file to preview before applying.</p>
+          <div class="mb-3">
+            <label for="updateFileInput" class="form-label fw-semibold">Update Package</label>
+            <input type="file" class="form-control" id="updateFileInput" accept=".CTUpdate">
+          </div>
+          <div id="uploadError" class="alert alert-danger d-none"></div>
+        </div>
+
+        <!-- Step 2: preview -->
+        <div id="stepPreview" style="display:none;">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <h6 class="mb-0">Package: <strong id="previewVersion"></strong></h6>
+              <small class="text-muted" id="previewDescription"></small>
+            </div>
+            <span class="badge bg-secondary" id="previewFileCount"></span>
+          </div>
+
+          <div id="previewWarning" class="alert alert-warning d-none">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            <span id="previewWarningText"></span>
+          </div>
+
+          <div class="table-responsive" style="max-height: 320px; overflow-y:auto;">
+            <table class="table table-sm table-bordered mb-0">
+              <thead class="table-light sticky-top">
+                <tr>
+                  <th>File</th>
+                  <th width="90">Action</th>
+                  <th width="120">Status</th>
+                </tr>
+              </thead>
+              <tbody id="previewFileList"></tbody>
+            </table>
+          </div>
+
+          <div class="mt-3">
+            <p class="mb-1 small text-muted">
+              <i class="bi bi-shield-check me-1"></i>
+              Applying this update will overwrite the listed files on the server.
+              It is strongly recommended to <a href="/backup-management.html">create a backup</a> first.
+            </p>
+          </div>
+        </div>
+
+        <!-- Processing spinner -->
+        <div id="stepProcessing" style="display:none;" class="text-center py-4">
+          <div class="spinner-border text-primary" role="status"></div>
+          <p class="mt-2 text-muted" id="processingMessage">Processing…</p>
+        </div>
+
+        <!-- Step 3: result -->
+        <div id="stepResult" style="display:none;">
+          <div id="resultAlert"></div>
+          <div id="resultDetails"></div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="cancelBtn">Cancel</button>
+        <button type="button" class="btn btn-primary" id="previewBtn" onclick="runPreview()">
+          <i class="bi bi-eye me-1"></i> Preview Changes
+        </button>
+        <button type="button" class="btn btn-success" id="applyBtn" style="display:none;" onclick="confirmApply()">
+          <i class="bi bi-check-circle me-1"></i> Apply Update
+        </button>
+        <button type="button" class="btn btn-primary" id="doneBtn" style="display:none;" data-bs-dismiss="modal" onclick="loadUpdates()">
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     UPDATE DETAIL MODAL
+     ============================================================ -->
+<div class="modal fade" id="detailModal" tabindex="-1" aria-labelledby="detailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="detailModalLabel">
+          <i class="bi bi-info-circle me-2"></i>Update Details
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="detailModalBody">
+        <div class="text-center py-3">
+          <div class="spinner-border text-primary" role="status"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer', { scripts: ['/ui.js', 'system-updates.js'], includeNavScript: true }) %>
