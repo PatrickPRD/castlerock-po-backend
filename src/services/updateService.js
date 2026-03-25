@@ -230,6 +230,18 @@ async function applyUpdate(pkg, userId) {
         throw new Error(`Hash mismatch for file ${entry.path}: package may be corrupt.`);
       }
 
+      // State-aware update: skip files that are already at the target hash.
+      try {
+        const existing = await fs.readFile(absPath);
+        const existingHash = sha256(existing);
+        if (existingHash === entry.hash) {
+          skipped.push({ path: entry.path, reason: 'already current' });
+          continue;
+        }
+      } catch {
+        // Missing file is expected on older installs; write below.
+      }
+
       // Ensure directory exists
       await fs.mkdir(path.dirname(absPath), { recursive: true });
       await fs.writeFile(absPath, decoded);

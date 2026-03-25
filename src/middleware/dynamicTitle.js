@@ -24,6 +24,8 @@ async function dynamicTitle(req, res, next) {
     // Make company name available to all views
     res.locals.companyName = cachedCompanyName;
     res.locals.appName = 'CostTracker';
+    // Ensure environment flag is always present for template conditionals.
+    res.locals.isDevMode = process.env.NODE_ENV === 'development';
     
     // Override res.render to automatically format titles
     const originalRender = res.render.bind(res);

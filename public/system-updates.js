@@ -5,10 +5,74 @@
 let _parsedPackageJson = null;
 let _uploadModal = null;
 let _detailModal = null;
+let _installedVersion = '';
+
+/* -------------------------------------------------------
+   Dev tool: generate update package
+------------------------------------------------------- */
+async function generateUpdatePackage() {
+  const version = (document.getElementById('generateVersion')?.value || '').trim();
+  const description = (document.getElementById('generateDescription')?.value || '').trim();
+  const full = Boolean(document.getElementById('generateFull')?.checked);
+  const btn = document.getElementById('generateUpdateBtn');
+  const result = document.getElementById('generateResult');
+
+  if (!version) {
+    result.innerHTML = '<div class="alert alert-danger mb-0">Version is required.</div>';
+    return;
+  }
+
+  const prevHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Generating';
+  result.innerHTML = '';
+
+  try {
+    const res = await fetch('/updates/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getAuthToken()}`
+      },
+      body: JSON.stringify({ version, description, full })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to generate update package');
+    }
+
+    const outputSnippet = data.output
+      ? `<details class="mt-2"><summary class="small text-muted">Generator output</summary><pre class="small mb-0 mt-2">${escHtml(data.output)}</pre></details>`
+      : '';
+
+    result.innerHTML = `
+      <div class="alert alert-success mb-0">
+        <div><strong>${escHtml(data.message)}</strong></div>
+        <div class="small text-muted mt-1">This is a one-time temporary download. The package is deleted from the server after transfer.</div>
+        <div class="mt-2">
+          <a class="btn btn-sm btn-outline-success" href="#" onclick="return downloadGeneratedUpdate('${escHtml(data.downloadUrl)}', '${escHtml(data.fileName)}')">
+            <i class="bi bi-download me-1"></i>Download Once: ${escHtml(data.fileName)}
+          </a>
+        </div>
+        ${outputSnippet}
+      </div>`;
+  } catch (err) {
+    result.innerHTML = `<div class="alert alert-danger mb-0">${escHtml(err.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = prevHtml;
+  }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   _uploadModal = new bootstrap.Modal(document.getElementById('uploadModal'));
   _detailModal = new bootstrap.Modal(document.getElementById('detailModal'));
+
+  const bumpLevelSelect = document.getElementById('generateBumpLevel');
+  if (bumpLevelSelect) {
+    bumpLevelSelect.addEventListener('change', applySuggestedNextVersion);
+  }
 
   document.getElementById('uploadModal').addEventListener('hidden.bs.modal', resetUploadModal);
 
@@ -32,6 +96,8 @@ async function loadUpdates() {
     const { updates, currentVersion } = await res.json();
 
     document.getElementById('currentVersion').textContent = currentVersion || '—';
+    _installedVersion = (currentVersion || '').trim();
+    applySuggestedNextVersion();
     renderUpdatesTable(updates);
   } catch (err) {
     showToast('Failed to load update history: ' + err.message, 'danger');
@@ -66,6 +132,52 @@ function renderUpdatesTable(updates) {
         </td>
       </tr>`;
   }).join('');
+}
+
+function applySuggestedNextVersion() {
+  const versionInput = document.getElementById('generateVersion');
+  const bumpLevelSelect = document.getElementById('generateBumpLevel');
+
+  if (!versionInput || !bumpLevelSelect) return;
+
+  const bumpLevel = bumpLevelSelect.value;
+  if (bumpLevel === 'custom') {
+    versionInput.readOnly = false;
+    versionInput.placeholder = 'e.g. 1.2.3';
+    return;
+  }
+
+  const nextVersion = getBumpedVersion(_installedVersion, bumpLevel);
+  versionInput.value = nextVersion;
+  versionInput.readOnly = true;
+}
+
+function getBumpedVersion(version, bumpLevel) {
+  const parsed = parseSemver(version);
+  if (!parsed) {
+    return bumpLevel === 'major' ? '1.0.0' : bumpLevel === 'minor' ? '0.1.0' : '0.0.1';
+  }
+
+  if (bumpLevel === 'major') {
+    return `${parsed.major + 1}.0.0`;
+  }
+  if (bumpLevel === 'minor') {
+    return `${parsed.major}.${parsed.minor + 1}.0`;
+  }
+  return `${parsed.major}.${parsed.minor}.${parsed.patch + 1}`;
+}
+
+function parseSemver(version) {
+  if (!version) return null;
+  const cleaned = String(version).trim().replace(/^v/i, '');
+  const match = cleaned.match(/^(\d+)\.(\d+)\.(\d+)$/);
+  if (!match) return null;
+
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3])
+  };
 }
 
 function statusBadgeHtml(status) {
@@ -146,6 +258,23 @@ function renderPreview(preview) {
   document.getElementById('previewDescription').textContent = preview.description || '';
   document.getElementById('previewFileCount').textContent = `${preview.files.length} file(s)`;
 
+  const summary = {
+    outdated: preview.files.filter(f => f.action === 'update' && !f.alreadyCurrent && !f.isNew).length,
+    alreadyCurrent: preview.files.filter(f => f.alreadyCurrent).length,
+    missingNew: preview.files.filter(f => f.action === 'update' && f.isNew).length,
+    deleteCandidates: preview.files.filter(f => f.action === 'delete').length
+  };
+
+  const summaryEl = document.getElementById('previewSummary');
+  if (summaryEl) {
+    summaryEl.innerHTML = [
+      `<span class="badge bg-warning text-dark">Outdated: ${summary.outdated}</span>`,
+      `<span class="badge bg-secondary">Already current: ${summary.alreadyCurrent}</span>`,
+      `<span class="badge bg-success">Missing/New: ${summary.missingNew}</span>`,
+      `<span class="badge bg-danger">Delete candidates: ${summary.deleteCandidates}</span>`
+    ].join('');
+  }
+
   const alreadyCurrent = preview.files.filter(f => f.alreadyCurrent).length;
   const warn = document.getElementById('previewWarning');
   if (alreadyCurrent > 0) {
@@ -158,15 +287,27 @@ function renderPreview(preview) {
 
   const tbody = document.getElementById('previewFileList');
   tbody.innerHTML = preview.files.map(f => {
+    const rowClass = f.action === 'delete'
+      ? 'table-danger'
+      : f.alreadyCurrent
+        ? 'table-secondary'
+        : f.isNew
+          ? 'table-success'
+          : 'table-warning';
+
     const actionBadge = f.action === 'delete'
       ? '<span class="badge bg-danger">Delete</span>'
       : f.isNew
         ? '<span class="badge bg-success">New</span>'
         : '<span class="badge bg-primary">Update</span>';
-    const statusBadge = f.alreadyCurrent
-      ? '<span class="badge bg-secondary">Already current</span>'
-      : '<span class="badge bg-warning text-dark">Will change</span>';
-    return `<tr>
+    const statusBadge = f.action === 'delete'
+      ? '<span class="badge bg-danger"><i class="bi bi-trash me-1"></i>Will delete</span>'
+      : f.alreadyCurrent
+        ? '<span class="badge bg-secondary"><i class="bi bi-check2-circle me-1"></i>Already current</span>'
+        : f.isNew
+          ? '<span class="badge bg-success"><i class="bi bi-plus-circle me-1"></i>Will add</span>'
+          : '<span class="badge bg-warning text-dark"><i class="bi bi-arrow-repeat me-1"></i>Will change</span>';
+    return `<tr class="${rowClass}">
       <td><code>${escHtml(f.path)}</code></td>
       <td>${actionBadge}</td>
       <td>${statusBadge}</td>
@@ -298,7 +439,13 @@ function escHtml(str) {
 }
 
 function getAuthToken() {
-  return localStorage.getItem('authToken') || sessionStorage.getItem('authToken') || '';
+  return (
+    localStorage.getItem('token') ||
+    sessionStorage.getItem('token') ||
+    localStorage.getItem('authToken') ||
+    sessionStorage.getItem('authToken') ||
+    ''
+  );
 }
 
 function showToast(message, type = 'info') {
@@ -326,4 +473,37 @@ function showToast(message, type = 'info') {
     </div>`);
   const toastEl = document.getElementById(id);
   new bootstrap.Toast(toastEl, { delay: 4000 }).show();
+}
+
+async function downloadGeneratedUpdate(downloadUrl, fileName) {
+  try {
+    const res = await fetch(downloadUrl, {
+      headers: { Authorization: `Bearer ${getAuthToken()}` }
+    });
+
+    if (!res.ok) {
+      let errorMessage = 'Failed to download update package';
+      try {
+        const data = await res.json();
+        if (data && data.error) errorMessage = data.error;
+      } catch {
+        // Keep default error message when response is not JSON.
+      }
+      throw new Error(errorMessage);
+    }
+
+    const blob = await res.blob();
+    const objectUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = fileName || 'update.CTUpdate';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(objectUrl);
+  } catch (err) {
+    showToast(err.message || 'Download failed', 'danger');
+  }
+
+  return false;
 }

@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
+const path = require('path');
+const fs = require('fs').promises;
+const { execFile } = require('child_process');
 const { authenticate } = require('../middleware/auth');
 const authorizeRoles = require('../middleware/authorizeRoles');
 const logAudit = require('../services/auditService');
@@ -13,6 +16,41 @@ const {
   getUpdate,
   getCurrentVersion
 } = require('../services/updateService');
+
+const PROJECT_ROOT = path.join(__dirname, '../../');
+const RELEASES_DIR = path.join(PROJECT_ROOT, 'releases');
+
+async function cleanupGeneratedPackages() {
+  try {
+    const files = await fs.readdir(RELEASES_DIR);
+    const toDelete = files.filter(name => name.endsWith('.CTUpdate'));
+    await Promise.all(toDelete.map(name => fs.unlink(path.join(RELEASES_DIR, name))));
+  } catch {
+    // Best effort cleanup. Ignore if directory does not exist.
+  }
+}
+
+function runGenerateUpdate(args) {
+  return new Promise((resolve, reject) => {
+    execFile('node', ['generate-update.js', ...args], { cwd: PROJECT_ROOT }, (error, stdout, stderr) => {
+      if (error) {
+        const err = new Error(stderr || stdout || error.message || 'generate-update failed');
+        err.code = error.code;
+        reject(err);
+        return;
+      }
+      resolve({ stdout: stdout || '', stderr: stderr || '' });
+    });
+  });
+}
+
+function assertDevGeneratorEnabled(res) {
+  if (process.env.NODE_ENV !== 'development') {
+    res.status(403).json({ error: 'Update package generation is available in development only' });
+    return false;
+  }
+  return true;
+}
 
 // 50 MB max — update packages should be small but give headroom
 const upload = multer({
@@ -29,6 +67,92 @@ const upload = multer({
 
 // All update routes: super_admin only
 router.use(authenticate, authorizeRoles('super_admin'));
+
+/* -------------------------------------------------------
+   POST /updates/generate
+   Dev-only helper to generate a .CTUpdate package from latest code
+------------------------------------------------------- */
+router.post('/generate', async (req, res) => {
+  if (!assertDevGeneratorEnabled(res)) return;
+
+  const version = String(req.body?.version || '').trim();
+  const description = String(req.body?.description || '').trim();
+  const full = typeof req.body?.full === 'undefined' ? true : Boolean(req.body?.full);
+
+  if (!version) {
+    return res.status(400).json({ error: 'version is required' });
+  }
+
+  // Keep generated update packages temporary-only.
+  await cleanupGeneratedPackages();
+
+  const args = ['--version', version];
+  if (description) {
+    args.push('--description', description);
+  }
+  if (full) {
+    args.push('--full');
+  }
+
+  try {
+    const { stdout } = await runGenerateUpdate(args);
+    const match = stdout.match(/Package written:\s*(.+\.CTUpdate)/i);
+    if (!match) {
+      return res.status(400).json({
+        error: 'No update package was produced. There may be no changes to package.',
+        output: stdout
+      });
+    }
+
+    const filePath = match[1].trim();
+    const fileName = path.basename(filePath);
+
+    await logAudit(req, 'SYSTEM_UPDATE_PACKAGE_GENERATED', 'system_updates', null, {
+      version,
+      fileName,
+      full
+    });
+
+    res.json({
+      message: `Update package ${fileName} generated successfully`,
+      fileName,
+      downloadUrl: `/updates/download/${encodeURIComponent(fileName)}`,
+      output: stdout
+    });
+  } catch (err) {
+    console.error('Error generating update package:', err);
+    res.status(500).json({ error: err.message || 'Failed to generate update package' });
+  }
+});
+
+/* -------------------------------------------------------
+   GET /updates/download/:filename
+   Dev-only helper to download a generated update package
+------------------------------------------------------- */
+router.get('/download/:filename', async (req, res) => {
+  if (!assertDevGeneratorEnabled(res)) return;
+
+  const filename = String(req.params.filename || '').trim();
+  if (!filename.endsWith('.CTUpdate')) {
+    return res.status(400).json({ error: 'Only .CTUpdate files can be downloaded' });
+  }
+
+  const safeName = path.basename(filename);
+  const absPath = path.join(RELEASES_DIR, safeName);
+
+  try {
+    await fs.access(absPath);
+    res.download(absPath, safeName, async () => {
+      try {
+        await fs.unlink(absPath);
+      } catch {
+        // Best effort cleanup after transfer.
+      }
+    });
+  } catch {
+    res.status(404).json({ error: 'Update package not found' });
+  }
+});
 
 /* -------------------------------------------------------
    GET /updates

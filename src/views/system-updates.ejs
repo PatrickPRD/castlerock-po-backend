@@ -18,6 +18,52 @@
 
     <div class="card-body">
 
+      <% if (typeof isDevMode !== 'undefined' && isDevMode) { %>
+        <div class="alert alert-warning">
+          <i class="bi bi-tools me-2"></i>
+          <strong>Dev Tools:</strong> Package generation is enabled in development mode only. Generated packages are temporary and removed after download.
+        </div>
+
+        <div class="card border-0 bg-light mb-3">
+          <div class="card-body">
+            <h6 class="mb-3"><i class="bi bi-box-seam me-2"></i>Generate Update Package (Dev)</h6>
+            <p class="small text-muted mb-3">This creates a one-time download package. The server keeps only update records and current state metadata.</p>
+            <div class="row g-2 align-items-end">
+              <div class="col-md-2">
+                <label for="generateBumpLevel" class="form-label mb-1">Update Level</label>
+                <select id="generateBumpLevel" class="form-select">
+                  <option value="patch" selected>Patch</option>
+                  <option value="minor">Minor</option>
+                  <option value="major">Major</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label for="generateVersion" class="form-label mb-1">Version</label>
+                <input id="generateVersion" type="text" class="form-control" placeholder="e.g. 1.0.2">
+                <div class="form-text">Auto-filled from installed version unless Custom is selected.</div>
+              </div>
+              <div class="col-md-4">
+                <label for="generateDescription" class="form-label mb-1">Description</label>
+                <input id="generateDescription" type="text" class="form-control" placeholder="Short release summary">
+              </div>
+              <div class="col-md-2">
+                <div class="form-check mt-4">
+                  <input class="form-check-input" type="checkbox" id="generateFull" checked>
+                  <label class="form-check-label" for="generateFull">Full (all tracked files)</label>
+                </div>
+              </div>
+              <div class="col-md-2">
+                <button id="generateUpdateBtn" class="btn btn-primary w-100" onclick="generateUpdatePackage()">
+                  <i class="bi bi-gear me-1"></i>Generate
+                </button>
+              </div>
+            </div>
+            <div id="generateResult" class="mt-3"></div>
+          </div>
+        </div>
+      <% } %>
+
       <div class="alert alert-info">
         <i class="bi bi-info-circle me-2"></i>
         <strong>How it works:</strong> Upload a <code>.CTUpdate</code> package generated from the latest source code.
@@ -92,6 +138,14 @@
               <small class="text-muted" id="previewDescription"></small>
             </div>
             <span class="badge bg-secondary" id="previewFileCount"></span>
+          </div>
+
+          <div id="previewSummary" class="d-flex flex-wrap gap-2 mb-3"></div>
+          <div class="small text-muted mb-3">
+            <span class="badge bg-warning text-dark me-1">Outdated</span>
+            <span class="badge bg-secondary me-1">Already current</span>
+            <span class="badge bg-success me-1">Missing/New</span>
+            <span class="badge bg-danger me-1">Delete candidate</span>
           </div>
 
           <div id="previewWarning" class="alert alert-warning d-none">
