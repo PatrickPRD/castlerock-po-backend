@@ -144,6 +144,7 @@ router.get(
         po.vat_rate,
         po.vat_amount,
         po.total_amount,
+        po.delivery_notes,
 
         po.supplier_id,
         s.name AS supplier,
@@ -238,7 +239,8 @@ router.post(
       description,
       netAmount,
       vatRate,
-      lineItems
+      lineItems,
+      deliveryNotes
     } = req.body;
 
     if (!supplierId || !siteId || !locationId || !poDate) {
@@ -278,6 +280,7 @@ router.post(
               location_id,
               po_date,
               description,
+              delivery_notes,
               net_amount,
               vat_rate,
               total_amount,
@@ -285,7 +288,7 @@ router.post(
               status,
               stage_id
             )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
           poNumber,
           supplierId,
@@ -293,6 +296,7 @@ router.post(
           locationId,
           poDate,
           normalizedLineItems.length ? '' : (description || ''),
+          deliveryNotes || '',
           net,
           vatDecimal,
           total,
@@ -428,7 +432,8 @@ router.put(
       netAmount,
       vatRate,
       stageId,
-      lineItems
+      lineItems,
+      deliveryNotes
     } = req.body;
 
     const normalizedLineItems = normalizeLineItems(lineItems);
@@ -457,6 +462,7 @@ router.put(
           location_id = ?,
           po_date = ?,
           description = ?,
+          delivery_notes = ?,
           net_amount = ?,
           vat_rate = ?,
           total_amount = ?,
@@ -468,6 +474,7 @@ router.put(
         locationId,
         poDate,
         normalizedLineItems.length ? '' : (description || ''),
+        deliveryNotes || '',
         net,
         vatDecimal,
         total,

@@ -9,6 +9,7 @@ let stageSelect;
 let poNumberInput;
 let poDateInput;
 let descriptionInp;
+let deliveryNotesInp;
 let netAmountInp;
 let vatRateSelect;
 let vatAmountSpan;
@@ -63,6 +64,7 @@ let availableVatRates = [];
   poNumberInput = document.getElementById('poNumber');
   poDateInput = document.getElementById('poDate');
   descriptionInp = document.getElementById('description');
+  deliveryNotesInp = document.getElementById('deliveryNotes');
   netAmountInp = document.getElementById('netAmount');
   vatRateSelect = document.getElementById('vatRate');
   vatAmountSpan = document.getElementById('vatAmount');
@@ -453,6 +455,7 @@ async function loadPO() {
 
   poDateInput.value    = po.po_date;
   descriptionInp.value = po.description || '';
+  deliveryNotesInp.value = po.delivery_notes || '';
   netAmountInp.value   = po.net_amount;
 
   if (po.line_items && po.line_items.length > 0) {
@@ -526,6 +529,7 @@ async function buildPOPayload() {
     locationId: locationSelect.value,
     poDate: poDateInput.value,
     description: descriptionInp.value || '',
+    deliveryNotes: deliveryNotesInp.value || '',
     netAmount: Number(netAmountInp.value) || 0,
     vatRate: Number(vatRateSelect.value) || 0,
     stageId: stageSelect.value

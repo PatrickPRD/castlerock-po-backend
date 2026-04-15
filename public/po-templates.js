@@ -22,6 +22,7 @@ const templateModalTitle = document.getElementById('templateModalTitle');
 const templateLineItemsBody = document.getElementById('templateLineItemsBody');
 const addTemplateLineItem = document.getElementById('addTemplateLineItem');
 const cancelTemplateBtn = document.getElementById('cancelTemplateBtn');
+const templateDeliveryNotes = document.getElementById('templateDeliveryNotes');
 const templateLineItemSuggestions = document.getElementById('templateLineItemSuggestions');
 
 const costItemLookup = window.createCostItemLookup
@@ -242,6 +243,7 @@ addTemplateBtn.addEventListener('click', () => {
   templateId.value = '';
   templateName.value = '';
   templateStage.value = '';
+  templateDeliveryNotes.value = '';
   templateLineItemsBody.innerHTML = '';
   addLineItemRow();
   openModal();
@@ -256,6 +258,7 @@ async function openEditTemplate(id) {
     templateId.value = t.id;
     templateName.value = t.name;
     templateStage.value = t.stage_id || '';
+    templateDeliveryNotes.value = t.delivery_notes || '';
     templateLineItemsBody.innerHTML = '';
 
     if (t.line_items && t.line_items.length) {
@@ -295,6 +298,7 @@ templateForm.addEventListener('submit', async (e) => {
   const payload = {
     name,
     stageId: templateStage.value || null,
+    deliveryNotes: templateDeliveryNotes.value || '',
     lineItems: items
   };
 

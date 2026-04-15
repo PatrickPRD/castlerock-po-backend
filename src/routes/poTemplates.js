@@ -85,6 +85,7 @@ router.get(
         SELECT
           t.id,
           t.name,
+          t.delivery_notes,
           t.stage_id,
           ps.name AS stage_name,
           t.active,
@@ -132,7 +133,7 @@ router.post(
   authenticate,
   authorizeRoles('super_admin', 'admin'),
   async (req, res) => {
-    const { name, stageId, lineItems } = req.body;
+    const { name, stageId, lineItems, deliveryNotes } = req.body;
 
     if (!name || !String(name).trim()) {
       return res.status(400).json({ error: 'Template name is required' });
@@ -149,9 +150,9 @@ router.post(
       await conn.beginTransaction();
 
       const [result] = await conn.query(`
-        INSERT INTO po_templates (name, stage_id, created_by)
-        VALUES (?, ?, ?)
-      `, [String(name).trim(), stageId || null, req.user.id]);
+        INSERT INTO po_templates (name, delivery_notes, stage_id, created_by)
+        VALUES (?, ?, ?, ?)
+      `, [String(name).trim(), deliveryNotes || '', stageId || null, req.user.id]);
 
       const values = normalizedItems.map(item => [
         result.insertId,
@@ -208,7 +209,7 @@ router.put(
   authenticate,
   authorizeRoles('super_admin', 'admin'),
   async (req, res) => {
-    const { name, stageId, lineItems } = req.body;
+    const { name, stageId, lineItems, deliveryNotes } = req.body;
 
     if (!name || !String(name).trim()) {
       return res.status(400).json({ error: 'Template name is required' });
@@ -235,9 +236,9 @@ router.put(
       }
 
       await conn.query(`
-        UPDATE po_templates SET name = ?, stage_id = ?, updated_at = CURRENT_TIMESTAMP
+        UPDATE po_templates SET name = ?, delivery_notes = ?, stage_id = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `, [String(name).trim(), stageId || null, req.params.id]);
+      `, [String(name).trim(), deliveryNotes || '', stageId || null, req.params.id]);
 
       await conn.query('DELETE FROM po_template_line_items WHERE template_id = ?', [req.params.id]);
 

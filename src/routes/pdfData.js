@@ -71,6 +71,7 @@ router.get(
           po.total_amount AS po_total_amount,
           po.vat_rate AS po_vat_rate,
           po.description,
+          po.delivery_notes,
           po.status,
           po.created_at,
           

@@ -268,6 +268,19 @@ async function generatePOPDF(poData, invoices = [], settings = {}, action = 'dow
     yPos += descLines.length * 5 + 5;
   }
 
+  // Delivery Notes
+  if (poData.delivery_notes) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('Delivery Notes', 15, yPos);
+    yPos += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    const dnLines = doc.splitTextToSize(poData.delivery_notes, 180);
+    doc.text(dnLines, 15, yPos);
+    yPos += dnLines.length * 5 + 5;
+  }
+
   // Line Items Table
   if (poData.line_items && poData.line_items.length > 0) {
     doc.setFont('helvetica', 'bold');

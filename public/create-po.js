@@ -28,6 +28,7 @@ const vatAmount      = document.getElementById('vatAmount');
 const totalAmount    = document.getElementById('totalAmount');
 const poDate         = document.getElementById('poDate');
 const description    = document.getElementById('description');
+const deliveryNotes  = document.getElementById('deliveryNotes');
 const stageSelect = document.getElementById('stage');
 const toggleLineItemsBtn = document.getElementById('toggleLineItems');
 const lineItemsSection = document.getElementById('lineItemsSection');
@@ -115,6 +116,11 @@ async function applyTemplate(id) {
     // Apply stage if template has one
     if (t.stage_id && stageSelect) {
       stageSelect.value = String(t.stage_id);
+    }
+
+    // Apply delivery notes if template has them
+    if (t.delivery_notes && deliveryNotes) {
+      deliveryNotes.value = t.delivery_notes;
     }
 
     // Switch to line items mode and populate
@@ -459,6 +465,7 @@ async function buildPOPayload() {
     locationId: locationSelect.value,
     poDate: poDate.value,
     description: description.value || '',
+    deliveryNotes: deliveryNotes.value || '',
     netAmount: Number(netAmount.value) || 0,
     vatRate: Number(vatRate.value) || 0,
     stageId: stageSelect.value
