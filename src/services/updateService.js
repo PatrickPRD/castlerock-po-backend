@@ -200,28 +200,37 @@ function analyzeUpdatePackage(updateData) {
   const incomingManifest = updateData.manifest || {};
 
   for (const filePath of (updateData.changes?.added || [])) {
-    const existsLocally = !!currentManifest[filePath];
-    analysis.changes.added.push(filePath);
-    analysis.fileDetails.push({
-      path: filePath,
-      action: existsLocally ? 'overwrite (file already exists locally)' : 'add',
-      size: updateData.files[filePath] ? Buffer.from(updateData.files[filePath], 'base64').length : 0
-    });
+    const localHash = currentManifest[filePath];
+    const incomingHash = incomingManifest[filePath];
+    const fileSize = updateData.files[filePath] ? Buffer.from(updateData.files[filePath], 'base64').length : 0;
+
+    if (localHash && localHash === incomingHash) {
+      // File exists locally with identical content — no action needed
+      analysis.changes.unchanged.push(filePath);
+      analysis.fileDetails.push({ path: filePath, action: 'unchanged (already up-to-date)', size: fileSize });
+    } else if (localHash) {
+      // File exists locally but content differs
+      analysis.changes.modified.push(filePath);
+      analysis.fileDetails.push({ path: filePath, action: 'overwrite (local file differs)', size: fileSize });
+    } else {
+      // File is genuinely new
+      analysis.changes.added.push(filePath);
+      analysis.fileDetails.push({ path: filePath, action: 'add', size: fileSize });
+    }
   }
 
   for (const filePath of (updateData.changes?.modified || [])) {
     const localHash = currentManifest[filePath];
     const incomingHash = incomingManifest[filePath];
+    const fileSize = updateData.files[filePath] ? Buffer.from(updateData.files[filePath], 'base64').length : 0;
+
     if (localHash === incomingHash) {
       analysis.changes.unchanged.push(filePath);
+      analysis.fileDetails.push({ path: filePath, action: 'unchanged (already up-to-date)', size: fileSize });
     } else {
       analysis.changes.modified.push(filePath);
+      analysis.fileDetails.push({ path: filePath, action: 'update', size: fileSize });
     }
-    analysis.fileDetails.push({
-      path: filePath,
-      action: localHash === incomingHash ? 'unchanged (already up-to-date)' : 'update',
-      size: updateData.files[filePath] ? Buffer.from(updateData.files[filePath], 'base64').length : 0
-    });
   }
 
   for (const filePath of (updateData.changes?.removed || [])) {
