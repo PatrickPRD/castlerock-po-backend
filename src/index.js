@@ -73,6 +73,7 @@ app.get('/current-costs-report.html', (req, res) => res.render('current-costs-re
 app.get('/gdpr.html', (req, res) => res.render('gdpr', { pageTitle: 'GDPR Privacy Notice' }));
 app.get('/audit-log.html', (req, res) => res.render('audit-log', { pageTitle: 'Audit Log' }));
 app.get('/system-updates.html', (req, res) => res.render('system-updates', { pageTitle: 'System Updates' }));
+app.get('/po-templates.html', (req, res) => res.render('po-templates', { pageTitle: 'PO Templates' }));
 
 // Health check with database connectivity test
 app.get('/health', async (req, res) => {
@@ -128,6 +129,10 @@ app.use('/location-spread-rules', locationSpreadRoutes);
 // Purchase Orders
 const poRoutes = require('./routes/purchaseOrders');
 app.use('/purchase-orders', poRoutes);
+
+// PO Templates
+const poTemplateRoutes = require('./routes/poTemplates');
+app.use('/po-templates', poTemplateRoutes);
 
 // Invoices
 const invoiceRoutes = require('./routes/invoices');

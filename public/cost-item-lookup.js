@@ -153,7 +153,11 @@
 
       const item = resolveSelection(descriptionField.value);
       if (!item) {
-        clearSelectionForRow(row);
+        // Do NOT clear here — the input event handler already calls
+        // clearSelectionForRow when the user edits the description.
+        // Clearing on blur/change would wipe pre-populated cost item
+        // links (e.g. from template loading) when the suggestion map
+        // is empty because no search has been performed.
         return false;
       }
 

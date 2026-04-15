@@ -1408,6 +1408,7 @@ function openCreatePOModal() {
   loadPOSuppliers();
   loadPOSites();
   loadPOStages();
+  loadDashboardTemplates();
   ensureVatRates().then(rates => {
     fillVatSelect(document.getElementById("poVatRate"), rates);
     const vatField = document.getElementById("poVatRate");
@@ -1421,6 +1422,7 @@ function openCreatePOModal() {
   document.getElementById("poTotalAmount").textContent = "0.00";
   document.getElementById("poSupplierSearch").value = "";
   document.getElementById("poSupplier").value = "";
+  document.getElementById("dashTemplateSearch").value = "";
 
   if (createLineItems) {
     createLineItems.reset();
@@ -1554,6 +1556,108 @@ async function loadPOStages() {
     console.error("Failed to load stages:", err);
   }
 }
+
+/* ============================
+   Dashboard Template Selector
+   ============================ */
+let dashAllTemplates = [];
+
+async function loadDashboardTemplates() {
+  try {
+    const res = await authenticatedFetch("/po-templates");
+    if (!res.ok) return;
+    dashAllTemplates = await res.json();
+    const wrap = document.getElementById("dashTemplateSelectorWrap");
+    if (dashAllTemplates.length > 0 && wrap) {
+      wrap.style.display = "block";
+    }
+  } catch (_) {
+    // templates optional
+  }
+}
+
+function filterAndShowTemplates(query) {
+  const searchInput = document.getElementById("dashTemplateSearch");
+  const dropdown = document.getElementById("dashTemplateDropdown");
+  if (!searchInput || !dropdown) return;
+
+  const q = (query || "").trim().toLowerCase();
+  const filtered = q
+    ? dashAllTemplates.filter(t =>
+        t.name.toLowerCase().includes(q) ||
+        (t.stage_name && t.stage_name.toLowerCase().includes(q))
+      )
+    : dashAllTemplates;
+
+  if (filtered.length === 0) {
+    dropdown.innerHTML = '<div style="padding: 10px; color: #999;">No templates found</div>';
+  } else {
+    dropdown.innerHTML = filtered.map(t => {
+      const stage = t.stage_name ? " [" + t.stage_name + "]" : "";
+      const label = t.name + stage + " (" + t.line_item_count + " items)";
+      return '<div class="template-option" data-id="' + t.id + '" style="padding: 10px; cursor: pointer; border-bottom: 1px solid #eee;">' + label + '</div>';
+    }).join("");
+
+    dropdown.querySelectorAll(".template-option").forEach(opt => {
+      opt.addEventListener("click", async () => {
+        const id = opt.dataset.id;
+        searchInput.value = opt.textContent;
+        dropdown.style.display = "none";
+        await applyDashTemplate(id);
+      });
+      opt.addEventListener("mouseenter", () => { opt.style.backgroundColor = "#f0f0f0"; });
+      opt.addEventListener("mouseleave", () => { opt.style.backgroundColor = "white"; });
+    });
+  }
+
+  dropdown.style.display = "block";
+  dropdown.style.width = searchInput.offsetWidth + "px";
+}
+
+async function applyDashTemplate(id) {
+  try {
+    const res = await authenticatedFetch("/po-templates/" + id);
+    if (!res.ok) throw new Error("Failed to load template");
+    const t = await res.json();
+
+    if (t.stage_id) {
+      const stageEl = document.getElementById("poStage");
+      if (stageEl) stageEl.value = String(t.stage_id);
+    }
+
+    if (t.line_items && t.line_items.length && createLineItems) {
+      createLineItems.loadItems(t.line_items);
+    }
+
+    showToast('Template "' + t.name + '" loaded', "success");
+  } catch (err) {
+    showToast("Error loading template: " + err.message, "error");
+  }
+}
+
+(function initDashTemplateListeners() {
+  document.addEventListener("DOMContentLoaded", () => {
+    const searchInput = document.getElementById("dashTemplateSearch");
+    const dropdown = document.getElementById("dashTemplateDropdown");
+
+    if (searchInput) {
+      searchInput.addEventListener("focus", () => {
+        filterAndShowTemplates("");
+      });
+
+      searchInput.addEventListener("input", (e) => {
+        filterAndShowTemplates(e.target.value);
+      });
+    }
+
+    document.addEventListener("click", (e) => {
+      if (searchInput && dropdown &&
+          !searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.style.display = "none";
+      }
+    });
+  });
+})();
 
 // Site → Location cascade
 document.addEventListener("DOMContentLoaded", () => {

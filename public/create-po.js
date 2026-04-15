@@ -44,6 +44,113 @@ const costItemLookup = window.createCostItemLookup
 let lineItemsMode = false;
 let lineItemSearchTimeout = null;
 let availableVatRates = [];
+let allTemplates = [];
+
+/* =========================
+   Template Selector
+   ========================= */
+const templateSelectorWrap = document.getElementById('templateSelectorWrap');
+const templateSearchInput = document.getElementById('templateSearch');
+const templateDropdown = document.getElementById('templateDropdown');
+
+async function loadTemplates() {
+  try {
+    const res = await fetch('/po-templates', {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (!res.ok) return;
+    allTemplates = await res.json();
+    if (allTemplates.length > 0) {
+      templateSelectorWrap.style.display = 'block';
+    }
+  } catch (_) {
+    // templates optional
+  }
+}
+
+function filterAndShowTemplates(query) {
+  if (!templateSearchInput || !templateDropdown) return;
+
+  const q = (query || '').trim().toLowerCase();
+  const filtered = q
+    ? allTemplates.filter(t =>
+        t.name.toLowerCase().includes(q) ||
+        (t.stage_name && t.stage_name.toLowerCase().includes(q))
+      )
+    : allTemplates;
+
+  if (filtered.length === 0) {
+    templateDropdown.innerHTML = '<div style="padding: 10px; color: #999;">No templates found</div>';
+  } else {
+    templateDropdown.innerHTML = filtered.map(t => {
+      const stage = t.stage_name ? ' [' + t.stage_name + ']' : '';
+      const label = t.name + stage + ' (' + t.line_item_count + ' items)';
+      return '<div class="template-option" data-id="' + t.id + '" style="padding: 10px; cursor: pointer; border-bottom: 1px solid #eee;">' + label + '</div>';
+    }).join('');
+
+    templateDropdown.querySelectorAll('.template-option').forEach(opt => {
+      opt.addEventListener('click', async () => {
+        const id = opt.dataset.id;
+        templateSearchInput.value = opt.textContent;
+        templateDropdown.style.display = 'none';
+        await applyTemplate(id);
+      });
+      opt.addEventListener('mouseenter', () => { opt.style.backgroundColor = '#f0f0f0'; });
+      opt.addEventListener('mouseleave', () => { opt.style.backgroundColor = 'white'; });
+    });
+  }
+
+  templateDropdown.style.display = 'block';
+  templateDropdown.style.width = templateSearchInput.offsetWidth + 'px';
+}
+
+async function applyTemplate(id) {
+  try {
+    const res = await fetch('/po-templates/' + id, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (!res.ok) throw new Error('Failed to load template');
+    const t = await res.json();
+
+    // Apply stage if template has one
+    if (t.stage_id && stageSelect) {
+      stageSelect.value = String(t.stage_id);
+    }
+
+    // Switch to line items mode and populate
+    if (t.line_items && t.line_items.length) {
+      lineItemsBody.innerHTML = '';
+      // Set mode flags without triggering the default empty row
+      lineItemsMode = true;
+      lineItemsSection.style.display = 'block';
+      description.style.display = 'none';
+      toggleLineItemsBtn.textContent = 'Use Description';
+      netAmount.disabled = true;
+
+      t.line_items.forEach(item => addLineItemRow(item));
+      updateLineItemsNet();
+    }
+
+    showToast('Template "' + t.name + '" loaded', 'success');
+  } catch (err) {
+    showToast('Error loading template: ' + err.message, 'error');
+  }
+}
+
+templateSearchInput.addEventListener('focus', () => {
+  filterAndShowTemplates('');
+});
+
+templateSearchInput.addEventListener('input', (e) => {
+  filterAndShowTemplates(e.target.value);
+});
+
+document.addEventListener('click', (e) => {
+  if (templateSearchInput && templateDropdown &&
+      !templateSearchInput.contains(e.target) && !templateDropdown.contains(e.target)) {
+    templateDropdown.style.display = 'none';
+  }
+});
 
 
 /* =========================
@@ -93,6 +200,7 @@ loadOptions('/suppliers', supplierSelect);
 loadOptions('/sites', siteSelect);
 loadOptions('/stages', stageSelect);
 loadVatRates();
+loadTemplates();
 
 /* =========================
    Site → Location cascade

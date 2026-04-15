@@ -305,6 +305,15 @@ async function listCostItems({ includeDeleted = false, deletedOnly = false } = {
         FROM cost_item_cost_history h
         WHERE h.changed_at >= DATE_SUB(CURDATE(), INTERVAL ${THREE_MONTH_COMPARISON_WINDOW} MONTH)
           AND h.change_source <> 'seed_po'
+
+        UNION ALL
+
+        SELECT
+          ci_base.id AS cost_item_id,
+          ci_base.cost_per AS point_cost,
+          COALESCE(ci_base.last_updated, ci_base.created_at) AS point_at,
+          0 AS point_id
+        FROM cost_items ci_base
       ) points
       GROUP BY points.cost_item_id
     ) tracked_recent
@@ -756,6 +765,13 @@ async function getCostItemHistory(id, { limit = 24 } = {}) {
   const historyRows = mergedRows;
   const points = [];
 
+  // Always include the item's own cost_per as a baseline data point
+  const baselinePoint = {
+    at: item.last_updated || item.updated_at || item.created_at,
+    cost_per: Number(item.cost_per),
+    source: 'baseline'
+  };
+
   if (historyRows.length > 0) {
     historyRows.forEach((row) => {
       points.push({
@@ -764,12 +780,22 @@ async function getCostItemHistory(id, { limit = 24 } = {}) {
         source: String(row.source || 'manual')
       });
     });
+
+    // Include baseline if it's not already represented by an identical point
+    const baselineTime = new Date(baselinePoint.at).getTime();
+    const baselineCost = baselinePoint.cost_per;
+    const alreadyPresent = points.some(
+      (p) => new Date(p.at).getTime() === baselineTime && p.cost_per === baselineCost
+    );
+    if (!alreadyPresent) {
+      points.push(baselinePoint);
+      points.sort((a, b) => {
+        const timeDiff = new Date(a.at).getTime() - new Date(b.at).getTime();
+        return timeDiff !== 0 ? timeDiff : 0;
+      });
+    }
   } else {
-    points.push({
-      at: item.last_updated || item.updated_at || item.created_at,
-      cost_per: Number(item.cost_per),
-      source: 'current'
-    });
+    points.push(baselinePoint);
   }
 
   return {
@@ -872,10 +898,21 @@ async function getCurrentCostsReport({
         AND h.changed_at < DATE_ADD(?, INTERVAL 1 DAY)
         AND h.change_source <> 'seed_po'
         AND h.cost_item_id IN (?)
+
+      UNION ALL
+
+      SELECT
+        ci_base.id AS cost_item_id,
+        ci_base.cost_per AS point_cost,
+        COALESCE(ci_base.last_updated, ci_base.created_at) AS point_at,
+        'baseline' AS source,
+        0 AS point_id
+      FROM cost_items ci_base
+      WHERE ci_base.id IN (?)
     ) points
     ORDER BY points.cost_item_id ASC, points.point_at ASC, points.point_id ASC
     `,
-    [fromDate, toDate, itemIds, fromDate, toDate, itemIds]
+    [fromDate, toDate, itemIds, fromDate, toDate, itemIds, itemIds]
   );
 
   // Keep report charts consistent with item history by ensuring the latest manual/uploaded

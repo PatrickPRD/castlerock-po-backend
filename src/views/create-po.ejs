@@ -4,6 +4,12 @@
 <main class="container">
   <div class="card">
     <form id="poForm">
+      <div id="templateSelectorWrap" style="margin-bottom: 1rem; display: none; position: relative;">
+        <label for="templateSearch" style="font-weight: 500; margin-bottom: 4px; display: block;">Load from Template</label>
+        <input type="text" id="templateSearch" class="form-control" placeholder="Type to search templates..." style="width: 100%;" autocomplete="off">
+        <input type="hidden" id="templateSelected">
+        <div id="templateDropdown" style="display: none; position: absolute; background: white; border: 1px solid #ddd; border-radius: 4px; max-height: 200px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 8px rgba(0,0,0,0.1); width: 100%;"></div>
+      </div>
       <select id="supplier"></select>
       <select id="site"></select>
       <select id="location"></select>
