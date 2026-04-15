@@ -23,6 +23,8 @@ const RESTORABLE_TABLES = new Set([
   'sites',
   'site_letters',
   'locations',
+  'cost_items',
+  'cost_item_cost_history',
   'cashflow_settings',
   'cashflow_templates',
   'cashflow_location_type_templates',
