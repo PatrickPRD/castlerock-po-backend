@@ -427,7 +427,7 @@ ensureAuthenticated();
                       ? `<button class="btn btn-sm btn-outline-success" type="button" data-action="restore" data-id="${item.id}">Restore</button>
                          <button class="btn btn-sm btn-outline-danger" type="button" data-action="permanent-delete" data-id="${item.id}" data-code="${escapeHtml(item.code)}">Delete Permanently</button>`
                       : '')
-                    : `<button class="btn btn-sm btn-outline-primary" type="button" data-action="edit" data-id="${item.id}">Update</button>
+                    : `${isSuperAdmin ? `<button class="btn btn-sm btn-outline-primary" type="button" data-action="edit" data-id="${item.id}">Update</button>` : ''}
                        ${isSuperAdmin ? `<button class="btn btn-sm btn-outline-secondary" type="button" data-action="edit-history" data-id="${item.id}"><i class="bi bi-clock-history me-1"></i>History</button>` : ''}
                        <button class="btn btn-sm btn-outline-danger" type="button" data-action="soft-delete" data-id="${item.id}">Delete</button>`}
                 </div>

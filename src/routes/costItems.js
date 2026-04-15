@@ -509,7 +509,7 @@ router.delete(
 router.put(
   '/:id',
   authenticate,
-  authorizeRoles('super_admin', 'admin'),
+  authorizeRoles('super_admin'),
   async (req, res) => {
     try {
       const itemId = Number(req.params.id);
