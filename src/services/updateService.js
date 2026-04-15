@@ -306,14 +306,24 @@ function applyUpdatePackage(updateData) {
     }
   }
 
-  // Update package.json dependencies if needed
+  // Update package.json dependencies only if they actually differ
   if (updateData.packageDependencies && Object.keys(updateData.packageDependencies).length > 0) {
     try {
       const pkgPath = path.join(PROJECT_ROOT, 'package.json');
       const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-      pkg.dependencies = { ...pkg.dependencies, ...updateData.packageDependencies };
-      fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
-      results.packageJsonUpdated = true;
+      const currentDeps = pkg.dependencies || {};
+      const incomingDeps = updateData.packageDependencies;
+
+      // Check if any dependency actually changed
+      const hasChanges = Object.entries(incomingDeps).some(
+        ([dep, ver]) => currentDeps[dep] !== ver
+      );
+
+      if (hasChanges) {
+        pkg.dependencies = { ...currentDeps, ...incomingDeps };
+        fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+        results.packageJsonUpdated = true;
+      }
     } catch (err) {
       results.errors.push({ file: 'package.json', error: err.message });
     }
