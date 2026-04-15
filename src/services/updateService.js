@@ -184,6 +184,7 @@ function analyzeUpdatePackage(updateData) {
     changes: {
       added: [],
       modified: [],
+      synced: [],
       removed: [],
       unchanged: []
     },
@@ -267,7 +268,7 @@ function analyzeUpdatePackage(updateData) {
       analysis.fileDetails.push({ path: filePath, action: 'add (missing locally)', size: fileSize });
     } else if (localHash !== incomingHash) {
       // File exists but differs from expected state
-      analysis.changes.modified.push(filePath);
+      analysis.changes.synced.push(filePath);
       analysis.fileDetails.push({ path: filePath, action: 'sync (local file differs)', size: fileSize });
     } else {
       analysis.changes.unchanged.push(filePath);

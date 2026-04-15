@@ -39,6 +39,7 @@
 
 .stat-added .stat-value { color: #198754; }
 .stat-modified .stat-value { color: #0d6efd; }
+.stat-synced .stat-value { color: #fd7e14; }
 .stat-removed .stat-value { color: #dc3545; }
 .stat-unchanged .stat-value { color: #6c757d; }
 .stat-deps .stat-value { color: #6f42c1; }
@@ -78,6 +79,7 @@
 .badge-delete { background: #f8d7da; color: #842029; }
 .badge-unchanged { background: #e9ecef; color: #6c757d; }
 .badge-overwrite { background: #fff3cd; color: #664d03; }
+.badge-sync { background: #ffe5d0; color: #984c0c; }
 
 /* Dependency changes */
 .dep-change-list {

@@ -205,6 +205,7 @@ function renderAnalysis(data) {
 
   const addedCount = data.changes.added.length;
   const modifiedCount = data.changes.modified.length;
+  const syncedCount = (data.changes.synced || []).length;
   const removedCount = data.changes.removed.length;
   const unchangedCount = data.changes.unchanged.length;
   const depChanges = (data.dependencyChanges.added.length + data.dependencyChanges.updated.length + data.dependencyChanges.removed.length);
@@ -225,7 +226,11 @@ function renderAnalysis(data) {
       </div>
       <div class="analysis-stat stat-modified">
         <div class="stat-value">${modifiedCount}</div>
-        <div class="stat-label">Files Modified</div>
+        <div class="stat-label">Files Updated</div>
+      </div>
+      <div class="analysis-stat stat-synced">
+        <div class="stat-value">${syncedCount}</div>
+        <div class="stat-label">Files Synced</div>
       </div>
       <div class="analysis-stat stat-removed">
         <div class="stat-value">${removedCount}</div>
@@ -252,6 +257,7 @@ function renderAnalysis(data) {
       if (file.action === 'add') badgeClass = 'badge-add';
       else if (file.action === 'delete') badgeClass = 'badge-delete';
       else if (file.action.includes('unchanged')) badgeClass = 'badge-unchanged';
+      else if (file.action.includes('sync')) badgeClass = 'badge-sync';
       else if (file.action.includes('overwrite')) badgeClass = 'badge-overwrite';
 
       html += `
