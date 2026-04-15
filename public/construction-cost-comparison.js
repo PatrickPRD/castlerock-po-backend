@@ -427,7 +427,7 @@ ensureAuthenticated();
                       ? `<button class="btn btn-sm btn-outline-success" type="button" data-action="restore" data-id="${item.id}">Restore</button>
                          <button class="btn btn-sm btn-outline-danger" type="button" data-action="permanent-delete" data-id="${item.id}" data-code="${escapeHtml(item.code)}">Delete Permanently</button>`
                       : '')
-                    : `${isSuperAdmin ? `<button class="btn btn-sm btn-outline-primary" type="button" data-action="edit" data-id="${item.id}">Update</button>` : ''}
+                    : `<button class="btn btn-sm btn-outline-primary" type="button" data-action="edit" data-id="${item.id}">${isSuperAdmin ? 'Edit' : 'Update'}</button>
                        ${isSuperAdmin ? `<button class="btn btn-sm btn-outline-secondary" type="button" data-action="edit-history" data-id="${item.id}"><i class="bi bi-clock-history me-1"></i>History</button>` : ''}
                        <button class="btn btn-sm btn-outline-danger" type="button" data-action="soft-delete" data-id="${item.id}">Delete</button>`}
                 </div>
@@ -612,11 +612,25 @@ ensureAuthenticated();
     costItemUnitInput.value = item.unit || '';
     costItemDescriptionInput.value = item.description || '';
     costItemCostPerInput.value = numberValue(item.cost_per).toFixed(2);
-    setCostItemMode(true);
-    costItemTypeInput.readOnly = true;
-    costItemUnitInput.readOnly = true;
-    costItemDescriptionInput.readOnly = true;
-    costItemModalTitle.textContent = 'Update Cost';
+
+    if (isSuperAdmin) {
+      // Super admin: show all fields, editable
+      setCostItemMode(false);
+      costItemCodeInput.readOnly = true;
+      costItemTypeInput.readOnly = false;
+      costItemUnitInput.readOnly = false;
+      costItemDescriptionInput.readOnly = false;
+      costItemModalTitle.textContent = 'Edit Cost Item';
+      if (costItemSubmitBtn) costItemSubmitBtn.textContent = 'Save Changes';
+    } else {
+      // Admin: cost-only update
+      setCostItemMode(true);
+      costItemTypeInput.readOnly = true;
+      costItemUnitInput.readOnly = true;
+      costItemDescriptionInput.readOnly = true;
+      costItemModalTitle.textContent = 'Update Cost';
+    }
+
     costItemModal.show();
   }
 
@@ -632,7 +646,17 @@ ensureAuthenticated();
 
     try {
       if (id) {
-        await apiJson(`/cost-items/${id}`, 'PUT', { costPer });
+        const payload = { costPer };
+        if (isSuperAdmin) {
+          payload.type = costItemTypeInput.value.trim();
+          payload.unit = costItemUnitInput.value.trim();
+          payload.description = costItemDescriptionInput.value.trim();
+          if (!payload.type || !payload.unit || !payload.description) {
+            showToast('Type, unit, description, and cost are required', 'warning');
+            return;
+          }
+        }
+        await apiJson(`/cost-items/${id}`, 'PUT', payload);
         showToast('Cost item updated', 'success');
       } else {
         const payload = {

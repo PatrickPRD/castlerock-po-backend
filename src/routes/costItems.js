@@ -509,7 +509,7 @@ router.delete(
 router.put(
   '/:id',
   authenticate,
-  authorizeRoles('super_admin'),
+  authorizeRoles('super_admin', 'admin'),
   async (req, res) => {
     try {
       const itemId = Number(req.params.id);
@@ -528,10 +528,16 @@ router.put(
         return res.status(400).json({ error: 'cost_per must be a valid non-negative number' });
       }
 
+      // Super admin can edit all fields; admin can only update cost
+      const isSuperAdmin = req.user.role === 'super_admin';
+      const type = isSuperAdmin && req.body.type ? req.body.type.trim() : existing.type;
+      const description = isSuperAdmin && req.body.description ? req.body.description.trim() : existing.description;
+      const unit = isSuperAdmin && req.body.unit ? req.body.unit.trim() : existing.unit;
+
       const result = await updateCostItem(itemId, {
-        type: existing.type,
-        description: existing.description,
-        unit: existing.unit,
+        type,
+        description,
+        unit,
         costPer: Number(numericCost.toFixed(2))
       }, {
         changedBy: req.user.id,
