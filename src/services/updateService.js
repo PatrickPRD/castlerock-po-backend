@@ -127,11 +127,12 @@ function createUpdatePackage() {
   for (const [filePath, hash] of Object.entries(currentManifest)) {
     if (!oldFiles[filePath]) {
       changes.added.push(filePath);
-      fileContents[filePath] = fs.readFileSync(path.join(PROJECT_ROOT, filePath)).toString('base64');
     } else if (oldFiles[filePath] !== hash) {
       changes.modified.push(filePath);
-      fileContents[filePath] = fs.readFileSync(path.join(PROJECT_ROOT, filePath)).toString('base64');
     }
+    // Include ALL tracked files so every update is self-contained
+    // This prevents missing files when a PROD instance skips an update
+    fileContents[filePath] = fs.readFileSync(path.join(PROJECT_ROOT, filePath)).toString('base64');
   }
 
   // Find removed files
@@ -242,6 +243,34 @@ function analyzeUpdatePackage(updateData) {
         action: 'delete',
         size: 0
       });
+    }
+  }
+
+  // Detect baseline files included in the package but not in changes
+  // These are files that haven't changed on DEV but may be missing on PROD
+  const changesSet = new Set([
+    ...(updateData.changes?.added || []),
+    ...(updateData.changes?.modified || []),
+    ...(updateData.changes?.removed || [])
+  ]);
+
+  for (const filePath of Object.keys(updateData.files || {})) {
+    if (changesSet.has(filePath)) continue; // already handled above
+
+    const localHash = currentManifest[filePath];
+    const incomingHash = incomingManifest[filePath];
+    const fileSize = updateData.files[filePath] ? Buffer.from(updateData.files[filePath], 'base64').length : 0;
+
+    if (!localHash) {
+      // File missing on this instance — will be restored from package
+      analysis.changes.added.push(filePath);
+      analysis.fileDetails.push({ path: filePath, action: 'add (missing locally)', size: fileSize });
+    } else if (localHash !== incomingHash) {
+      // File exists but differs from expected state
+      analysis.changes.modified.push(filePath);
+      analysis.fileDetails.push({ path: filePath, action: 'sync (local file differs)', size: fileSize });
+    } else {
+      analysis.changes.unchanged.push(filePath);
     }
   }
 

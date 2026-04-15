@@ -986,6 +986,7 @@ async function editPO(id) {
     document.getElementById("editPOSite").value = po.site; // Display site name as text
     document.getElementById("editPODate").value = po.po_date.split('T')[0];
     document.getElementById("editPODescription").value = po.description || "";
+    document.getElementById("editPODeliveryNotes").value = po.delivery_notes || "";
     document.getElementById("editPONetAmount").value = po.net_amount;
     let originalNetAmount = po.net_amount;
     
@@ -1625,6 +1626,11 @@ async function applyDashTemplate(id) {
       if (stageEl) stageEl.value = String(t.stage_id);
     }
 
+    if (t.delivery_notes) {
+      const dnEl = document.getElementById("poDeliveryNotes");
+      if (dnEl) dnEl.value = t.delivery_notes;
+    }
+
     if (t.line_items && t.line_items.length && createLineItems) {
       createLineItems.loadItems(t.line_items);
     }
@@ -1746,6 +1752,7 @@ document.addEventListener("DOMContentLoaded", () => {
         stageId: document.getElementById("poStage").value,
         poDate: document.getElementById("poDate").value,
         description: document.getElementById("poDescription").value || "",
+        deliveryNotes: document.getElementById("poDeliveryNotes").value || "",
         netAmount: Number(document.getElementById("poNetAmount").value) || 0,
         vatRate: Number(document.getElementById("poVatRate").value) || 0
       };
@@ -1808,6 +1815,7 @@ document.addEventListener("DOMContentLoaded", () => {
         stageId: document.getElementById("poStage").value,
         poDate: document.getElementById("poDate").value,
         description: document.getElementById("poDescription").value || "",
+        deliveryNotes: document.getElementById("poDeliveryNotes").value || "",
         netAmount: Number(document.getElementById("poNetAmount").value) || 0,
         vatRate: Number(document.getElementById("poVatRate").value) || 0
       };
@@ -1879,6 +1887,7 @@ document.addEventListener("DOMContentLoaded", () => {
         stageId: document.getElementById("editPOStage").value,
         poDate: document.getElementById("editPODate").value,
         description: document.getElementById("editPODescription").value || "",
+        deliveryNotes: document.getElementById("editPODeliveryNotes").value || "",
         netAmount: Number(document.getElementById("editPONetAmount").value) || 0,
         vatRate: Number(document.getElementById("editPOVatRate").value) || 0
       };
@@ -2075,6 +2084,7 @@ document.addEventListener("DOMContentLoaded", () => {
         stageId: document.getElementById("editPOStage").value,
         poDate: document.getElementById("editPODate").value,
         description: document.getElementById("editPODescription").value || "",
+        deliveryNotes: document.getElementById("editPODeliveryNotes").value || "",
         netAmount: Number(document.getElementById("editPONetAmount").value) || 0,
         vatRate: Number(document.getElementById("editPOVatRate").value) || 0
       };
