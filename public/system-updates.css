@@ -1,0 +1,108 @@
+/* System Updates page styles */
+
+#envBanner.env-dev {
+  background-color: #fff3cd;
+  border-color: #ffc107;
+  color: #664d03;
+}
+
+#envBanner.env-prod {
+  background-color: #d1e7dd;
+  border-color: #198754;
+  color: #0f5132;
+}
+
+/* Analysis results table */
+.analysis-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.analysis-stat {
+  background: var(--bs-light, #f8f9fa);
+  border-radius: 8px;
+  padding: 12px 16px;
+  text-align: center;
+}
+
+.analysis-stat .stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.analysis-stat .stat-label {
+  font-size: 0.82rem;
+  color: var(--bs-secondary, #6c757d);
+}
+
+.stat-added .stat-value { color: #198754; }
+.stat-modified .stat-value { color: #0d6efd; }
+.stat-removed .stat-value { color: #dc3545; }
+.stat-unchanged .stat-value { color: #6c757d; }
+.stat-deps .stat-value { color: #6f42c1; }
+
+/* File list */
+.file-change-list {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--bs-border-color, #dee2e6);
+  border-radius: 8px;
+}
+
+.file-change-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--bs-border-color-translucent, #dee2e61a);
+  font-size: 0.88rem;
+  font-family: monospace;
+}
+
+.file-change-item:last-child {
+  border-bottom: none;
+}
+
+.file-change-item .badge-action {
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.badge-add { background: #d1e7dd; color: #0f5132; }
+.badge-update { background: #cfe2ff; color: #084298; }
+.badge-delete { background: #f8d7da; color: #842029; }
+.badge-unchanged { background: #e9ecef; color: #6c757d; }
+.badge-overwrite { background: #fff3cd; color: #664d03; }
+
+/* Dependency changes */
+.dep-change-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.dep-change-list li {
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--bs-border-color-translucent, #dee2e61a);
+  font-size: 0.88rem;
+}
+
+.dep-change-list li:last-child {
+  border-bottom: none;
+}
+
+/* Confirmation buttons */
+#btnApply {
+  min-width: 200px;
+}
+
+/* Server control buttons */
+#btnRestart,
+#btnNpmRestart {
+  min-width: 180px;
+}

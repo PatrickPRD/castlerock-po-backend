@@ -72,6 +72,7 @@ app.get('/cashflow-report.html', (req, res) => res.render('cashflow-report', { p
 app.get('/current-costs-report.html', (req, res) => res.render('current-costs-report', { pageTitle: 'Current Costs Report' }));
 app.get('/gdpr.html', (req, res) => res.render('gdpr', { pageTitle: 'GDPR Privacy Notice' }));
 app.get('/audit-log.html', (req, res) => res.render('audit-log', { pageTitle: 'Audit Log' }));
+app.get('/system-updates.html', (req, res) => res.render('system-updates', { pageTitle: 'System Updates' }));
 
 // Health check with database connectivity test
 app.get('/health', async (req, res) => {
@@ -158,6 +159,10 @@ app.use('/cashflow', cashflowRoutes);
 // Cashflow Bulk Import
 const cashflowBulkImportRoutes = require('./routes/cashflow-bulk-import');
 app.use('/cashflow', cashflowBulkImportRoutes);
+
+// System Updates
+const updateRoutes = require('./routes/updates');
+app.use('/updates', updateRoutes);
 
 // ✅ EXPORTS — THIS IS THE CRITICAL PART
 const exportRoutes = require('./routes/exports');
