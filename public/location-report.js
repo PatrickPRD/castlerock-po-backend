@@ -168,7 +168,7 @@ function renderReport() {
           </div>
           ${r.expected_spent != null ? `
           <div class="detail-summary-item">
-            <span class="detail-summary-label">Expected Spent</span>
+            <span class="detail-summary-label">Expected Spend</span>
             <span class="detail-summary-value">${euro(r.expected_spent)}</span>
           </div>
           ` : ''}
@@ -189,35 +189,50 @@ function renderReport() {
 });
 
   // Update totals bar
-  let sumNet = 0, sumPL = 0, sumSales = 0, sumProfitPct = 0;
+  let sumNet = 0, sumPL = 0, sumSales = 0, sumExpendedSpend = 0, sumExpectedProfit = 0;
+  let sumSalePriceExVat = 0;
   const siteSet = new Set();
   data.forEach(r => {
     sumNet += num(r.totals.net) + num(r.totals.labour || 0);
     sumPL += calcProfitLoss(r);
     sumSales += num(r.sale_price);
-    const spExVat = num(r.sale_price) / (1 + getVatRate());
-    const pl = calcProfitLoss(r);
-    sumProfitPct += spExVat > 0 ? (pl / spExVat) * 100 : 0;
+    sumExpendedSpend += num(r.expected_spent || 0);
+    sumSalePriceExVat += num(r.sale_price) / (1 + getVatRate());
+    const tp = calcTargetProfit(r);
+    if (tp != null) sumExpectedProfit += tp;
     if (r.site) siteSet.add(r.site);
   });
-  const avgProfitPct = data.length > 0 ? (sumProfitPct / data.length).toFixed(1) : '0.0';
+  const actualProfitPct = sumSalePriceExVat > 0 ? ((sumPL / sumSalePriceExVat) * 100).toFixed(1) : '0.0';
+  const expectedProfitPct = sumSalePriceExVat > 0 ? ((sumExpectedProfit / sumSalePriceExVat) * 100).toFixed(1) : '0.0';
   const locCountEl = document.getElementById('locCount');
   const siteCountEl = document.getElementById('siteCount');
   const barNetEl = document.getElementById('barTotalNet');
   const barSalesEl = document.getElementById('barTotalSales');
-  const barPLEl = document.getElementById('barProfitLoss');
-  const barPctEl = document.getElementById('barProfitPct');
+  const barExpendedSpendEl = document.getElementById('barExpendedSpend');
+  const barExpectedProfitEl = document.getElementById('barExpectedProfit');
+  const barExpectedProfitPctEl = document.getElementById('barExpectedProfitPct');
+  const barActualProfitEl = document.getElementById('barActualProfit');
+  const barActualProfitPctEl = document.getElementById('barActualProfitPct');
   if (locCountEl) locCountEl.textContent = data.length;
   if (siteCountEl) siteCountEl.textContent = siteSet.size;
   if (barNetEl) barNetEl.textContent = euro(sumNet);
   if (barSalesEl) barSalesEl.textContent = euro(sumSales);
-  if (barPLEl) {
-    barPLEl.textContent = euro(sumPL);
-    barPLEl.className = sumPL >= 0 ? 'profit-positive' : 'profit-negative';
+  if (barExpendedSpendEl) barExpendedSpendEl.textContent = euro(sumExpendedSpend);
+  if (barExpectedProfitEl) {
+    barExpectedProfitEl.textContent = euro(sumExpectedProfit);
+    barExpectedProfitEl.className = sumExpectedProfit >= 0 ? 'profit-positive' : 'profit-negative';
   }
-  if (barPctEl) {
-    barPctEl.textContent = avgProfitPct + '%';
-    barPctEl.className = parseFloat(avgProfitPct) >= 0 ? 'profit-positive' : 'profit-negative';
+  if (barExpectedProfitPctEl) {
+    barExpectedProfitPctEl.textContent = ' (' + expectedProfitPct + '%)';
+    barExpectedProfitPctEl.className = parseFloat(expectedProfitPct) >= 0 ? 'profit-positive' : 'profit-negative';
+  }
+  if (barActualProfitEl) {
+    barActualProfitEl.textContent = euro(sumPL);
+    barActualProfitEl.className = sumPL >= 0 ? 'profit-positive' : 'profit-negative';
+  }
+  if (barActualProfitPctEl) {
+    barActualProfitPctEl.textContent = ' (' + actualProfitPct + '%)';
+    barActualProfitPctEl.className = parseFloat(actualProfitPct) >= 0 ? 'profit-positive' : 'profit-negative';
   }
 }
 
