@@ -27,23 +27,6 @@
         </div>
         <button class="btn btn-outline-primary" onclick="exportExcel()">Export to Excel</button>
       </div>
-      <hr class="my-2">
-      <div class="row g-2 report-filters align-items-md-end">
-        <div class="col-12 col-md-3 form-group">
-          <label for="vatOnSaleFilter">VAT on Sale</label>
-          <select id="vatOnSaleFilter">
-            <option value="0">0%</option>
-          </select>
-        </div>
-        <div class="col-12 col-md-3 form-group">
-          <label for="solicitorInput">Solicitor (%)</label>
-          <input type="number" id="solicitorInput" class="form-control" min="0" max="100" step="0.1" value="1">
-        </div>
-        <div class="col-12 col-md-3 form-group">
-          <label for="auctioneerInput">Auctioneer (%)</label>
-          <input type="number" id="auctioneerInput" class="form-control" min="0" max="100" step="0.1" value="1">
-        </div>
-      </div>
     </div>
   </div>
   <div class="card report-table-card">
@@ -59,6 +42,7 @@
           <th class="sortable" data-sort="labour">Inc. Labour (<span data-currency-symbol>€</span>) <span class="sort-indicator"></span></th>
           <th class="sortable" data-sort="salePrice">Sale Price (<span data-currency-symbol>€</span>) <span class="sort-indicator"></span></th>
           <th class="sortable" data-sort="profitLoss">Profit/Loss (<span data-currency-symbol>€</span>) <span class="sort-indicator"></span></th>
+          <th class="sortable" data-sort="profitPct">Profit % <span class="sort-indicator"></span></th>
         </tr>
       </thead>
       <tbody id="reportTable"></tbody>

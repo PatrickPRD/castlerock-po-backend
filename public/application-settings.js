@@ -51,6 +51,7 @@ const vatAddBtn = document.getElementById('vatAddBtn');
 const vatList = document.getElementById('vatList');
 const solicitorPctInput = document.getElementById('solicitorPctInput');
 const auctioneerPctInput = document.getElementById('auctioneerPctInput');
+const vatOnSaleSelect = document.getElementById('vatOnSaleSelect');
 const financialResetBtn = document.getElementById('financialResetBtn');
 const systemSettingsForm = document.getElementById('systemSettingsForm');
 const auditLogRetentionInput = document.getElementById('auditLogRetention');
@@ -270,6 +271,7 @@ async function loadFinancialSettings() {
       : 1;
   }
   renderVatList();
+  renderVatOnSaleOptions(settings.vat_on_sale);
 }
 
 async function loadSystemSettings() {
@@ -324,6 +326,27 @@ function renderVatList() {
 
     vatList.appendChild(row);
   });
+
+  // Re-render VAT on Sale options when rates change
+  const currentVatOnSale = vatOnSaleSelect ? vatOnSaleSelect.value : null;
+  renderVatOnSaleOptions(currentVatOnSale != null ? Number(currentVatOnSale) : null);
+}
+
+function renderVatOnSaleOptions(selectedRate) {
+  if (!vatOnSaleSelect) return;
+  vatOnSaleSelect.innerHTML = '';
+  const rates = [...financialVatRates].sort((a, b) => a - b);
+  rates.forEach(rate => {
+    const opt = document.createElement('option');
+    opt.value = String(rate);
+    opt.textContent = `${rate}%`;
+    vatOnSaleSelect.appendChild(opt);
+  });
+  if (selectedRate != null && rates.some(r => Number(r.toFixed(3)) === Number(Number(selectedRate).toFixed(3)))) {
+    vatOnSaleSelect.value = String(selectedRate);
+  } else if (rates.length > 0) {
+    vatOnSaleSelect.value = String(rates[rates.length - 1]);
+  }
 }
 
 function handleAddVat() {
@@ -351,7 +374,8 @@ async function saveFinancialSettings() {
     bankHolidaysPerYear: Number(bankHolidaysPerYearInput?.value || 0),
     leaveYearStart: parseLeaveYearStart(leaveYearStartDateInput?.value) || '01-01',
     solicitorPct: Number(solicitorPctInput?.value || 1),
-    auctioneerPct: Number(auctioneerPctInput?.value || 1)
+    auctioneerPct: Number(auctioneerPctInput?.value || 1),
+    vatOnSale: Number(vatOnSaleSelect?.value || 23)
   };
   const res = await api('/settings/financial', 'PUT', payload);
   financialVatRates = res.vat_rates || financialVatRates;

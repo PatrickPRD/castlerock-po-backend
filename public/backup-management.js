@@ -33,6 +33,8 @@ const RESTORABLE_TABLES = new Set([
   'location_spread_rules',
   'location_spread_rule_sites',
   'location_spread_rule_locations',
+  'po_templates',
+  'po_template_line_items',
   'purchase_orders',
   'po_line_items',
   'invoices',

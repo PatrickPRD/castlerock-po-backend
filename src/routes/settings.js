@@ -183,6 +183,9 @@ router.get(
       const auctioneer_pct = Number.isFinite(Number(settings.auctioneer_pct))
         ? Number(settings.auctioneer_pct)
         : 1;
+      const vat_on_sale = Number.isFinite(Number(settings.vat_on_sale))
+        ? Number(settings.vat_on_sale)
+        : (vatRates.length > 0 ? Math.max(...vatRates) : 23);
 
       res.json({
         currency_code,
@@ -193,7 +196,8 @@ router.get(
         vat_rates: vatRates,
         usage,
         solicitor_pct,
-        auctioneer_pct
+        auctioneer_pct,
+        vat_on_sale
       });
     } catch (error) {
       console.error('Error fetching financial settings:', error);
@@ -249,7 +253,8 @@ router.put(
         bankHolidaysPerYear,
         leaveYearStart,
         solicitorPct,
-        auctioneerPct
+        auctioneerPct,
+        vatOnSale
       } = req.body || {};
 
       const currency = String(currencyCode || 'EUR').toUpperCase();
@@ -320,6 +325,7 @@ router.put(
 
       const solPct = Number.isFinite(Number(solicitorPct)) ? Math.min(100, Math.max(0, Number(solicitorPct))) : 1;
       const aucPct = Number.isFinite(Number(auctioneerPct)) ? Math.min(100, Math.max(0, Number(auctioneerPct))) : 1;
+      const vatSale = Number.isFinite(Number(vatOnSale)) ? Number(vatOnSale) : (normalizedRates.length > 0 ? Math.max(...normalizedRates) : 23);
 
       await SettingsService.updateSetting('currency_code', currency);
       await SettingsService.updateSetting('vat_rates', JSON.stringify(normalizedRates));
@@ -329,6 +335,7 @@ router.put(
       await SettingsService.updateSetting('leave_year_start', normalizedLeaveYearStart);
       await SettingsService.updateSetting('solicitor_pct', solPct);
       await SettingsService.updateSetting('auctioneer_pct', aucPct);
+      await SettingsService.updateSetting('vat_on_sale', vatSale);
 
       res.json({
         success: true,
@@ -339,7 +346,8 @@ router.put(
         bank_holidays_per_year: Number(bankHolidaysPerYear),
         leave_year_start: normalizedLeaveYearStart,
         solicitor_pct: solPct,
-        auctioneer_pct: aucPct
+        auctioneer_pct: aucPct,
+        vat_on_sale: vatSale
       });
     } catch (error) {
       console.error('Error updating financial settings:', error);

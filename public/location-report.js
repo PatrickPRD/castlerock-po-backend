@@ -5,14 +5,12 @@ const table = document.getElementById('reportTable');
 const showSpreadLocations = document.getElementById('showSpreadLocations');
 const siteFilter = document.getElementById('siteFilter');
 const locationFilter = document.getElementById('locationFilter');
-const vatOnSaleFilter = document.getElementById('vatOnSaleFilter');
-const solicitorInput = document.getElementById('solicitorInput');
-const auctioneerInput = document.getElementById('auctioneerInput');
 const sortHeaders = document.querySelectorAll('th[data-sort]');
 const loadingOverlay = document.getElementById('reportLoading');
 
 let allData = [];
 let sortState = { key: 'site', dir: 'asc' };
+let saleCostSettings = { vatOnSale: 23, solicitorPct: 1, auctioneerPct: 1 };
 const SORT_SPINNER_MIN_MS = 120;
 
 /* =========================
@@ -23,15 +21,15 @@ const euro = v => (window.formatMoney ? window.formatMoney(v) : `€${num(v).toF
 const getCurrencySymbol = () => (window.getCurrencySymbol ? window.getCurrencySymbol() : '€');
 
 function getVatRate() {
-  return num(vatOnSaleFilter.value) / 100;
+  return num(saleCostSettings.vatOnSale) / 100;
 }
 
 function calcProfitLoss(r) {
   const salePrice = num(r.sale_price);
   const vatRate = getVatRate();
   const salePriceExVat = salePrice / (1 + vatRate);
-  const solicitorPct = num(solicitorInput.value) / 100;
-  const auctioneerPct = num(auctioneerInput.value) / 100;
+  const solicitorPct = num(saleCostSettings.solicitorPct) / 100;
+  const auctioneerPct = num(saleCostSettings.auctioneerPct) / 100;
   const solicitorCost = salePrice * solicitorPct;
   const auctioneerCost = salePrice * auctioneerPct;
   const netSpendIncLabour = num(r.totals.net) + num(r.totals.labour || 0);
@@ -76,6 +74,8 @@ function renderReport() {
   const rowId = `loc-${index}`;
   const profitLoss = calcProfitLoss(r);
   const plClass = profitLoss >= 0 ? 'profit-positive' : 'profit-negative';
+  const salePriceExVat = num(r.sale_price) / (1 + num(saleCostSettings.vatOnSale) / 100);
+  const profitPct = salePriceExVat > 0 ? ((profitLoss / salePriceExVat) * 100).toFixed(1) : '0.0';
 
   // MAIN ROW
  table.innerHTML += `
@@ -88,20 +88,21 @@ function renderReport() {
     <td>${euro(r.totals.labour || 0)}</td>
     <td>${euro(r.sale_price || 0)}</td>
     <td class="${plClass}">${euro(profitLoss)}</td>
+    <td class="${plClass}">${profitPct}%</td>
   </tr>
 `;
 
 
   // DETAILS ROW (STAGES)
   const salePrice = num(r.sale_price);
-  const solicitorPct = num(solicitorInput.value) / 100;
-  const auctioneerPct = num(auctioneerInput.value) / 100;
+  const solicitorPct = num(saleCostSettings.solicitorPct) / 100;
+  const auctioneerPct = num(saleCostSettings.auctioneerPct) / 100;
   const solicitorCost = salePrice * solicitorPct;
   const auctioneerCost = salePrice * auctioneerPct;
 
   table.innerHTML += `
     <tr class="details-row" id="${rowId}">
-      <td colspan="6">
+      <td colspan="7">
         <table class="inner-table">
           <thead>
             <tr>
@@ -142,7 +143,7 @@ function renderReport() {
           </div>
           <div class="detail-summary-item detail-summary-pl ${plClass}">
             <span class="detail-summary-label">Profit/Loss</span>
-            <span class="detail-summary-value">${euro(profitLoss)}</span>
+            <span class="detail-summary-value">${euro(profitLoss)} (${profitPct}%)</span>
           </div>
         </div>
       </td>
@@ -175,6 +176,14 @@ function sortData(data) {
       case 'profitLoss':
         result = calcProfitLoss(a) - calcProfitLoss(b);
         break;
+      case 'profitPct': {
+        const aSPExVat = num(a.sale_price) / (1 + num(saleCostSettings.vatOnSale) / 100);
+        const bSPExVat = num(b.sale_price) / (1 + num(saleCostSettings.vatOnSale) / 100);
+        const aPct = aSPExVat > 0 ? (calcProfitLoss(a) / aSPExVat) * 100 : 0;
+        const bPct = bSPExVat > 0 ? (calcProfitLoss(b) / bSPExVat) * 100 : 0;
+        result = aPct - bPct;
+        break;
+      }
       case 'site':
       default:
         result = String(a.site || '').localeCompare(String(b.site || ''), undefined, { sensitivity: 'base' });
@@ -323,9 +332,6 @@ siteFilter.addEventListener('change', () => {
   renderReport();
 });
 locationFilter.addEventListener('change', renderReport);
-vatOnSaleFilter.addEventListener('change', renderReport);
-solicitorInput.addEventListener('input', renderReport);
-auctioneerInput.addEventListener('input', renderReport);
 sortHeaders.forEach(th => {
   th.addEventListener('click', () => {
     const key = th.dataset.sort;
@@ -364,26 +370,11 @@ async function loadVatRates() {
       headers: { Authorization: 'Bearer ' + token }
     });
     const data = await res.json();
-    const rates = data.vat_rates || [0, 13.5, 23];
 
-    vatOnSaleFilter.innerHTML = '';
-    rates.sort((a, b) => a - b).forEach(rate => {
-      const opt = document.createElement('option');
-      opt.value = String(rate);
-      opt.textContent = `${rate}%`;
-      vatOnSaleFilter.appendChild(opt);
-    });
-
-    // Default to highest rate
-    if (rates.length > 0) {
-      vatOnSaleFilter.value = String(rates[rates.length - 1]);
-    }
-
-    // Set solicitor/auctioneer defaults from saved settings
-    const solPct = Number.isFinite(Number(data.solicitor_pct)) ? Number(data.solicitor_pct) : 1;
-    const aucPct = Number.isFinite(Number(data.auctioneer_pct)) ? Number(data.auctioneer_pct) : 1;
-    solicitorInput.value = solPct;
-    auctioneerInput.value = aucPct;
+    // Store sale cost settings from financial settings
+    saleCostSettings.vatOnSale = Number.isFinite(Number(data.vat_on_sale)) ? Number(data.vat_on_sale) : 23;
+    saleCostSettings.solicitorPct = Number.isFinite(Number(data.solicitor_pct)) ? Number(data.solicitor_pct) : 1;
+    saleCostSettings.auctioneerPct = Number.isFinite(Number(data.auctioneer_pct)) ? Number(data.auctioneer_pct) : 1;
   } catch (err) {
     console.error('Failed to load VAT rates:', err);
   }
