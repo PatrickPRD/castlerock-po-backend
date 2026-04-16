@@ -157,6 +157,37 @@ function renderReport() {
   `;
 });
 
+  // Update totals bar
+  let sumNet = 0, sumPL = 0, sumSales = 0, sumProfitPct = 0;
+  const siteSet = new Set();
+  data.forEach(r => {
+    sumNet += num(r.totals.net) + num(r.totals.labour || 0);
+    sumPL += calcProfitLoss(r);
+    sumSales += num(r.sale_price);
+    const spExVat = num(r.sale_price) / (1 + getVatRate());
+    const pl = calcProfitLoss(r);
+    sumProfitPct += spExVat > 0 ? (pl / spExVat) * 100 : 0;
+    if (r.site) siteSet.add(r.site);
+  });
+  const avgProfitPct = data.length > 0 ? (sumProfitPct / data.length).toFixed(1) : '0.0';
+  const locCountEl = document.getElementById('locCount');
+  const siteCountEl = document.getElementById('siteCount');
+  const barNetEl = document.getElementById('barTotalNet');
+  const barSalesEl = document.getElementById('barTotalSales');
+  const barPLEl = document.getElementById('barProfitLoss');
+  const barPctEl = document.getElementById('barProfitPct');
+  if (locCountEl) locCountEl.textContent = data.length;
+  if (siteCountEl) siteCountEl.textContent = siteSet.size;
+  if (barNetEl) barNetEl.textContent = euro(sumNet);
+  if (barSalesEl) barSalesEl.textContent = euro(sumSales);
+  if (barPLEl) {
+    barPLEl.textContent = euro(sumPL);
+    barPLEl.className = sumPL >= 0 ? 'profit-positive' : 'profit-negative';
+  }
+  if (barPctEl) {
+    barPctEl.textContent = avgProfitPct + '%';
+    barPctEl.className = parseFloat(avgProfitPct) >= 0 ? 'profit-positive' : 'profit-negative';
+  }
 }
 
 function sortData(data) {

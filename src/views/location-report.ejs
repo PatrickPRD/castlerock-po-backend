@@ -50,4 +50,31 @@
   </div>
 </main>
 
+<div id="totalsBar" class="totals-bar">
+  <div>
+    <strong>Locations:</strong>
+    <span id="locCount">0</span>
+  </div>
+  <div>
+    <strong>Sites:</strong>
+    <span id="siteCount">0</span>
+  </div>
+  <div>
+    <strong>Total Net:</strong>
+    <span id="barTotalNet"><span data-currency-symbol>€</span>0</span>
+  </div>
+  <div>
+    <strong>Total Sales:</strong>
+    <span id="barTotalSales"><span data-currency-symbol>€</span>0</span>
+  </div>
+  <div>
+    <strong>Total Profit/Loss:</strong>
+    <span id="barProfitLoss"><span data-currency-symbol>€</span>0</span>
+  </div>
+  <div>
+    <strong>Avg Profit %:</strong>
+    <span id="barProfitPct">0.0%</span>
+  </div>
+</div>
+
 <%- include('partials/footer', { scripts: ['/ui.js', 'location-report.js'], includeNavScript: true }) %>
