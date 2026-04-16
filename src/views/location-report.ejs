@@ -3,34 +3,47 @@
 
 <main class="container">
   <div class="card">
-    <div class="report-controls d-flex justify-content-between align-items-center mb-3">
-      <div class="row g-2 report-filters align-items-md-center">
-        <div class="col-12 col-md-3 form-group">
-          <label for="siteFilter">Site</label>
-          <select id="siteFilter">
-            <option value="">All Sites</option>
-          </select>
+    <div class="report-controls mb-3">
+      <div class="d-flex justify-content-between align-items-center">
+        <div class="row g-2 report-filters align-items-md-center flex-grow-1">
+          <div class="col-12 col-md-4 form-group">
+            <label for="siteFilter">Site</label>
+            <select id="siteFilter">
+              <option value="">All Sites</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-4 form-group">
+            <label for="locationFilter">Location</label>
+            <select id="locationFilter">
+              <option value="">All Locations</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-auto spread-toggle text-md-start">
+            <label class="checkbox-row mb-0">
+              <input type="checkbox" id="showSpreadLocations">
+              Show Spread Locations
+            </label>
+          </div>
         </div>
-        <div class="col-12 col-md-3 form-group">
-          <label for="locationFilter">Location</label>
-          <select id="locationFilter">
-            <option value="">All Locations</option>
-          </select>
-        </div>
+        <button class="btn btn-outline-primary" onclick="exportExcel()">Export to Excel</button>
+      </div>
+      <hr class="my-2">
+      <div class="row g-2 report-filters align-items-md-end">
         <div class="col-12 col-md-3 form-group">
           <label for="vatOnSaleFilter">VAT on Sale</label>
           <select id="vatOnSaleFilter">
             <option value="0">0%</option>
           </select>
         </div>
-        <div class="col-12 col-md-auto spread-toggle text-md-start">
-          <label class="checkbox-row mb-0">
-            <input type="checkbox" id="showSpreadLocations">
-            Show Spread Locations
-          </label>
+        <div class="col-12 col-md-3 form-group">
+          <label for="solicitorInput">Solicitor (%)</label>
+          <input type="number" id="solicitorInput" class="form-control" min="0" max="100" step="0.1" value="0">
+        </div>
+        <div class="col-12 col-md-3 form-group">
+          <label for="auctioneerInput">Auctioneer (%)</label>
+          <input type="number" id="auctioneerInput" class="form-control" min="0" max="100" step="0.1" value="0">
         </div>
       </div>
-      <button class="btn btn-outline-primary" onclick="exportExcel()">Export to Excel</button>
     </div>
   </div>
   <div class="card report-table-card">

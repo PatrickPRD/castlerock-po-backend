@@ -6,6 +6,8 @@ const showSpreadLocations = document.getElementById('showSpreadLocations');
 const siteFilter = document.getElementById('siteFilter');
 const locationFilter = document.getElementById('locationFilter');
 const vatOnSaleFilter = document.getElementById('vatOnSaleFilter');
+const solicitorInput = document.getElementById('solicitorInput');
+const auctioneerInput = document.getElementById('auctioneerInput');
 const sortHeaders = document.querySelectorAll('th[data-sort]');
 const loadingOverlay = document.getElementById('reportLoading');
 
@@ -28,8 +30,12 @@ function calcProfitLoss(r) {
   const salePrice = num(r.sale_price);
   const vatRate = getVatRate();
   const salePriceExVat = salePrice / (1 + vatRate);
+  const solicitorPct = num(solicitorInput.value) / 100;
+  const auctioneerPct = num(auctioneerInput.value) / 100;
+  const solicitorCost = salePrice * solicitorPct;
+  const auctioneerCost = salePrice * auctioneerPct;
   const netSpendIncLabour = num(r.totals.net) + num(r.totals.labour || 0);
-  return salePriceExVat - netSpendIncLabour;
+  return salePriceExVat - netSpendIncLabour - solicitorCost - auctioneerCost;
 }
 
 /* =========================
@@ -290,6 +296,8 @@ siteFilter.addEventListener('change', () => {
 });
 locationFilter.addEventListener('change', renderReport);
 vatOnSaleFilter.addEventListener('change', renderReport);
+solicitorInput.addEventListener('input', renderReport);
+auctioneerInput.addEventListener('input', renderReport);
 sortHeaders.forEach(th => {
   th.addEventListener('click', () => {
     const key = th.dataset.sort;
