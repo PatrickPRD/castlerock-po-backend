@@ -33,6 +33,9 @@
           <th class="sortable" data-sort="type" style="cursor: pointer; user-select: none;">
             Type <span class="sort-indicator"></span>
           </th>
+          <th class="sortable" data-sort="sale_price" style="cursor: pointer; user-select: none;">
+            Sale Price <span class="sort-indicator"></span>
+          </th>
           <th class="sortable" data-sort="site" style="cursor: pointer; user-select: none;">
             Site <span class="sort-indicator"></span>
           </th>
@@ -102,6 +105,11 @@
         <div>
           <label for="locationType" style="display: block; margin-bottom: 0.25rem; font-weight: 500;">Location Type</label>
           <input id="locationType" placeholder="Enter location type" class="form-control" style="width: 100%;">
+        </div>
+
+        <div>
+          <label for="locationSalePrice" style="display: block; margin-bottom: 0.25rem; font-weight: 500;">Sale Price</label>
+          <input id="locationSalePrice" type="number" step="0.01" min="0" placeholder="0.00" class="form-control" style="width: 100%;">
         </div>
 
         <div>

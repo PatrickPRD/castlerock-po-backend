@@ -112,15 +112,17 @@ function renderFilteredLocations() {
   sorted.forEach((l) => {
     const escapedName = (l.name || '').replace(/'/g, "\\'");
     const escapedType = (l.type || '').replace(/'/g, "\\'");
+    const salePrice = parseFloat(l.sale_price) || 0;
     
     locationTable.innerHTML += `
       <tr>
         <td>${l.name}</td>
         <td>${l.type || ''}</td>
+        <td>${salePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
         <td>${l.site}</td>
         <td>
           <button class="btn btn-outline-primary"
-            onclick="editLocation(${l.id}, '${escapedName}', '${escapedType}', ${l.site_id})">
+            onclick="editLocation(${l.id}, '${escapedName}', '${escapedType}', ${l.site_id}, ${salePrice})">
             Edit
           </button>
           <button class="btn btn-danger" onclick="deleteLocation(${l.id})">
@@ -145,9 +147,10 @@ function closeLocationModal() {
   resetLocationForm();
 }
 
-function editLocation(id, name, type, siteId) {
+function editLocation(id, name, type, siteId, salePrice) {
   document.getElementById("locationName").value = name;
   document.getElementById("locationType").value = type || "";
+  document.getElementById("locationSalePrice").value = salePrice || 0;
   document.getElementById("siteSelect").value = siteId;
 
   editingLocationId = id;
@@ -169,6 +172,7 @@ function editLocation(id, name, type, siteId) {
 async function saveLocation() {
   const name = document.getElementById("locationName").value.trim();
   const type = document.getElementById("locationType").value.trim();
+  const salePrice = document.getElementById("locationSalePrice").value;
   const siteId = document.getElementById("siteSelect").value;
 
   if (!name) {
@@ -185,6 +189,7 @@ async function saveLocation() {
       await api(`/admin/locations/${editingLocationId}`, "PUT", {
         name,
         type,
+        sale_price: salePrice,
         site_id: siteId,
       });
       showToast("Location updated successfully", "success");
@@ -192,6 +197,7 @@ async function saveLocation() {
       await api("/admin/locations", "POST", {
         name,
         type,
+        sale_price: salePrice,
         site_id: siteId,
       });
       showToast("Location added successfully", "success");
@@ -208,6 +214,7 @@ function resetLocationForm() {
   editingLocationId = null;
   document.getElementById("locationName").value = "";
   document.getElementById("locationType").value = "";
+  document.getElementById("locationSalePrice").value = "";
   document.getElementById("siteSelect").value = "";
 
   document.getElementById("locationEditNotice").style.display = "none";
