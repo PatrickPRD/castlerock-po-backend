@@ -113,16 +113,18 @@ function renderFilteredLocations() {
     const escapedName = (l.name || '').replace(/'/g, "\\'");
     const escapedType = (l.type || '').replace(/'/g, "\\'");
     const salePrice = parseFloat(l.sale_price) || 0;
+    const floorArea = l.floor_area != null ? parseFloat(l.floor_area) : null;
     
     locationTable.innerHTML += `
       <tr>
         <td>${l.name}</td>
         <td>${l.type || ''}</td>
         <td>${salePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td>${floorArea != null ? floorArea.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}</td>
         <td>${l.site}</td>
         <td>
           <button class="btn btn-outline-primary"
-            onclick="editLocation(${l.id}, '${escapedName}', '${escapedType}', ${l.site_id}, ${salePrice})">
+            onclick="editLocation(${l.id}, '${escapedName}', '${escapedType}', ${l.site_id}, ${salePrice}, ${floorArea})">
             Edit
           </button>
           <button class="btn btn-danger" onclick="deleteLocation(${l.id})">
@@ -147,10 +149,11 @@ function closeLocationModal() {
   resetLocationForm();
 }
 
-function editLocation(id, name, type, siteId, salePrice) {
+function editLocation(id, name, type, siteId, salePrice, floorArea) {
   document.getElementById("locationName").value = name;
   document.getElementById("locationType").value = type || "";
   document.getElementById("locationSalePrice").value = salePrice || 0;
+  document.getElementById("locationFloorArea").value = floorArea != null ? floorArea : "";
   document.getElementById("siteSelect").value = siteId;
 
   editingLocationId = id;
@@ -173,6 +176,7 @@ async function saveLocation() {
   const name = document.getElementById("locationName").value.trim();
   const type = document.getElementById("locationType").value.trim();
   const salePrice = document.getElementById("locationSalePrice").value;
+  const floorArea = document.getElementById("locationFloorArea").value;
   const siteId = document.getElementById("siteSelect").value;
 
   if (!name) {
@@ -190,6 +194,7 @@ async function saveLocation() {
         name,
         type,
         sale_price: salePrice,
+        floor_area: floorArea || null,
         site_id: siteId,
       });
       showToast("Location updated successfully", "success");
@@ -198,6 +203,7 @@ async function saveLocation() {
         name,
         type,
         sale_price: salePrice,
+        floor_area: floorArea || null,
         site_id: siteId,
       });
       showToast("Location added successfully", "success");
@@ -215,6 +221,7 @@ function resetLocationForm() {
   document.getElementById("locationName").value = "";
   document.getElementById("locationType").value = "";
   document.getElementById("locationSalePrice").value = "";
+  document.getElementById("locationFloorArea").value = "";
   document.getElementById("siteSelect").value = "";
 
   document.getElementById("locationEditNotice").style.display = "none";

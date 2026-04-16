@@ -66,6 +66,7 @@ CREATE TABLE `locations` (
   `name` VARCHAR(255) NOT NULL,
   `type` VARCHAR(100) DEFAULT NULL,
   `sale_price` DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+  `floor_area` DECIMAL(12, 2) DEFAULT NULL,
   `site_id` INT NOT NULL,
   `active` TINYINT(1) NOT NULL DEFAULT 1,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
