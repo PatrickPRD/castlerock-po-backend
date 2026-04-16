@@ -49,6 +49,8 @@ const leaveYearStartDateInput = document.getElementById('leaveYearStartDate');
 const vatInput = document.getElementById('vatInput');
 const vatAddBtn = document.getElementById('vatAddBtn');
 const vatList = document.getElementById('vatList');
+const solicitorPctInput = document.getElementById('solicitorPctInput');
+const auctioneerPctInput = document.getElementById('auctioneerPctInput');
 const financialResetBtn = document.getElementById('financialResetBtn');
 const systemSettingsForm = document.getElementById('systemSettingsForm');
 const auditLogRetentionInput = document.getElementById('auditLogRetention');
@@ -257,6 +259,16 @@ async function loadFinancialSettings() {
   if (leaveYearStartDateInput) {
     leaveYearStartDateInput.value = formatLeaveYearStart(settings.leave_year_start || '01-01');
   }
+  if (solicitorPctInput) {
+    solicitorPctInput.value = Number.isFinite(Number(settings.solicitor_pct))
+      ? Number(settings.solicitor_pct)
+      : 1;
+  }
+  if (auctioneerPctInput) {
+    auctioneerPctInput.value = Number.isFinite(Number(settings.auctioneer_pct))
+      ? Number(settings.auctioneer_pct)
+      : 1;
+  }
   renderVatList();
 }
 
@@ -337,7 +349,9 @@ async function saveFinancialSettings() {
     sickDaysPerYear: Number(sickDaysPerYearInput?.value || 0),
     annualLeaveDaysPerYear: Number(annualLeaveDaysPerYearInput?.value || 0),
     bankHolidaysPerYear: Number(bankHolidaysPerYearInput?.value || 0),
-    leaveYearStart: parseLeaveYearStart(leaveYearStartDateInput?.value) || '01-01'
+    leaveYearStart: parseLeaveYearStart(leaveYearStartDateInput?.value) || '01-01',
+    solicitorPct: Number(solicitorPctInput?.value || 1),
+    auctioneerPct: Number(auctioneerPctInput?.value || 1)
   };
   const res = await api('/settings/financial', 'PUT', payload);
   financialVatRates = res.vat_rates || financialVatRates;
