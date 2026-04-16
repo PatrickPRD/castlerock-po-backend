@@ -21,6 +21,7 @@ const RESTORABLE_TABLES = new Set([
   'po_stages',
   'suppliers',
   'sites',
+  'site_capital_costs',
   'site_letters',
   'locations',
   'cost_items',
