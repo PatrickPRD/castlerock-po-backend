@@ -91,12 +91,16 @@ async function getLocationBreakdownData(showSpreadLocations) {
 
       COALESCE(SUM(po.net_amount), 0)        AS total_net,
       COALESCE(SUM(po.total_amount), 0)      AS total_gross,
-      COALESCE(SUM(i.total_amount), 0)       AS total_invoiced
+      COALESCE(SUM(COALESCE(inv.invoiced_total, 0)), 0) AS total_invoiced
 
     FROM purchase_orders po
     JOIN locations l  ON l.id  = po.location_id
     JOIN sites si     ON si.id = l.site_id
-    LEFT JOIN invoices i ON i.purchase_order_id = po.id
+    LEFT JOIN (
+      SELECT purchase_order_id, SUM(total_amount) AS invoiced_total
+      FROM invoices
+      GROUP BY purchase_order_id
+    ) inv ON inv.purchase_order_id = po.id
 
     WHERE po.status NOT IN ('cancelled', 'draft')
 
@@ -111,6 +115,7 @@ async function getLocationBreakdownData(showSpreadLocations) {
     FROM timesheet_entries te
     JOIN workers w ON w.id = te.worker_id
     JOIN locations l ON l.id = te.location_id
+    WHERE (te.leave_type IS NULL OR te.leave_type IN ('paid_sick', 'annual_leave', 'bank_holiday'))
     GROUP BY l.id
   `);
 
@@ -178,12 +183,16 @@ async function getLocationBreakdownData(showSpreadLocations) {
 
       COALESCE(SUM(po.net_amount), 0)     AS net_total,
       COALESCE(SUM(po.total_amount), 0)   AS gross_total,
-      COALESCE(SUM(i.total_amount), 0)    AS invoiced_total
+      COALESCE(SUM(COALESCE(inv.invoiced_total, 0)), 0) AS invoiced_total
 
     FROM purchase_orders po
     JOIN locations l   ON l.id = po.location_id
     JOIN po_stages ps  ON ps.id = po.stage_id
-    LEFT JOIN invoices i ON i.purchase_order_id = po.id
+    LEFT JOIN (
+      SELECT purchase_order_id, SUM(total_amount) AS invoiced_total
+      FROM invoices
+      GROUP BY purchase_order_id
+    ) inv ON inv.purchase_order_id = po.id
 
     WHERE po.status NOT IN ('cancelled', 'draft')
 
@@ -408,22 +417,28 @@ router.get(
         COALESCE(SUM(po.net_amount), 0) AS total_net,
 
         -- Invoice VAT
-        COALESCE(SUM(i.vat_amount), 0) AS total_vat,
+        COALESCE(SUM(COALESCE(inv.vat_amount, 0)), 0) AS total_vat,
 
         -- Invoice gross
-        COALESCE(SUM(i.total_amount), 0) AS total_gross,
+        COALESCE(SUM(COALESCE(inv.invoiced_total, 0)), 0) AS total_gross,
 
         -- Uninvoiced (ex VAT only)
         COALESCE(SUM(po.net_amount), 0)
-          - COALESCE(SUM(i.net_amount), 0)
+          - COALESCE(SUM(COALESCE(inv.invoiced_net, 0)), 0)
           AS uninvoiced_total
 
       FROM purchase_orders po
       JOIN sites si ON po.site_id = si.id
       JOIN locations l ON po.location_id = l.id
 
-      LEFT JOIN invoices i
-        ON i.purchase_order_id = po.id
+      LEFT JOIN (
+        SELECT purchase_order_id,
+               SUM(net_amount) AS invoiced_net,
+               SUM(vat_amount) AS vat_amount,
+               SUM(total_amount) AS invoiced_total
+        FROM invoices
+        GROUP BY purchase_order_id
+      ) inv ON inv.purchase_order_id = po.id
 
       WHERE po.status NOT IN ('cancelled', 'draft')
 
@@ -1237,15 +1252,22 @@ router.get(
       SELECT
         s.name  AS site,
         l.name  AS location,
-        SUM(po.net_amount)                        AS total_po_net,
-        SUM(IFNULL(i.vat_amount, 0))              AS total_invoice_vat,
-        SUM(IFNULL(i.total_amount, 0))            AS total_invoice_gross,
+        SUM(po.net_amount)                                  AS total_po_net,
+        SUM(IFNULL(inv.vat_amount, 0))                      AS total_invoice_vat,
+        SUM(IFNULL(inv.invoiced_total, 0))                  AS total_invoice_gross,
         SUM(po.net_amount)
-          - SUM(IFNULL(i.net_amount, 0))           AS uninvoiced_net
+          - SUM(IFNULL(inv.invoiced_net, 0))                AS uninvoiced_net
       FROM purchase_orders po
       JOIN sites s      ON po.site_id = s.id
       JOIN locations l  ON po.location_id = l.id
-      LEFT JOIN invoices i ON i.purchase_order_id = po.id
+      LEFT JOIN (
+        SELECT purchase_order_id,
+               SUM(net_amount) AS invoiced_net,
+               SUM(vat_amount) AS vat_amount,
+               SUM(total_amount) AS invoiced_total
+        FROM invoices
+        GROUP BY purchase_order_id
+      ) inv ON inv.purchase_order_id = po.id
       WHERE po.status NOT IN ('cancelled', 'draft')
       GROUP BY s.name, l.name
       ORDER BY s.name, l.name
@@ -1356,16 +1378,20 @@ router.get(
         ROUND(SUM(po.vat_amount), 2)                                   AS total_po_vat,
         ROUND(SUM(po.total_amount), 2)                                 AS total_po_gross,
 
-        ROUND(IFNULL(SUM(i.net_amount), 0), 2)                          AS total_invoiced_net,
+        ROUND(IFNULL(SUM(inv.invoiced_net), 0), 2)                      AS total_invoiced_net,
 
         ROUND(
-          SUM(po.net_amount) - IFNULL(SUM(i.net_amount), 0),
+          SUM(po.net_amount) - IFNULL(SUM(inv.invoiced_net), 0),
           2
         )                                                               AS uninvoiced_net
 
       FROM suppliers s
       JOIN purchase_orders po ON po.supplier_id = s.id
-      LEFT JOIN invoices i ON i.purchase_order_id = po.id
+      LEFT JOIN (
+        SELECT purchase_order_id, SUM(net_amount) AS invoiced_net
+        FROM invoices
+        GROUP BY purchase_order_id
+      ) inv ON inv.purchase_order_id = po.id
 
       WHERE po.status NOT IN ('cancelled', 'draft')
         ${siteFilter}
