@@ -94,8 +94,8 @@ async function getLocationBreakdownData(showSpreadLocations) {
       COALESCE(SUM(i.total_amount), 0)       AS total_invoiced
 
     FROM purchase_orders po
-    JOIN sites si     ON si.id = po.site_id
     JOIN locations l  ON l.id  = po.location_id
+    JOIN sites si     ON si.id = l.site_id
     LEFT JOIN invoices i ON i.purchase_order_id = po.id
 
     WHERE po.status NOT IN ('cancelled', 'draft')
