@@ -95,18 +95,13 @@ function renderFilteredLocations() {
     ? allLocations.filter(l => String(l.site_id) === String(selectedSiteFilter))
     : allLocations;
 
-  // Apply sorting
+  // Apply sorting with natural number order
   const sorted = [...filtered].sort((a, b) => {
-    let aVal = a[sortColumn] || '';
-    let bVal = b[sortColumn] || '';
+    let aVal = String(a[sortColumn] || '');
+    let bVal = String(b[sortColumn] || '');
     
-    // Convert to strings for comparison
-    aVal = String(aVal).toLowerCase();
-    bVal = String(bVal).toLowerCase();
-    
-    if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-    if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
-    return 0;
+    const cmp = aVal.localeCompare(bVal, undefined, { sensitivity: 'base', numeric: true });
+    return sortDirection === 'asc' ? cmp : -cmp;
   });
 
   sorted.forEach((l) => {
