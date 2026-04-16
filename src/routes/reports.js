@@ -126,7 +126,7 @@ async function getLocationBreakdownData(showSpreadLocations) {
     labourMap.set(row.location_id, Number(row.labour_cost || 0));
   });
 
-  // Capital costs spread evenly across all locations on each site
+  // Capital costs spread across all locations on each site weighted by floor area
   const [capitalCosts] = await db.query(`
     SELECT site_id, COALESCE(SUM(cost), 0) AS total_capital_cost
     FROM site_capital_costs
@@ -137,10 +137,43 @@ async function getLocationBreakdownData(showSpreadLocations) {
   capitalCosts.forEach(row => {
     const siteLocations = locationsBySite.get(row.site_id) || [];
     if (siteLocations.length === 0) return;
-    const share = Number(row.total_capital_cost) / siteLocations.length;
+    const totalCapital = Number(row.total_capital_cost);
+
+    // Separate locations with and without floor area
+    const withArea = [];
+    const withoutArea = [];
     siteLocations.forEach(locId => {
-      capitalCostPerLocation.set(locId, share);
+      const info = locationMap.get(locId);
+      if (info && info.floor_area && info.floor_area > 0) {
+        withArea.push({ id: locId, area: info.floor_area });
+      } else {
+        withoutArea.push(locId);
+      }
     });
+
+    if (withArea.length === 0) {
+      // No floor areas at all — equal distribution
+      const share = totalCapital / siteLocations.length;
+      siteLocations.forEach(locId => {
+        capitalCostPerLocation.set(locId, share);
+      });
+    } else if (withoutArea.length === 0) {
+      // All have floor area — pure proportional
+      const totalArea = withArea.reduce((sum, t) => sum + t.area, 0);
+      withArea.forEach(t => {
+        capitalCostPerLocation.set(t.id, totalCapital * (t.area / totalArea));
+      });
+    } else {
+      // Mixed: treat unknowns as having the average floor area
+      const avgArea = withArea.reduce((sum, t) => sum + t.area, 0) / withArea.length;
+      const totalArea = withArea.reduce((sum, t) => sum + t.area, 0) + (avgArea * withoutArea.length);
+      withArea.forEach(t => {
+        capitalCostPerLocation.set(t.id, totalCapital * (t.area / totalArea));
+      });
+      withoutArea.forEach(locId => {
+        capitalCostPerLocation.set(locId, totalCapital * (avgArea / totalArea));
+      });
+    }
   });
 
   const totalsMap = new Map();
@@ -519,9 +552,8 @@ router.get(
         const salePriceExVat = salePrice / (1 + vatRate);
         const solicitorCost = salePrice * (solicitorPct / 100);
         const auctioneerCost = salePrice * (auctioneerPct / 100);
-        const capitalCost = Number(r.totals.capital_cost || 0);
         const expectedSpent = Number(r.expected_spent);
-        return salePriceExVat - expectedSpent - capitalCost - solicitorCost - auctioneerCost;
+        return salePriceExVat - solicitorCost - auctioneerCost - expectedSpent;
       }
 
       /* -------- Group by site -------- */

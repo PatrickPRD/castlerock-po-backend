@@ -42,13 +42,10 @@ function calcTargetProfit(r) {
   const salePrice = num(r.sale_price);
   const vatRate = getVatRate();
   const salePriceExVat = salePrice / (1 + vatRate);
-  const solicitorPct = num(saleCostSettings.solicitorPct) / 100;
-  const auctioneerPct = num(saleCostSettings.auctioneerPct) / 100;
-  const solicitorCost = salePrice * solicitorPct;
-  const auctioneerCost = salePrice * auctioneerPct;
-  const capitalCost = num(r.totals.capital_cost || 0);
+  const solicitorCost = salePrice * (num(saleCostSettings.solicitorPct) / 100);
+  const auctioneerCost = salePrice * (num(saleCostSettings.auctioneerPct) / 100);
   const expectedSpent = num(r.expected_spent);
-  return salePriceExVat - expectedSpent - capitalCost - solicitorCost - auctioneerCost;
+  return salePriceExVat - solicitorCost - auctioneerCost - expectedSpent;
 }
 
 /* =========================
