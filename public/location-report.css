@@ -93,6 +93,50 @@
   background: #fafafac0;
 }
 
+/* Detail summary below inner table */
+.detail-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #f3f4f6;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.detail-summary-item {
+  display: flex;
+  flex-direction: column;
+  min-width: 120px;
+}
+
+.detail-summary-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #6b7280;
+  margin-bottom: 2px;
+}
+
+.detail-summary-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.detail-summary-pl .detail-summary-value {
+  font-size: 1rem;
+}
+
+.detail-summary-pl.profit-positive .detail-summary-value {
+  color: #16a34a;
+}
+
+.detail-summary-pl.profit-negative .detail-summary-value {
+  color: #dc2626;
+}
+
 /* Inner table should not affect layout */
 .inner-table {
   width: 100%;

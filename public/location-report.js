@@ -93,6 +93,12 @@ function renderReport() {
 
 
   // DETAILS ROW (STAGES)
+  const salePrice = num(r.sale_price);
+  const solicitorPct = num(solicitorInput.value) / 100;
+  const auctioneerPct = num(auctioneerInput.value) / 100;
+  const solicitorCost = salePrice * solicitorPct;
+  const auctioneerCost = salePrice * auctioneerPct;
+
   table.innerHTML += `
     <tr class="details-row" id="${rowId}">
       <td colspan="6">
@@ -117,6 +123,28 @@ function renderReport() {
 </tbody>
 
         </table>
+        <div class="detail-summary">
+          <div class="detail-summary-item">
+            <span class="detail-summary-label">Total Net</span>
+            <span class="detail-summary-value">${euro(num(r.totals.net) + num(r.totals.labour || 0))}</span>
+          </div>
+          <div class="detail-summary-item">
+            <span class="detail-summary-label">Sale Price</span>
+            <span class="detail-summary-value">${euro(salePrice)}</span>
+          </div>
+          <div class="detail-summary-item">
+            <span class="detail-summary-label">Solicitor (${(solicitorPct * 100).toFixed(1)}%)</span>
+            <span class="detail-summary-value">${euro(solicitorCost)}</span>
+          </div>
+          <div class="detail-summary-item">
+            <span class="detail-summary-label">Auctioneer (${(auctioneerPct * 100).toFixed(1)}%)</span>
+            <span class="detail-summary-value">${euro(auctioneerCost)}</span>
+          </div>
+          <div class="detail-summary-item detail-summary-pl ${plClass}">
+            <span class="detail-summary-label">Profit/Loss</span>
+            <span class="detail-summary-value">${euro(profitLoss)}</span>
+          </div>
+        </div>
       </td>
     </tr>
   `;
@@ -350,6 +378,12 @@ async function loadVatRates() {
     if (rates.length > 0) {
       vatOnSaleFilter.value = String(rates[rates.length - 1]);
     }
+
+    // Set solicitor/auctioneer defaults from saved settings
+    const solPct = Number.isFinite(Number(data.solicitor_pct)) ? Number(data.solicitor_pct) : 1;
+    const aucPct = Number.isFinite(Number(data.auctioneer_pct)) ? Number(data.auctioneer_pct) : 1;
+    solicitorInput.value = solPct;
+    auctioneerInput.value = aucPct;
   } catch (err) {
     console.error('Failed to load VAT rates:', err);
   }
