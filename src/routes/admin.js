@@ -502,9 +502,12 @@ router.get(
   authorizeRoles('super_admin'),
   async (req, res) => {
     const [rows] = await db.query(
-      `SELECT id, name, site_letter, address, active
-       FROM sites
-       ORDER BY name`
+      `SELECT s.id, s.name, s.site_letter, s.address, s.active,
+              COALESCE(SUM(cc.cost), 0) AS total_capital_cost
+       FROM sites s
+       LEFT JOIN site_capital_costs cc ON cc.site_id = s.id
+       GROUP BY s.id, s.name, s.site_letter, s.address, s.active
+       ORDER BY s.name`
     );
     res.json(rows);
   }
@@ -657,6 +660,151 @@ router.delete(
         req
       }).catch(err => console.error('Site delete audit log failed:', err));
     }
+
+    res.json({ success: true });
+  }
+);
+
+/* ======================================================
+   SITE CAPITAL COSTS – SUPER ADMIN ONLY
+   ====================================================== */
+
+router.get(
+  '/sites/:siteId/capital-costs',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const siteId = req.params.siteId;
+    const [rows] = await db.query(
+      `SELECT id, site_id, title, description, cost
+       FROM site_capital_costs
+       WHERE site_id = ?
+       ORDER BY created_at DESC`,
+      [siteId]
+    );
+    res.json(rows);
+  }
+);
+
+router.post(
+  '/sites/:siteId/capital-costs',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const siteId = req.params.siteId;
+    const { title, description, cost } = req.body;
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+
+    const parsedCost = parseFloat(cost);
+    if (isNaN(parsedCost) || parsedCost < 0) {
+      return res.status(400).json({ error: 'Cost must be a valid non-negative number' });
+    }
+
+    try {
+      const [result] = await db.query(
+        `INSERT INTO site_capital_costs (site_id, title, description, cost)
+         VALUES (?, ?, ?, ?)`,
+        [siteId, title.trim(), description ? description.trim() : null, parsedCost]
+      );
+
+      logAudit({
+        table_name: 'site_capital_costs',
+        record_id: result.insertId,
+        action: 'CREATE',
+        old_data: null,
+        new_data: { site_id: siteId, title: title.trim(), description, cost: parsedCost },
+        changed_by: req.user.id,
+        req
+      }).catch(err => console.error('Capital cost create audit log failed:', err));
+
+      res.json({ success: true, id: result.insertId });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to create capital cost' });
+    }
+  }
+);
+
+router.put(
+  '/sites/:siteId/capital-costs/:id',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const { siteId, id } = req.params;
+    const { title, description, cost } = req.body;
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+
+    const parsedCost = parseFloat(cost);
+    if (isNaN(parsedCost) || parsedCost < 0) {
+      return res.status(400).json({ error: 'Cost must be a valid non-negative number' });
+    }
+
+    const [[oldRecord]] = await db.query(
+      'SELECT * FROM site_capital_costs WHERE id = ? AND site_id = ?',
+      [id, siteId]
+    );
+
+    if (!oldRecord) {
+      return res.status(404).json({ error: 'Capital cost not found' });
+    }
+
+    await db.query(
+      `UPDATE site_capital_costs
+       SET title = ?, description = ?, cost = ?
+       WHERE id = ? AND site_id = ?`,
+      [title.trim(), description ? description.trim() : null, parsedCost, id, siteId]
+    );
+
+    logAudit({
+      table_name: 'site_capital_costs',
+      record_id: id,
+      action: 'UPDATE',
+      old_data: { title: oldRecord.title, description: oldRecord.description, cost: oldRecord.cost },
+      new_data: { title: title.trim(), description, cost: parsedCost },
+      changed_by: req.user.id,
+      req
+    }).catch(err => console.error('Capital cost update audit log failed:', err));
+
+    res.json({ success: true });
+  }
+);
+
+router.delete(
+  '/sites/:siteId/capital-costs/:id',
+  authenticate,
+  authorizeRoles('super_admin'),
+  async (req, res) => {
+    const { siteId, id } = req.params;
+
+    const [[record]] = await db.query(
+      'SELECT * FROM site_capital_costs WHERE id = ? AND site_id = ?',
+      [id, siteId]
+    );
+
+    if (!record) {
+      return res.status(404).json({ error: 'Capital cost not found' });
+    }
+
+    await db.query(
+      'DELETE FROM site_capital_costs WHERE id = ? AND site_id = ?',
+      [id, siteId]
+    );
+
+    logAudit({
+      table_name: 'site_capital_costs',
+      record_id: id,
+      action: 'DELETE',
+      old_data: record,
+      new_data: null,
+      changed_by: req.user.id,
+      req
+    }).catch(err => console.error('Capital cost delete audit log failed:', err));
 
     res.json({ success: true });
   }

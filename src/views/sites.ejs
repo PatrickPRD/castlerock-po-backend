@@ -14,9 +14,10 @@
         <thead>
           <tr>
             <th>Site</th>
-            <th>Site Letter</th>
+            <th style="width:80px">Site Letter</th>
             <th>Address</th>
-            <th style="width:160px">Actions</th>
+            <th style="width:140px; text-align:right;">Capital Cost</th>
+            <th style="width:280px">Actions</th>
           </tr>
         </thead>
         <tbody id="siteTable"></tbody>
@@ -49,6 +50,58 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
           <button id="saveSiteBtn" class="btn btn-primary" onclick="saveSite()">Add Site</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Capital Costs Modal -->
+  <div class="modal fade" id="capitalCostsListModal" tabindex="-1" aria-labelledby="capitalCostsListModalLabel" aria-hidden="true" style="display:none;">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="capitalCostsListModalLabel">Capital Costs</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="table-scroll">
+            <table class="po-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Description</th>
+                  <th style="width:140px; text-align:right;">Cost</th>
+                  <th style="width:160px">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="capitalCostsTable"></tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="2" style="text-align:right;"><strong>Total</strong></td>
+                  <td style="text-align:right;"><strong id="capitalCostsTotal">0.00</strong></td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <!-- Inline add/edit form (hidden by default) -->
+          <div id="capitalCostForm" style="display:none; margin-top:1rem; border-top:1px solid #dee2e6; padding-top:1rem;">
+            <h6 id="capitalCostFormLabel">Add Capital Cost</h6>
+            <div class="form-row" style="flex-direction: column; gap: 10px;">
+              <input id="capitalCostTitle" placeholder="Title" class="form-control">
+              <textarea id="capitalCostDescription" placeholder="Description" rows="3" class="form-control"></textarea>
+              <input id="capitalCostAmount" type="number" step="0.01" min="0" placeholder="Cost" class="form-control">
+            </div>
+            <div style="display:flex; gap:8px; margin-top:10px; justify-content:flex-end;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="cancelCapitalCostForm()">Cancel</button>
+              <button id="saveCapitalCostBtn" class="btn btn-primary btn-sm" onclick="saveCapitalCost()">Add Capital Cost</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button id="addCapitalCostBtn" class="btn btn-primary" type="button" onclick="openAddCapitalCostForm()">Add Capital Cost</button>
         </div>
       </div>
     </div>

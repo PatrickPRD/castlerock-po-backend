@@ -117,6 +117,23 @@ async function getLocationBreakdownData(showSpreadLocations) {
     labourMap.set(row.location_id, Number(row.labour_cost || 0));
   });
 
+  // Capital costs spread evenly across all locations on each site
+  const [capitalCosts] = await db.query(`
+    SELECT site_id, COALESCE(SUM(cost), 0) AS total_capital_cost
+    FROM site_capital_costs
+    GROUP BY site_id
+  `);
+
+  const capitalCostPerLocation = new Map();
+  capitalCosts.forEach(row => {
+    const siteLocations = locationsBySite.get(row.site_id) || [];
+    if (siteLocations.length === 0) return;
+    const share = Number(row.total_capital_cost) / siteLocations.length;
+    siteLocations.forEach(locId => {
+      capitalCostPerLocation.set(locId, share);
+    });
+  });
+
   const totalsMap = new Map();
   locationTotals.forEach(l => {
     const info = locationMap.get(l.location_id);
@@ -129,6 +146,7 @@ async function getLocationBreakdownData(showSpreadLocations) {
       total_gross: Number(l.total_gross),
       total_invoiced: Number(l.total_invoiced),
       total_labour: labourMap.get(l.location_id) || 0,
+      capital_cost: capitalCostPerLocation.get(l.location_id) || 0,
       sale_price: info ? info.sale_price : 0
     });
   });
@@ -146,6 +164,7 @@ async function getLocationBreakdownData(showSpreadLocations) {
       total_gross: 0,
       total_invoiced: 0,
       total_labour: labourCost,
+      capital_cost: capitalCostPerLocation.get(locationId) || 0,
       sale_price: info.sale_price || 0
     });
   });
@@ -255,6 +274,7 @@ async function getLocationBreakdownData(showSpreadLocations) {
         const shareGross = sourceTotals.total_gross / targets.length;
         const shareInvoiced = sourceTotals.total_invoiced / targets.length;
         const shareLabour = (sourceTotals.total_labour || 0) / targets.length;
+        const shareCapital = (sourceTotals.capital_cost || 0) / targets.length;
 
         targets.forEach(targetId => {
           // Skip if this target is itself a source location in another rule
@@ -273,6 +293,7 @@ async function getLocationBreakdownData(showSpreadLocations) {
               total_gross: 0,
               total_invoiced: 0,
               total_labour: 0,
+              capital_cost: 0,
               sale_price: info.sale_price || 0
             });
           }
@@ -282,6 +303,7 @@ async function getLocationBreakdownData(showSpreadLocations) {
           targetTotals.total_gross += shareGross;
           targetTotals.total_invoiced += shareInvoiced;
           targetTotals.total_labour += shareLabour;
+          targetTotals.capital_cost += shareCapital;
         });
 
         const sourceStages = stageMap.get(sourceId) || new Map();
@@ -331,7 +353,8 @@ async function getLocationBreakdownData(showSpreadLocations) {
         net: Number(loc.total_net),
         gross: Number(loc.total_gross),
         uninvoiced: Number(loc.total_gross) - Number(loc.total_invoiced),
-        labour: Number(loc.total_labour || 0)
+        labour: Number(loc.total_labour || 0),
+        capital_cost: Number(loc.capital_cost || 0)
       },
       stages: Array.from((stageMap.get(loc.location_id) || new Map()).values()).map(s => ({
         stage: s.stage,

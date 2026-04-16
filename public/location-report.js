@@ -32,8 +32,9 @@ function calcProfitLoss(r) {
   const auctioneerPct = num(saleCostSettings.auctioneerPct) / 100;
   const solicitorCost = salePrice * solicitorPct;
   const auctioneerCost = salePrice * auctioneerPct;
+  const capitalCost = num(r.totals.capital_cost || 0);
   const netSpendIncLabour = num(r.totals.net) + num(r.totals.labour || 0);
-  return salePriceExVat - netSpendIncLabour - solicitorCost - auctioneerCost;
+  return salePriceExVat - netSpendIncLabour - capitalCost - solicitorCost - auctioneerCost;
 }
 
 /* =========================
@@ -99,6 +100,7 @@ function renderReport() {
   const auctioneerPct = num(saleCostSettings.auctioneerPct) / 100;
   const solicitorCost = salePrice * solicitorPct;
   const auctioneerCost = salePrice * auctioneerPct;
+  const capitalCost = num(r.totals.capital_cost || 0);
 
   table.innerHTML += `
     <tr class="details-row" id="${rowId}">
@@ -128,6 +130,10 @@ function renderReport() {
           <div class="detail-summary-item">
             <span class="detail-summary-label">Total Net</span>
             <span class="detail-summary-value">${euro(num(r.totals.net) + num(r.totals.labour || 0))}</span>
+          </div>
+          <div class="detail-summary-item">
+            <span class="detail-summary-label">Capital Cost</span>
+            <span class="detail-summary-value">${euro(capitalCost)}</span>
           </div>
           <div class="detail-summary-item">
             <span class="detail-summary-label">Sale Price</span>
