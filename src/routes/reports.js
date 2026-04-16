@@ -55,6 +55,7 @@ async function getLocationBreakdownData(showSpreadLocations) {
       l.id,
       l.name,
       l.site_id,
+      l.sale_price,
       s.name AS site
     FROM locations l
     JOIN sites s ON s.id = l.site_id
@@ -69,7 +70,8 @@ async function getLocationBreakdownData(showSpreadLocations) {
       id: l.id,
       name: l.name,
       site_id: l.site_id,
-      site: l.site
+      site: l.site,
+      sale_price: Number(l.sale_price || 0)
     });
 
     if (!locationsBySite.has(l.site_id)) {
@@ -117,6 +119,7 @@ async function getLocationBreakdownData(showSpreadLocations) {
 
   const totalsMap = new Map();
   locationTotals.forEach(l => {
+    const info = locationMap.get(l.location_id);
     totalsMap.set(l.location_id, {
       site: l.site,
       site_id: l.site_id,
@@ -125,7 +128,8 @@ async function getLocationBreakdownData(showSpreadLocations) {
       total_net: Number(l.total_net),
       total_gross: Number(l.total_gross),
       total_invoiced: Number(l.total_invoiced),
-      total_labour: labourMap.get(l.location_id) || 0
+      total_labour: labourMap.get(l.location_id) || 0,
+      sale_price: info ? info.sale_price : 0
     });
   });
 
@@ -141,7 +145,8 @@ async function getLocationBreakdownData(showSpreadLocations) {
       total_net: 0,
       total_gross: 0,
       total_invoiced: 0,
-      total_labour: labourCost
+      total_labour: labourCost,
+      sale_price: info.sale_price || 0
     });
   });
 
@@ -266,7 +271,9 @@ async function getLocationBreakdownData(showSpreadLocations) {
               location_id: info.id,
               total_net: 0,
               total_gross: 0,
-              total_invoiced: 0
+              total_invoiced: 0,
+              total_labour: 0,
+              sale_price: info.sale_price || 0
             });
           }
 
@@ -319,6 +326,7 @@ async function getLocationBreakdownData(showSpreadLocations) {
       site: loc.site,
       location: loc.location,
       location_id: loc.location_id,
+      sale_price: Number(loc.sale_price || 0),
       totals: {
         net: Number(loc.total_net),
         gross: Number(loc.total_gross),

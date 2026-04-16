@@ -58,16 +58,33 @@
 
 /* Lock parent columns */
 
+.po-table th:nth-child(1),
+.po-table td:nth-child(1) { width: 16%; }
 
 .po-table th:nth-child(2),
-.po-table td:nth-child(2) { width: 34%; }
+.po-table td:nth-child(2) { width: 22%; }
 
 .po-table th:nth-child(3),
 .po-table td:nth-child(3),
 .po-table th:nth-child(4),
-.po-table td:nth-child(4) {
-  width: 20%;
+.po-table td:nth-child(4),
+.po-table th:nth-child(5),
+.po-table td:nth-child(5),
+.po-table th:nth-child(6),
+.po-table td:nth-child(6) {
+  width: 15.5%;
   text-align: right;
+}
+
+/* Profit/Loss colouring */
+.profit-positive {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.profit-negative {
+  color: #dc2626;
+  font-weight: 600;
 }
 
 /* Details row */
@@ -218,6 +235,8 @@ background-color: #8d888841;
   .po-table > tbody > tr.main-row td:nth-child(2)::before { content: "Location" !important; }
   .po-table > tbody > tr.main-row td:nth-child(3)::before { content: "Total Net" !important; }
   .po-table > tbody > tr.main-row td:nth-child(4)::before { content: "Inc. Labour" !important; }
+  .po-table > tbody > tr.main-row td:nth-child(5)::before { content: "Sale Price" !important; }
+  .po-table > tbody > tr.main-row td:nth-child(6)::before { content: "Profit/Loss" !important; }
 
   /* Details row content */
   .details-row td {

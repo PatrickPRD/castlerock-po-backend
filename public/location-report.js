@@ -5,6 +5,7 @@ const table = document.getElementById('reportTable');
 const showSpreadLocations = document.getElementById('showSpreadLocations');
 const siteFilter = document.getElementById('siteFilter');
 const locationFilter = document.getElementById('locationFilter');
+const vatOnSaleFilter = document.getElementById('vatOnSaleFilter');
 const sortHeaders = document.querySelectorAll('th[data-sort]');
 const loadingOverlay = document.getElementById('reportLoading');
 
@@ -18,6 +19,18 @@ const SORT_SPINNER_MIN_MS = 120;
 const num = v => isNaN(Number(v)) ? 0 : Number(v);
 const euro = v => (window.formatMoney ? window.formatMoney(v) : `€${num(v).toFixed(2)}`);
 const getCurrencySymbol = () => (window.getCurrencySymbol ? window.getCurrencySymbol() : '€');
+
+function getVatRate() {
+  return num(vatOnSaleFilter.value) / 100;
+}
+
+function calcProfitLoss(r) {
+  const salePrice = num(r.sale_price);
+  const vatRate = getVatRate();
+  const salePriceExVat = salePrice / (1 + vatRate);
+  const netSpendIncLabour = num(r.totals.net) + num(r.totals.labour || 0);
+  return salePriceExVat - netSpendIncLabour;
+}
 
 /* =========================
    Load Report
@@ -55,6 +68,8 @@ function renderReport() {
 
   data.forEach((r, index) => {
   const rowId = `loc-${index}`;
+  const profitLoss = calcProfitLoss(r);
+  const plClass = profitLoss >= 0 ? 'profit-positive' : 'profit-negative';
 
   // MAIN ROW
  table.innerHTML += `
@@ -65,6 +80,8 @@ function renderReport() {
     </td>
     <td>${euro(r.totals.net + (r.totals.labour || 0))}</td>
     <td>${euro(r.totals.labour || 0)}</td>
+    <td>${euro(r.sale_price || 0)}</td>
+    <td class="${plClass}">${euro(profitLoss)}</td>
   </tr>
 `;
 
@@ -72,7 +89,7 @@ function renderReport() {
   // DETAILS ROW (STAGES)
   table.innerHTML += `
     <tr class="details-row" id="${rowId}">
-      <td colspan="4">
+      <td colspan="6">
         <table class="inner-table">
           <thead>
             <tr>
@@ -117,6 +134,12 @@ function sortData(data) {
       }
       case 'labour':
         result = num(a.totals.labour || 0) - num(b.totals.labour || 0);
+        break;
+      case 'salePrice':
+        result = num(a.sale_price || 0) - num(b.sale_price || 0);
+        break;
+      case 'profitLoss':
+        result = calcProfitLoss(a) - calcProfitLoss(b);
         break;
       case 'site':
       default:
@@ -266,6 +289,7 @@ siteFilter.addEventListener('change', () => {
   renderReport();
 });
 locationFilter.addEventListener('change', renderReport);
+vatOnSaleFilter.addEventListener('change', renderReport);
 sortHeaders.forEach(th => {
   th.addEventListener('click', () => {
     const key = th.dataset.sort;
@@ -298,12 +322,38 @@ async function loadSites() {
   }
 }
 
+async function loadVatRates() {
+  try {
+    const res = await fetch('/settings/financial', {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    const data = await res.json();
+    const rates = data.vat_rates || [0, 13.5, 23];
+
+    vatOnSaleFilter.innerHTML = '';
+    rates.sort((a, b) => a - b).forEach(rate => {
+      const opt = document.createElement('option');
+      opt.value = String(rate);
+      opt.textContent = `${rate}%`;
+      vatOnSaleFilter.appendChild(opt);
+    });
+
+    // Default to highest rate
+    if (rates.length > 0) {
+      vatOnSaleFilter.value = String(rates[rates.length - 1]);
+    }
+  } catch (err) {
+    console.error('Failed to load VAT rates:', err);
+  }
+}
+
 (async () => {
   if (window.loadCurrencySettings) {
     try {
       await window.loadCurrencySettings();
     } catch (_) {}
   }
+  await loadVatRates();
   await loadSites();
   await loadReport();
 })();

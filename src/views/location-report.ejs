@@ -5,16 +5,22 @@
   <div class="card">
     <div class="report-controls d-flex justify-content-between align-items-center mb-3">
       <div class="row g-2 report-filters align-items-md-center">
-        <div class="col-12 col-md-5 form-group">
+        <div class="col-12 col-md-3 form-group">
           <label for="siteFilter">Site</label>
           <select id="siteFilter">
             <option value="">All Sites</option>
           </select>
         </div>
-        <div class="col-12 col-md-5 form-group">
+        <div class="col-12 col-md-3 form-group">
           <label for="locationFilter">Location</label>
           <select id="locationFilter">
             <option value="">All Locations</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-3 form-group">
+          <label for="vatOnSaleFilter">VAT on Sale</label>
+          <select id="vatOnSaleFilter">
+            <option value="0">0%</option>
           </select>
         </div>
         <div class="col-12 col-md-auto spread-toggle text-md-start">
@@ -38,6 +44,8 @@
           <th class="sortable" data-sort="location">Location <span class="sort-indicator"></span></th>
           <th class="sortable" data-sort="total">Total Net (<span data-currency-symbol>€</span>) <span class="sort-indicator"></span></th>
           <th class="sortable" data-sort="labour">Inc. Labour (<span data-currency-symbol>€</span>) <span class="sort-indicator"></span></th>
+          <th class="sortable" data-sort="salePrice">Sale Price (<span data-currency-symbol>€</span>) <span class="sort-indicator"></span></th>
+          <th class="sortable" data-sort="profitLoss">Profit/Loss (<span data-currency-symbol>€</span>) <span class="sort-indicator"></span></th>
         </tr>
       </thead>
       <tbody id="reportTable"></tbody>
