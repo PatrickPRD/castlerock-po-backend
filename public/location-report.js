@@ -340,7 +340,7 @@ async function exportExcel() {
 
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'po-totals-by-location-breakdown.xlsx';
+    a.download = 'location-report.xlsx';
     document.body.appendChild(a);
     a.click();
     a.remove();

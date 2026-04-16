@@ -456,7 +456,7 @@ router.get(
 );
 
 /* ======================================================
-   EXCEL — LOCATION → STAGE BREAKDOWN
+   EXCEL — LOCATION → STAGE BREAKDOWN (Presentation-Ready)
    ====================================================== */
 router.get(
   '/po-totals-by-location-breakdown.xlsx',
@@ -467,6 +467,31 @@ router.get(
       const showSpreadLocations = req.query.showSpread === '1' || req.query.showSpread === 'true';
       const data = await getLocationBreakdownData(showSpreadLocations);
 
+      /* -------- Load financial settings -------- */
+      const settings = await SettingsService.getSettings();
+      const currencyCode = settings.currency_code || 'EUR';
+      const currencySymbol = { EUR: '€', GBP: '£', USD: '$' }[currencyCode] || '€';
+      const vatRates = settings.vat_rates ? JSON.parse(settings.vat_rates) : [0, 13.5, 23];
+      const vatOnSale = Number.isFinite(Number(settings.vat_on_sale))
+        ? Number(settings.vat_on_sale)
+        : (vatRates.length > 0 ? Math.max(...vatRates) : 23);
+      const solicitorPct = Number.isFinite(Number(settings.solicitor_pct))
+        ? Number(settings.solicitor_pct) : 1;
+      const auctioneerPct = Number.isFinite(Number(settings.auctioneer_pct))
+        ? Number(settings.auctioneer_pct) : 1;
+      const vatRate = vatOnSale / 100;
+
+      /* -------- Profit/Loss helper -------- */
+      function calcProfitLoss(r) {
+        const salePrice = Number(r.sale_price || 0);
+        const salePriceExVat = salePrice / (1 + vatRate);
+        const solicitorCost = salePrice * (solicitorPct / 100);
+        const auctioneerCost = salePrice * (auctioneerPct / 100);
+        const capitalCost = Number(r.totals.capital_cost || 0);
+        const netSpendIncLabour = Number(r.totals.net) + Number(r.totals.labour || 0);
+        return salePriceExVat - netSpendIncLabour - capitalCost - solicitorCost - auctioneerCost;
+      }
+
       /* -------- Group by site -------- */
       const sites = {};
       data.forEach(r => {
@@ -474,70 +499,497 @@ router.get(
         sites[r.site].push(r);
       });
 
+      /* -------- Style constants -------- */
+      const currFmt = `${currencySymbol}#,##0.00`;
+      const pctFmt = '0.0%';
+      const brandColor = '1B4F72';
+      const brandColorLight = 'D6EAF8';
+      const profitGreenBg = 'E8F5E9';
+      const profitGreenFont = '2E7D32';
+      const lossRedBg = 'FFEBEE';
+      const lossRedFont = 'C62828';
+      const lightGrayBg = 'F5F5F5';
+      const borderStyle = { style: 'thin', color: { argb: 'FFBDBDBD' } };
+
+      const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + brandColor } };
+      const headerFont = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+      const headerAlignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+
+      function applyBorder(cell) {
+        cell.border = { top: borderStyle, left: borderStyle, bottom: borderStyle, right: borderStyle };
+      }
+
+      function applyCurrencyCell(cell, value) {
+        cell.value = value;
+        cell.numFmt = currFmt;
+        cell.alignment = { horizontal: 'right' };
+        applyBorder(cell);
+      }
+
+      function applyProfitStyle(cell, value) {
+        cell.value = value;
+        cell.numFmt = currFmt;
+        cell.alignment = { horizontal: 'right' };
+        applyBorder(cell);
+        if (value >= 0) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + profitGreenBg } };
+          cell.font = { bold: true, color: { argb: 'FF' + profitGreenFont } };
+        } else {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + lossRedBg } };
+          cell.font = { bold: true, color: { argb: 'FF' + lossRedFont } };
+        }
+      }
+
+      function applyPctStyle(cell, value) {
+        cell.value = value;
+        cell.numFmt = pctFmt;
+        cell.alignment = { horizontal: 'right' };
+        applyBorder(cell);
+        if (value >= 0) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + profitGreenBg } };
+          cell.font = { bold: true, color: { argb: 'FF' + profitGreenFont } };
+        } else {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + lossRedBg } };
+          cell.font = { bold: true, color: { argb: 'FF' + lossRedFont } };
+        }
+      }
+
       /* -------- Build Excel -------- */
       const workbook = new ExcelJS.Workbook();
       workbook.creator = 'Castlerock Homes';
+      workbook.created = new Date();
 
+      /* ========== SUMMARY SHEET ========== */
+      const summary = workbook.addWorksheet('Summary', {
+        properties: { tabColor: { argb: 'FF' + brandColor } }
+      });
+
+      // Title row
+      summary.mergeCells('A1:J1');
+      const titleCell = summary.getCell('A1');
+      titleCell.value = 'Location Report — Profit & Loss Summary';
+      titleCell.font = { size: 16, bold: true, color: { argb: 'FF' + brandColor } };
+      titleCell.alignment = { horizontal: 'left', vertical: 'middle' };
+      summary.getRow(1).height = 30;
+
+      // Subtitle with settings
+      summary.mergeCells('A2:J2');
+      const subtitleCell = summary.getCell('A2');
+      subtitleCell.value = `Generated: ${new Date().toLocaleDateString('en-GB')}  |  VAT on Sale: ${vatOnSale}%  |  Solicitor: ${solicitorPct}%  |  Auctioneer: ${auctioneerPct}%`;
+      subtitleCell.font = { size: 10, italic: true, color: { argb: 'FF757575' } };
+      subtitleCell.alignment = { horizontal: 'left' };
+
+      // Summary headers (row 4)
+      const summaryHeaders = [
+        'Site', 'Location', `Total Net (${currencySymbol})`, `Labour (${currencySymbol})`,
+        `Capital Cost (${currencySymbol})`, `Sale Price (${currencySymbol})`,
+        `Sale Price ex VAT (${currencySymbol})`, `Solicitor (${currencySymbol})`,
+        `Auctioneer (${currencySymbol})`, `Profit/Loss (${currencySymbol})`, 'Profit %'
+      ];
+      const summaryHeaderRow = summary.getRow(4);
+      summaryHeaderRow.height = 28;
+      summaryHeaders.forEach((h, i) => {
+        const cell = summaryHeaderRow.getCell(i + 1);
+        cell.value = h;
+        cell.fill = headerFill;
+        cell.font = headerFont;
+        cell.alignment = headerAlignment;
+        applyBorder(cell);
+      });
+
+      // Summary data rows
+      let summaryRowIdx = 5;
+      let grandTotalNet = 0, grandTotalLabour = 0, grandTotalCapital = 0;
+      let grandTotalSales = 0, grandTotalSalesExVat = 0;
+      let grandTotalSolicitor = 0, grandTotalAuctioneer = 0, grandTotalPL = 0;
+
+      data.forEach((r, idx) => {
+        const salePrice = Number(r.sale_price || 0);
+        const salePriceExVat = salePrice / (1 + vatRate);
+        const totalNet = Number(r.totals.net) + Number(r.totals.labour || 0);
+        const labour = Number(r.totals.labour || 0);
+        const capitalCost = Number(r.totals.capital_cost || 0);
+        const solicitorCost = salePrice * (solicitorPct / 100);
+        const auctioneerCost = salePrice * (auctioneerPct / 100);
+        const profitLoss = calcProfitLoss(r);
+        const profitPctVal = salePriceExVat > 0 ? profitLoss / salePriceExVat : 0;
+
+        grandTotalNet += totalNet;
+        grandTotalLabour += labour;
+        grandTotalCapital += capitalCost;
+        grandTotalSales += salePrice;
+        grandTotalSalesExVat += salePriceExVat;
+        grandTotalSolicitor += solicitorCost;
+        grandTotalAuctioneer += auctioneerCost;
+        grandTotalPL += profitLoss;
+
+        const row = summary.getRow(summaryRowIdx);
+        const isAlt = idx % 2 === 1;
+        const altFill = isAlt
+          ? { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + lightGrayBg } }
+          : undefined;
+
+        // Site
+        const siteCell = row.getCell(1);
+        siteCell.value = r.site;
+        siteCell.alignment = { horizontal: 'left' };
+        applyBorder(siteCell);
+        if (altFill) siteCell.fill = altFill;
+
+        // Location
+        const locCell = row.getCell(2);
+        locCell.value = r.location;
+        locCell.alignment = { horizontal: 'left' };
+        applyBorder(locCell);
+        if (altFill) locCell.fill = altFill;
+
+        // Total Net
+        applyCurrencyCell(row.getCell(3), totalNet);
+        if (altFill) row.getCell(3).fill = altFill;
+
+        // Labour
+        applyCurrencyCell(row.getCell(4), labour);
+        if (altFill) row.getCell(4).fill = altFill;
+
+        // Capital Cost
+        applyCurrencyCell(row.getCell(5), capitalCost);
+        if (altFill) row.getCell(5).fill = altFill;
+
+        // Sale Price
+        applyCurrencyCell(row.getCell(6), salePrice);
+        if (altFill) row.getCell(6).fill = altFill;
+
+        // Sale Price ex VAT
+        applyCurrencyCell(row.getCell(7), salePriceExVat);
+        if (altFill) row.getCell(7).fill = altFill;
+
+        // Solicitor
+        applyCurrencyCell(row.getCell(8), solicitorCost);
+        if (altFill) row.getCell(8).fill = altFill;
+
+        // Auctioneer
+        applyCurrencyCell(row.getCell(9), auctioneerCost);
+        if (altFill) row.getCell(9).fill = altFill;
+
+        // Profit/Loss
+        applyProfitStyle(row.getCell(10), profitLoss);
+
+        // Profit %
+        applyPctStyle(row.getCell(11), profitPctVal);
+
+        summaryRowIdx++;
+      });
+
+      // Summary totals row
+      const totalRowIdx = summaryRowIdx;
+      const totalsRow = summary.getRow(totalRowIdx);
+      totalsRow.height = 24;
+      const totalsFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + brandColor } };
+      const totalsFont = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+
+      const totalsLabelCell = totalsRow.getCell(1);
+      totalsLabelCell.value = 'TOTAL';
+      totalsLabelCell.fill = totalsFill;
+      totalsLabelCell.font = totalsFont;
+      totalsLabelCell.alignment = { horizontal: 'left' };
+      applyBorder(totalsLabelCell);
+
+      totalsRow.getCell(2).value = `${data.length} locations`;
+      totalsRow.getCell(2).fill = totalsFill;
+      totalsRow.getCell(2).font = totalsFont;
+      applyBorder(totalsRow.getCell(2));
+
+      const grandTotals = [
+        grandTotalNet, grandTotalLabour, grandTotalCapital,
+        grandTotalSales, grandTotalSalesExVat,
+        grandTotalSolicitor, grandTotalAuctioneer
+      ];
+      grandTotals.forEach((val, i) => {
+        const cell = totalsRow.getCell(i + 3);
+        cell.value = val;
+        cell.numFmt = currFmt;
+        cell.fill = totalsFill;
+        cell.font = totalsFont;
+        cell.alignment = { horizontal: 'right' };
+        applyBorder(cell);
+      });
+
+      // Grand total P/L
+      const grandPLCell = totalsRow.getCell(10);
+      grandPLCell.value = grandTotalPL;
+      grandPLCell.numFmt = currFmt;
+      grandPLCell.font = { bold: true, color: { argb: grandTotalPL >= 0 ? 'FF' + profitGreenFont : 'FF' + lossRedFont }, size: 11 };
+      grandPLCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: grandTotalPL >= 0 ? 'FF' + profitGreenBg : 'FF' + lossRedBg } };
+      applyBorder(grandPLCell);
+
+      // Grand avg profit %
+      const grandAvgPct = data.length > 0
+        ? data.reduce((sum, r) => {
+            const sp = Number(r.sale_price || 0) / (1 + vatRate);
+            return sum + (sp > 0 ? calcProfitLoss(r) / sp : 0);
+          }, 0) / data.length
+        : 0;
+      const grandPctCell = totalsRow.getCell(11);
+      grandPctCell.value = grandAvgPct;
+      grandPctCell.numFmt = pctFmt;
+      grandPctCell.font = { bold: true, color: { argb: grandAvgPct >= 0 ? 'FF' + profitGreenFont : 'FF' + lossRedFont }, size: 11 };
+      grandPctCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: grandAvgPct >= 0 ? 'FF' + profitGreenBg : 'FF' + lossRedBg } };
+      applyBorder(grandPctCell);
+
+      // Summary column widths
+      summary.getColumn(1).width = 22;
+      summary.getColumn(2).width = 22;
+      [3, 4, 5, 6, 7, 8, 9, 10].forEach(c => { summary.getColumn(c).width = 18; });
+      summary.getColumn(11).width = 12;
+      summary.views = [{ state: 'frozen', ySplit: 4, xSplit: 2 }];
+
+      /* ========== PER-SITE DETAIL SHEETS ========== */
       for (const [siteName, rows] of Object.entries(sites)) {
-        const sheet = workbook.addWorksheet(siteName.substring(0, 31));
+        const sheetName = siteName.length > 28 ? siteName.substring(0, 28) + '...' : siteName;
+        const sheet = workbook.addWorksheet(sheetName);
         let rowCursor = 1;
 
         // Site title
-        sheet.mergeCells(rowCursor, 1, rowCursor, 3);
-        sheet.getCell(rowCursor, 1).value = siteName;
-        sheet.getCell(rowCursor, 1).font = { size: 16, bold: true };
+        sheet.mergeCells(rowCursor, 1, rowCursor, 7);
+        const siteTitleCell = sheet.getCell(rowCursor, 1);
+        siteTitleCell.value = siteName;
+        siteTitleCell.font = { size: 16, bold: true, color: { argb: 'FF' + brandColor } };
+        siteTitleCell.alignment = { vertical: 'middle' };
+        sheet.getRow(rowCursor).height = 28;
+        rowCursor++;
+
+        // Site subtitle
+        sheet.mergeCells(rowCursor, 1, rowCursor, 7);
+        sheet.getCell(rowCursor, 1).value = `${rows.length} locations  |  Generated: ${new Date().toLocaleDateString('en-GB')}`;
+        sheet.getCell(rowCursor, 1).font = { size: 10, italic: true, color: { argb: 'FF757575' } };
         rowCursor += 2;
 
+        // Site overview table header
+        const overviewHeaders = [
+          'Location', `Total Net (${currencySymbol})`, `Labour (${currencySymbol})`,
+          `Sale Price (${currencySymbol})`, `Profit/Loss (${currencySymbol})`, 'Profit %'
+        ];
+        const ohRow = sheet.getRow(rowCursor);
+        ohRow.height = 24;
+        overviewHeaders.forEach((h, i) => {
+          const cell = ohRow.getCell(i + 1);
+          cell.value = h;
+          cell.fill = headerFill;
+          cell.font = headerFont;
+          cell.alignment = headerAlignment;
+          applyBorder(cell);
+        });
+        rowCursor++;
+
+        // Site overview data rows
+        let siteTotalNet = 0, siteTotalSales = 0, siteTotalPL = 0;
+        rows.forEach((loc, idx) => {
+          const totalNet = Number(loc.totals.net) + Number(loc.totals.labour || 0);
+          const labour = Number(loc.totals.labour || 0);
+          const salePrice = Number(loc.sale_price || 0);
+          const profitLoss = calcProfitLoss(loc);
+          const salePriceExVat = salePrice / (1 + vatRate);
+          const profitPctVal = salePriceExVat > 0 ? profitLoss / salePriceExVat : 0;
+
+          siteTotalNet += totalNet;
+          siteTotalSales += salePrice;
+          siteTotalPL += profitLoss;
+
+          const row = sheet.getRow(rowCursor);
+          const isAlt = idx % 2 === 1;
+          const altFill = isAlt
+            ? { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + lightGrayBg } }
+            : undefined;
+
+          const locCell = row.getCell(1);
+          locCell.value = loc.location;
+          locCell.font = { bold: true };
+          locCell.alignment = { horizontal: 'left' };
+          applyBorder(locCell);
+          if (altFill) locCell.fill = altFill;
+
+          applyCurrencyCell(row.getCell(2), totalNet);
+          if (altFill) row.getCell(2).fill = altFill;
+
+          applyCurrencyCell(row.getCell(3), labour);
+          if (altFill) row.getCell(3).fill = altFill;
+
+          applyCurrencyCell(row.getCell(4), salePrice);
+          if (altFill) row.getCell(4).fill = altFill;
+
+          applyProfitStyle(row.getCell(5), profitLoss);
+          applyPctStyle(row.getCell(6), profitPctVal);
+
+          rowCursor++;
+        });
+
+        // Site totals row
+        const siteTotal = sheet.getRow(rowCursor);
+        siteTotal.height = 24;
+        const stCell = siteTotal.getCell(1);
+        stCell.value = 'SITE TOTAL';
+        stCell.fill = totalsFill;
+        stCell.font = totalsFont;
+        applyBorder(stCell);
+
+        const stNetCell = siteTotal.getCell(2);
+        stNetCell.value = siteTotalNet;
+        stNetCell.numFmt = currFmt;
+        stNetCell.fill = totalsFill;
+        stNetCell.font = totalsFont;
+        stNetCell.alignment = { horizontal: 'right' };
+        applyBorder(stNetCell);
+
+        siteTotal.getCell(3).fill = totalsFill;
+        applyBorder(siteTotal.getCell(3));
+
+        const stSalesCell = siteTotal.getCell(4);
+        stSalesCell.value = siteTotalSales;
+        stSalesCell.numFmt = currFmt;
+        stSalesCell.fill = totalsFill;
+        stSalesCell.font = totalsFont;
+        stSalesCell.alignment = { horizontal: 'right' };
+        applyBorder(stSalesCell);
+
+        const stPLCell = siteTotal.getCell(5);
+        stPLCell.value = siteTotalPL;
+        stPLCell.numFmt = currFmt;
+        stPLCell.font = { bold: true, color: { argb: siteTotalPL >= 0 ? 'FF' + profitGreenFont : 'FF' + lossRedFont }, size: 11 };
+        stPLCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: siteTotalPL >= 0 ? 'FF' + profitGreenBg : 'FF' + lossRedBg } };
+        applyBorder(stPLCell);
+
+        siteTotal.getCell(6).fill = totalsFill;
+        applyBorder(siteTotal.getCell(6));
+
+        rowCursor += 3;
+
+        // Detailed breakdowns per location
         rows.forEach(loc => {
-          // Location title
-          sheet.mergeCells(rowCursor, 1, rowCursor, 3);
-          sheet.getCell(rowCursor, 1).value = loc.location;
-          sheet.getCell(rowCursor, 1).font = { size: 13, bold: true };
+          const salePrice = Number(loc.sale_price || 0);
+          const salePriceExVat = salePrice / (1 + vatRate);
+          const labour = Number(loc.totals.labour || 0);
+          const capitalCost = Number(loc.totals.capital_cost || 0);
+          const solicitorCost = salePrice * (solicitorPct / 100);
+          const auctioneerCost = salePrice * (auctioneerPct / 100);
+          const profitLoss = calcProfitLoss(loc);
+          const profitPctVal = salePriceExVat > 0 ? profitLoss / salePriceExVat : 0;
+
+          // Location header
+          sheet.mergeCells(rowCursor, 1, rowCursor, 4);
+          const locTitle = sheet.getCell(rowCursor, 1);
+          locTitle.value = loc.location;
+          locTitle.font = { size: 13, bold: true, color: { argb: 'FF' + brandColor } };
+          locTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + brandColorLight } };
+          locTitle.alignment = { vertical: 'middle' };
+          locTitle.border = { bottom: { style: 'medium', color: { argb: 'FF' + brandColor } } };
+          [2, 3, 4].forEach(c => {
+            sheet.getCell(rowCursor, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + brandColorLight } };
+            sheet.getCell(rowCursor, c).border = { bottom: { style: 'medium', color: { argb: 'FF' + brandColor } } };
+          });
+          sheet.getRow(rowCursor).height = 24;
           rowCursor++;
 
-// Build table rows from stages
-const tableRows = loc.stages.map(s => ([
-  s.stage,
-  s.net,
-  s.gross
-]));
+          // Stage breakdown header
+          const stgHdrRow = sheet.getRow(rowCursor);
+          ['Stage', `Net (${currencySymbol})`, `Gross (${currencySymbol})`].forEach((h, i) => {
+            const cell = stgHdrRow.getCell(i + 1);
+            cell.value = h;
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+            cell.font = { bold: true, size: 10 };
+            cell.alignment = { horizontal: i === 0 ? 'left' : 'center' };
+            applyBorder(cell);
+          });
+          rowCursor++;
 
-// Create Excel table (with filters + totals)
-sheet.addTable({
-  name: `T_${siteName.replace(/\W/g, '')}_${loc.location_id}`,
-  ref: `A${rowCursor}`,
-  headerRow: true,
-  totalsRow: true,
-  style: {
-    theme: 'TableStyleMedium9',
-    showRowStripes: true
-  },
-  columns: [
-    { name: 'Stage', totalsRowLabel: 'TOTAL' },
-    { name: 'Net (€)', totalsRowFunction: 'sum' },
-    { name: 'Gross (€)', totalsRowFunction: 'sum' }
-  ],
-  rows: tableRows
-});
+          // Stage rows
+          loc.stages.forEach(s => {
+            const stgRow = sheet.getRow(rowCursor);
+            const stgCell = stgRow.getCell(1);
+            stgCell.value = s.stage;
+            stgCell.alignment = { horizontal: 'left' };
+            applyBorder(stgCell);
+            applyCurrencyCell(stgRow.getCell(2), s.net);
+            applyCurrencyCell(stgRow.getCell(3), s.gross);
+            rowCursor++;
+          });
 
-// Currency formatting
-['B', 'C'].forEach(col => {
-  sheet.getColumn(col).numFmt = '€#,##0.00';
-});
+          // Stage totals
+          const stgTotalRow = sheet.getRow(rowCursor);
+          const stgTotalLabel = stgTotalRow.getCell(1);
+          stgTotalLabel.value = 'Stage Total';
+          stgTotalLabel.font = { bold: true };
+          stgTotalLabel.alignment = { horizontal: 'left' };
+          applyBorder(stgTotalLabel);
+          const stgNetTotal = loc.stages.reduce((s, st) => s + st.net, 0);
+          const stgGrossTotal = loc.stages.reduce((s, st) => s + st.gross, 0);
+          applyCurrencyCell(stgTotalRow.getCell(2), stgNetTotal);
+          stgTotalRow.getCell(2).font = { bold: true };
+          applyCurrencyCell(stgTotalRow.getCell(3), stgGrossTotal);
+          stgTotalRow.getCell(3).font = { bold: true };
+          rowCursor += 2;
 
-// Advance cursor: header + rows + totals + spacing
-rowCursor += tableRows.length + 3;
+          // Profit/Loss breakdown section
+          const plTitle = sheet.getRow(rowCursor);
+          sheet.mergeCells(rowCursor, 1, rowCursor, 2);
+          plTitle.getCell(1).value = 'Profit & Loss Breakdown';
+          plTitle.getCell(1).font = { bold: true, size: 11, color: { argb: 'FF' + brandColor } };
+          plTitle.getCell(1).border = { bottom: { style: 'thin', color: { argb: 'FF' + brandColor } } };
+          plTitle.getCell(2).border = { bottom: { style: 'thin', color: { argb: 'FF' + brandColor } } };
+          rowCursor++;
 
+          const plItems = [
+            ['Total Net (inc. Labour)', Number(loc.totals.net) + labour],
+            ['Labour Cost', labour],
+            ['Capital Cost', capitalCost],
+            ['Sale Price', salePrice],
+            ['Sale Price (ex VAT)', salePriceExVat],
+            [`Solicitor (${solicitorPct}%)`, solicitorCost],
+            [`Auctioneer (${auctioneerPct}%)`, auctioneerCost]
+          ];
+
+          plItems.forEach(([label, val]) => {
+            const plRow = sheet.getRow(rowCursor);
+            const plLabel = plRow.getCell(1);
+            plLabel.value = label;
+            plLabel.alignment = { horizontal: 'left' };
+            plLabel.font = { size: 10 };
+            applyBorder(plLabel);
+            applyCurrencyCell(plRow.getCell(2), val);
+            rowCursor++;
+          });
+
+          // Profit/Loss result
+          const plResultRow = sheet.getRow(rowCursor);
+          const plResultLabel = plResultRow.getCell(1);
+          plResultLabel.value = 'Profit / Loss';
+          plResultLabel.font = { bold: true, size: 11 };
+          plResultLabel.alignment = { horizontal: 'left' };
+          applyBorder(plResultLabel);
+          applyProfitStyle(plResultRow.getCell(2), profitLoss);
+
+          rowCursor++;
+
+          // Profit % row
+          const pctResultRow = sheet.getRow(rowCursor);
+          const pctResultLabel = pctResultRow.getCell(1);
+          pctResultLabel.value = 'Profit %';
+          pctResultLabel.font = { bold: true, size: 11 };
+          pctResultLabel.alignment = { horizontal: 'left' };
+          applyBorder(pctResultLabel);
+          applyPctStyle(pctResultRow.getCell(2), profitPctVal);
+
+          rowCursor += 3;
         });
 
-        // Formatting
-        sheet.getColumn('A').width = 30;
-        ['B', 'C'].forEach(col => {
-          sheet.getColumn(col).numFmt = '€#,##0.00';
-          sheet.getColumn(col).width = 18;
-        });
+        // Column widths
+        sheet.getColumn(1).width = 30;
+        sheet.getColumn(2).width = 20;
+        sheet.getColumn(3).width = 20;
+        sheet.getColumn(4).width = 20;
+        sheet.getColumn(5).width = 20;
+        sheet.getColumn(6).width = 14;
 
-        sheet.views = [{ state: 'frozen', ySplit: 2 }];
+        sheet.views = [{ state: 'frozen', ySplit: 4 }];
       }
 
       res.setHeader(
@@ -546,22 +998,11 @@ rowCursor += tableRows.length + 3;
       );
       res.setHeader(
         'Content-Disposition',
-        'attachment; filename="po-location-stage-breakdown.xlsx"'
+        'attachment; filename="location-report.xlsx"'
       );
 
       const buffer = await workbook.xlsx.writeBuffer();
-
-res.setHeader(
-  'Content-Type',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-);
-res.setHeader(
-  'Content-Disposition',
-  'attachment; filename="po-location-stage-breakdown.xlsx"'
-);
-
-res.send(Buffer.from(buffer));
-
+      res.send(Buffer.from(buffer));
 
     } catch (err) {
       console.error('EXCEL EXPORT FAILED:', err);
