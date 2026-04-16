@@ -56,6 +56,7 @@ async function getLocationBreakdownData(showSpreadLocations) {
       l.name,
       l.site_id,
       l.sale_price,
+      l.floor_area,
       s.name AS site
     FROM locations l
     JOIN sites s ON s.id = l.site_id
@@ -71,7 +72,8 @@ async function getLocationBreakdownData(showSpreadLocations) {
       name: l.name,
       site_id: l.site_id,
       site: l.site,
-      sale_price: Number(l.sale_price || 0)
+      sale_price: Number(l.sale_price || 0),
+      floor_area: l.floor_area ? Number(l.floor_area) : null
     });
 
     if (!locationsBySite.has(l.site_id)) {
@@ -268,19 +270,45 @@ async function getLocationBreakdownData(showSpreadLocations) {
 
         targets = [...new Set(targets)].filter(id => id && locationMap.has(id) && id !== sourceId);
 
-        if (targets.length === 0) return;
+        // Also filter out targets that are themselves sources (no chaining)
+        const eligibleTargets = targets.filter(id => !allSourceLocationIds.has(id));
 
-        const shareNet = sourceTotals.total_net / targets.length;
-        const shareGross = sourceTotals.total_gross / targets.length;
-        const shareInvoiced = sourceTotals.total_invoiced / targets.length;
-        const shareLabour = (sourceTotals.total_labour || 0) / targets.length;
-        const shareCapital = (sourceTotals.capital_cost || 0) / targets.length;
+        if (eligibleTargets.length === 0) return;
 
-        targets.forEach(targetId => {
-          // Skip if this target is itself a source location in another rule
-          if (allSourceLocationIds.has(targetId)) {
-            return;
+        // --- Build floor-area-weighted shares ---
+        // Separate targets into those with and without floor area
+        const withArea = [];
+        const withoutArea = [];
+        eligibleTargets.forEach(id => {
+          const info = locationMap.get(id);
+          if (info && info.floor_area && info.floor_area > 0) {
+            withArea.push({ id, area: info.floor_area });
+          } else {
+            withoutArea.push(id);
           }
+        });
+
+        // Compute per-target weight fraction
+        const targetWeights = new Map();
+
+        if (withArea.length === 0) {
+          // No floor areas at all → equal distribution
+          const equalWeight = 1 / eligibleTargets.length;
+          eligibleTargets.forEach(id => targetWeights.set(id, equalWeight));
+        } else if (withoutArea.length === 0) {
+          // All have floor area → pure proportional
+          const totalArea = withArea.reduce((sum, t) => sum + t.area, 0);
+          withArea.forEach(t => targetWeights.set(t.id, t.area / totalArea));
+        } else {
+          // Mixed: treat unknowns as having the average floor area of known targets
+          const avgArea = withArea.reduce((sum, t) => sum + t.area, 0) / withArea.length;
+          const totalArea = withArea.reduce((sum, t) => sum + t.area, 0) + (avgArea * withoutArea.length);
+          withArea.forEach(t => targetWeights.set(t.id, t.area / totalArea));
+          withoutArea.forEach(id => targetWeights.set(id, avgArea / totalArea));
+        }
+
+        eligibleTargets.forEach(targetId => {
+          const weight = targetWeights.get(targetId);
 
           if (!totalsMap.has(targetId)) {
             const info = locationMap.get(targetId);
@@ -299,22 +327,17 @@ async function getLocationBreakdownData(showSpreadLocations) {
           }
 
           const targetTotals = totalsMap.get(targetId);
-          targetTotals.total_net += shareNet;
-          targetTotals.total_gross += shareGross;
-          targetTotals.total_invoiced += shareInvoiced;
-          targetTotals.total_labour += shareLabour;
-          targetTotals.capital_cost += shareCapital;
+          targetTotals.total_net += sourceTotals.total_net * weight;
+          targetTotals.total_gross += sourceTotals.total_gross * weight;
+          targetTotals.total_invoiced += sourceTotals.total_invoiced * weight;
+          targetTotals.total_labour += (sourceTotals.total_labour || 0) * weight;
+          targetTotals.capital_cost += (sourceTotals.capital_cost || 0) * weight;
         });
 
         const sourceStages = stageMap.get(sourceId) || new Map();
         sourceStages.forEach(stage => {
-          const stageNet = stage.net / targets.length;
-          const stageGross = stage.gross / targets.length;
-          const stageInvoiced = stage.invoiced / targets.length;
-
-          targets.forEach(targetId => {
-            // Skip if this target is itself a source location in another rule
-            if (allSourceLocationIds.has(targetId)) return;
+          eligibleTargets.forEach(targetId => {
+            const weight = targetWeights.get(targetId);
 
             if (!stageMap.has(targetId)) {
               stageMap.set(targetId, new Map());
@@ -326,9 +349,9 @@ async function getLocationBreakdownData(showSpreadLocations) {
             }
 
             const targetStage = targetStages.get(stage.stage);
-            targetStage.net += stageNet;
-            targetStage.gross += stageGross;
-            targetStage.invoiced += stageInvoiced;
+            targetStage.net += stage.net * weight;
+            targetStage.gross += stage.gross * weight;
+            targetStage.invoiced += stage.invoiced * weight;
           });
         });
 
