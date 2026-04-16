@@ -37,6 +37,20 @@ function calcProfitLoss(r) {
   return salePriceExVat - netSpendIncLabour - capitalCost - solicitorCost - auctioneerCost;
 }
 
+function calcTargetProfit(r) {
+  if (r.expected_spent == null) return null;
+  const salePrice = num(r.sale_price);
+  const vatRate = getVatRate();
+  const salePriceExVat = salePrice / (1 + vatRate);
+  const solicitorPct = num(saleCostSettings.solicitorPct) / 100;
+  const auctioneerPct = num(saleCostSettings.auctioneerPct) / 100;
+  const solicitorCost = salePrice * solicitorPct;
+  const auctioneerCost = salePrice * auctioneerPct;
+  const capitalCost = num(r.totals.capital_cost || 0);
+  const expectedSpent = num(r.expected_spent);
+  return salePriceExVat - expectedSpent - capitalCost - solicitorCost - auctioneerCost;
+}
+
 /* =========================
    Load Report
    ========================= */
@@ -78,6 +92,11 @@ function renderReport() {
   const salePriceExVat = num(r.sale_price) / (1 + num(saleCostSettings.vatOnSale) / 100);
   const profitPct = salePriceExVat > 0 ? ((profitLoss / salePriceExVat) * 100).toFixed(1) : '0.0';
 
+  const targetProfit = calcTargetProfit(r);
+  const hasTarget = targetProfit != null;
+  const tpClass = hasTarget ? (targetProfit >= 0 ? 'profit-positive' : 'profit-negative') : '';
+  const targetPct = hasTarget && salePriceExVat > 0 ? ((targetProfit / salePriceExVat) * 100).toFixed(1) : null;
+
   // MAIN ROW
  table.innerHTML += `
   <tr class="main-row" data-target="${rowId}">
@@ -88,6 +107,9 @@ function renderReport() {
     <td>${euro(r.totals.net + (r.totals.labour || 0))}</td>
     <td>${euro(r.totals.labour || 0)}</td>
     <td>${euro(r.sale_price || 0)}</td>
+    <td>${r.expected_spent != null ? euro(r.expected_spent) : ''}</td>
+    <td class="${tpClass}">${hasTarget ? euro(targetProfit) : ''}</td>
+    <td class="${tpClass}">${targetPct != null ? targetPct + '%' : ''}</td>
     <td class="${plClass}">${euro(profitLoss)}</td>
     <td class="${plClass}">${profitPct}%</td>
   </tr>
@@ -104,7 +126,7 @@ function renderReport() {
 
   table.innerHTML += `
     <tr class="details-row" id="${rowId}">
-      <td colspan="7">
+      <td colspan="10">
         <table class="inner-table">
           <thead>
             <tr>
@@ -147,10 +169,22 @@ function renderReport() {
             <span class="detail-summary-label">Auctioneer (${(auctioneerPct * 100).toFixed(1)}%)</span>
             <span class="detail-summary-value">${euro(auctioneerCost)}</span>
           </div>
+          ${r.expected_spent != null ? `
+          <div class="detail-summary-item">
+            <span class="detail-summary-label">Expected Spent</span>
+            <span class="detail-summary-value">${euro(r.expected_spent)}</span>
+          </div>
+          ` : ''}
           <div class="detail-summary-item detail-summary-pl ${plClass}">
-            <span class="detail-summary-label">Profit/Loss</span>
+            <span class="detail-summary-label">Actual Profit/Loss</span>
             <span class="detail-summary-value">${euro(profitLoss)} (${profitPct}%)</span>
           </div>
+          ${hasTarget ? `
+          <div class="detail-summary-item detail-summary-pl ${tpClass}">
+            <span class="detail-summary-label">Target Profit/Loss</span>
+            <span class="detail-summary-value">${euro(targetProfit)} (${targetPct}%)</span>
+          </div>
+          ` : ''}
         </div>
       </td>
     </tr>
@@ -219,6 +253,22 @@ function sortData(data) {
         const aPct = aSPExVat > 0 ? (calcProfitLoss(a) / aSPExVat) * 100 : 0;
         const bPct = bSPExVat > 0 ? (calcProfitLoss(b) / bSPExVat) * 100 : 0;
         result = aPct - bPct;
+        break;
+      }
+      case 'expectedSpent':
+        result = num(a.expected_spent || 0) - num(b.expected_spent || 0);
+        break;
+      case 'targetProfit':
+        result = num(calcTargetProfit(a) || 0) - num(calcTargetProfit(b) || 0);
+        break;
+      case 'targetPct': {
+        const aTP = calcTargetProfit(a);
+        const bTP = calcTargetProfit(b);
+        const aSPExVat2 = num(a.sale_price) / (1 + num(saleCostSettings.vatOnSale) / 100);
+        const bSPExVat2 = num(b.sale_price) / (1 + num(saleCostSettings.vatOnSale) / 100);
+        const aTPct = aTP != null && aSPExVat2 > 0 ? (aTP / aSPExVat2) * 100 : 0;
+        const bTPct = bTP != null && bSPExVat2 > 0 ? (bTP / bSPExVat2) * 100 : 0;
+        result = aTPct - bTPct;
         break;
       }
       case 'site':

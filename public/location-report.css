@@ -59,10 +59,10 @@
 /* Lock parent columns */
 
 .po-table th:nth-child(1),
-.po-table td:nth-child(1) { width: 14%; }
+.po-table td:nth-child(1) { width: 10%; }
 
 .po-table th:nth-child(2),
-.po-table td:nth-child(2) { width: 20%; }
+.po-table td:nth-child(2) { width: 14%; }
 
 .po-table th:nth-child(3),
 .po-table td:nth-child(3),
@@ -71,14 +71,24 @@
 .po-table th:nth-child(5),
 .po-table td:nth-child(5),
 .po-table th:nth-child(6),
-.po-table td:nth-child(6) {
-  width: 13%;
+.po-table td:nth-child(6),
+.po-table th:nth-child(7),
+.po-table td:nth-child(7),
+.po-table th:nth-child(8),
+.po-table td:nth-child(8) {
+  width: 10%;
   text-align: right;
 }
 
-.po-table th:nth-child(7),
-.po-table td:nth-child(7) {
-  width: 8%;
+.po-table th:nth-child(9),
+.po-table td:nth-child(9) {
+  width: 10%;
+  text-align: right;
+}
+
+.po-table th:nth-child(10),
+.po-table td:nth-child(10) {
+  width: 6%;
   text-align: right;
 }
 

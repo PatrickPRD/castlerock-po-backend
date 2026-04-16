@@ -1923,7 +1923,7 @@ router.get(
   authorizeRoles('super_admin'),
   async (req, res) => {
     const [rows] = await db.query(
-      `SELECT l.id, l.name, l.type, l.sale_price, l.floor_area, l.site_id, s.name AS site
+      `SELECT l.id, l.name, l.type, l.sale_price, l.floor_area, l.expected_spent, l.site_id, s.name AS site
        FROM locations l
        JOIN sites s ON l.site_id = s.id
        ORDER BY s.name, l.name`
@@ -1937,7 +1937,7 @@ router.post(
   authenticate,
   authorizeRoles('super_admin'),
   async (req, res) => {
-    const { name, type, site_id, sale_price, floor_area } = req.body;
+    const { name, type, site_id, sale_price, floor_area, expected_spent } = req.body;
 
     if (!name || !site_id) {
       return res.status(400).json({
@@ -1947,11 +1947,12 @@ router.post(
 
     const parsedSalePrice = parseFloat(sale_price) || 0;
     const parsedFloorArea = floor_area ? parseFloat(floor_area) : null;
+    const parsedExpectedSpent = expected_spent ? parseFloat(expected_spent) : null;
 
     const [result] = await db.query(
-      `INSERT INTO locations (name, type, sale_price, floor_area, site_id)
-       VALUES (?, ?, ?, ?, ?)`,
-      [name.trim(), type || null, parsedSalePrice, parsedFloorArea, site_id]
+      `INSERT INTO locations (name, type, sale_price, floor_area, expected_spent, site_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [name.trim(), type || null, parsedSalePrice, parsedFloorArea, parsedExpectedSpent, site_id]
     );
 
     logAudit({
@@ -1959,7 +1960,7 @@ router.post(
       record_id: result.insertId,
       action: 'CREATE',
       old_data: null,
-      new_data: { name: name.trim(), type, sale_price: parsedSalePrice, floor_area: parsedFloorArea, site_id },
+      new_data: { name: name.trim(), type, sale_price: parsedSalePrice, floor_area: parsedFloorArea, expected_spent: parsedExpectedSpent, site_id },
       changed_by: req.user.id,
       req
     }).catch(err => console.error('Location create audit log failed:', err));
@@ -1979,7 +1980,7 @@ router.put(
   authorizeRoles('super_admin'),
   async (req, res) => {
     const locationId = req.params.id;
-    const { name, type, site_id, sale_price, floor_area } = req.body;
+    const { name, type, site_id, sale_price, floor_area, expected_spent } = req.body;
 
     if (!name || !site_id) {
       return res.status(400).json({
@@ -1989,6 +1990,7 @@ router.put(
 
     const parsedSalePrice = parseFloat(sale_price) || 0;
     const parsedFloorArea = floor_area ? parseFloat(floor_area) : null;
+    const parsedExpectedSpent = expected_spent ? parseFloat(expected_spent) : null;
 
     const [[oldLocation]] = await db.query(
       'SELECT * FROM locations WHERE id = ?',
@@ -1997,13 +1999,14 @@ router.put(
 
     await db.query(
       `UPDATE locations
-       SET name = ?, type = ?, sale_price = ?, floor_area = ?, site_id = ?
+       SET name = ?, type = ?, sale_price = ?, floor_area = ?, expected_spent = ?, site_id = ?
        WHERE id = ?`,
       [
         name.trim(),
         type || null,
         parsedSalePrice,
         parsedFloorArea,
+        parsedExpectedSpent,
         site_id,
         locationId
       ]
@@ -2014,8 +2017,8 @@ router.put(
         table_name: 'locations',
         record_id: locationId,
         action: 'UPDATE',
-        old_data: { name: oldLocation.name, type: oldLocation.type, sale_price: oldLocation.sale_price, floor_area: oldLocation.floor_area, site_id: oldLocation.site_id },
-        new_data: { name: name.trim(), type, sale_price: parsedSalePrice, floor_area: parsedFloorArea, site_id },
+        old_data: { name: oldLocation.name, type: oldLocation.type, sale_price: oldLocation.sale_price, floor_area: oldLocation.floor_area, expected_spent: oldLocation.expected_spent, site_id: oldLocation.site_id },
+        new_data: { name: name.trim(), type, sale_price: parsedSalePrice, floor_area: parsedFloorArea, expected_spent: parsedExpectedSpent, site_id },
         changed_by: req.user.id,
         req
       }).catch(err => console.error('Location update audit log failed:', err));

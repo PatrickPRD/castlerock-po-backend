@@ -57,6 +57,7 @@ async function getLocationBreakdownData(showSpreadLocations) {
       l.site_id,
       l.sale_price,
       l.floor_area,
+      l.expected_spent,
       s.name AS site
     FROM locations l
     JOIN sites s ON s.id = l.site_id
@@ -73,7 +74,8 @@ async function getLocationBreakdownData(showSpreadLocations) {
       site_id: l.site_id,
       site: l.site,
       sale_price: Number(l.sale_price || 0),
-      floor_area: l.floor_area ? Number(l.floor_area) : null
+      floor_area: l.floor_area ? Number(l.floor_area) : null,
+      expected_spent: l.expected_spent != null ? Number(l.expected_spent) : null
     });
 
     if (!locationsBySite.has(l.site_id)) {
@@ -376,11 +378,14 @@ async function getLocationBreakdownData(showSpreadLocations) {
       if (a.site > b.site) return 1;
       return a.location.localeCompare(b.location);
     })
-    .map(loc => ({
+    .map(loc => {
+      const info = locationMap.get(loc.location_id);
+      return {
       site: loc.site,
       location: loc.location,
       location_id: loc.location_id,
       sale_price: Number(loc.sale_price || 0),
+      expected_spent: info ? info.expected_spent : null,
       totals: {
         net: Number(loc.total_net),
         gross: Number(loc.total_gross),
@@ -394,7 +399,8 @@ async function getLocationBreakdownData(showSpreadLocations) {
         gross: Number(s.gross),
         uninvoiced: Number(s.gross) - Number(s.invoiced)
       }))
-    }));
+    };
+    });
 
 
   return result;
@@ -507,6 +513,17 @@ router.get(
         return salePriceExVat - netSpendIncLabour - capitalCost - solicitorCost - auctioneerCost;
       }
 
+      function calcTargetProfit(r) {
+        if (r.expected_spent == null) return null;
+        const salePrice = Number(r.sale_price || 0);
+        const salePriceExVat = salePrice / (1 + vatRate);
+        const solicitorCost = salePrice * (solicitorPct / 100);
+        const auctioneerCost = salePrice * (auctioneerPct / 100);
+        const capitalCost = Number(r.totals.capital_cost || 0);
+        const expectedSpent = Number(r.expected_spent);
+        return salePriceExVat - expectedSpent - capitalCost - solicitorCost - auctioneerCost;
+      }
+
       /* -------- Group by site -------- */
       const sites = {};
       data.forEach(r => {
@@ -580,7 +597,7 @@ router.get(
       });
 
       // Title row
-      summary.mergeCells('A1:J1');
+      summary.mergeCells('A1:N1');
       const titleCell = summary.getCell('A1');
       titleCell.value = 'Location Report — Profit & Loss Summary';
       titleCell.font = { size: 16, bold: true, color: { argb: 'FF' + brandColor } };
@@ -588,7 +605,7 @@ router.get(
       summary.getRow(1).height = 30;
 
       // Subtitle with settings
-      summary.mergeCells('A2:J2');
+      summary.mergeCells('A2:N2');
       const subtitleCell = summary.getCell('A2');
       subtitleCell.value = `Generated: ${new Date().toLocaleDateString('en-GB')}  |  VAT on Sale: ${vatOnSale}%  |  Solicitor: ${solicitorPct}%  |  Auctioneer: ${auctioneerPct}%`;
       subtitleCell.font = { size: 10, italic: true, color: { argb: 'FF757575' } };
@@ -599,7 +616,9 @@ router.get(
         'Site', 'Location', `Total Net (${currencySymbol})`, `Labour (${currencySymbol})`,
         `Capital Cost (${currencySymbol})`, `Sale Price (${currencySymbol})`,
         `Sale Price ex VAT (${currencySymbol})`, `Solicitor (${currencySymbol})`,
-        `Auctioneer (${currencySymbol})`, `Profit/Loss (${currencySymbol})`, 'Profit %'
+        `Auctioneer (${currencySymbol})`, `Expected Spent (${currencySymbol})`,
+        `Target Profit (${currencySymbol})`, 'Target %',
+        `Actual Profit (${currencySymbol})`, 'Actual %'
       ];
       const summaryHeaderRow = summary.getRow(4);
       summaryHeaderRow.height = 28;
@@ -616,7 +635,8 @@ router.get(
       let summaryRowIdx = 5;
       let grandTotalNet = 0, grandTotalLabour = 0, grandTotalCapital = 0;
       let grandTotalSales = 0, grandTotalSalesExVat = 0;
-      let grandTotalSolicitor = 0, grandTotalAuctioneer = 0, grandTotalPL = 0;
+      let grandTotalSolicitor = 0, grandTotalAuctioneer = 0;
+      let grandTotalExpectedSpent = 0, grandTotalTargetPL = 0, grandTotalPL = 0;
 
       data.forEach((r, idx) => {
         const salePrice = Number(r.sale_price || 0);
@@ -626,6 +646,9 @@ router.get(
         const capitalCost = Number(r.totals.capital_cost || 0);
         const solicitorCost = salePrice * (solicitorPct / 100);
         const auctioneerCost = salePrice * (auctioneerPct / 100);
+        const expectedSpent = r.expected_spent != null ? Number(r.expected_spent) : null;
+        const targetProfit = calcTargetProfit(r);
+        const targetPctVal = targetProfit != null && salePriceExVat > 0 ? targetProfit / salePriceExVat : null;
         const profitLoss = calcProfitLoss(r);
         const profitPctVal = salePriceExVat > 0 ? profitLoss / salePriceExVat : 0;
 
@@ -636,6 +659,8 @@ router.get(
         grandTotalSalesExVat += salePriceExVat;
         grandTotalSolicitor += solicitorCost;
         grandTotalAuctioneer += auctioneerCost;
+        if (expectedSpent != null) grandTotalExpectedSpent += expectedSpent;
+        if (targetProfit != null) grandTotalTargetPL += targetProfit;
         grandTotalPL += profitLoss;
 
         const row = summary.getRow(summaryRowIdx);
@@ -686,11 +711,39 @@ router.get(
         applyCurrencyCell(row.getCell(9), auctioneerCost);
         if (altFill) row.getCell(9).fill = altFill;
 
-        // Profit/Loss
-        applyProfitStyle(row.getCell(10), profitLoss);
+        // Expected Spent
+        const esCell = row.getCell(10);
+        if (expectedSpent != null) {
+          applyCurrencyCell(esCell, expectedSpent);
+        } else {
+          esCell.value = '';
+          applyBorder(esCell);
+        }
+        if (altFill) esCell.fill = altFill;
 
-        // Profit %
-        applyPctStyle(row.getCell(11), profitPctVal);
+        // Target Profit
+        if (targetProfit != null) {
+          applyProfitStyle(row.getCell(11), targetProfit);
+        } else {
+          row.getCell(11).value = '';
+          applyBorder(row.getCell(11));
+          if (altFill) row.getCell(11).fill = altFill;
+        }
+
+        // Target %
+        if (targetPctVal != null) {
+          applyPctStyle(row.getCell(12), targetPctVal);
+        } else {
+          row.getCell(12).value = '';
+          applyBorder(row.getCell(12));
+          if (altFill) row.getCell(12).fill = altFill;
+        }
+
+        // Actual Profit/Loss
+        applyProfitStyle(row.getCell(13), profitLoss);
+
+        // Actual Profit %
+        applyPctStyle(row.getCell(14), profitPctVal);
 
         summaryRowIdx++;
       });
@@ -729,8 +782,41 @@ router.get(
         applyBorder(cell);
       });
 
-      // Grand total P/L
-      const grandPLCell = totalsRow.getCell(10);
+      // Grand total Expected Spent
+      const grandESCell = totalsRow.getCell(10);
+      grandESCell.value = grandTotalExpectedSpent;
+      grandESCell.numFmt = currFmt;
+      grandESCell.fill = totalsFill;
+      grandESCell.font = totalsFont;
+      grandESCell.alignment = { horizontal: 'right' };
+      applyBorder(grandESCell);
+
+      // Grand total Target P/L
+      const grandTPLCell = totalsRow.getCell(11);
+      grandTPLCell.value = grandTotalTargetPL;
+      grandTPLCell.numFmt = currFmt;
+      grandTPLCell.font = { bold: true, color: { argb: grandTotalTargetPL >= 0 ? 'FF' + profitGreenFont : 'FF' + lossRedFont }, size: 11 };
+      grandTPLCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: grandTotalTargetPL >= 0 ? 'FF' + profitGreenBg : 'FF' + lossRedBg } };
+      applyBorder(grandTPLCell);
+
+      // Grand avg target %
+      const locationsWithTarget = data.filter(r => r.expected_spent != null);
+      const grandAvgTargetPct = locationsWithTarget.length > 0
+        ? locationsWithTarget.reduce((sum, r) => {
+            const sp = Number(r.sale_price || 0) / (1 + vatRate);
+            const tp = calcTargetProfit(r);
+            return sum + (sp > 0 && tp != null ? tp / sp : 0);
+          }, 0) / locationsWithTarget.length
+        : 0;
+      const grandTPctCell = totalsRow.getCell(12);
+      grandTPctCell.value = grandAvgTargetPct;
+      grandTPctCell.numFmt = pctFmt;
+      grandTPctCell.font = { bold: true, color: { argb: grandAvgTargetPct >= 0 ? 'FF' + profitGreenFont : 'FF' + lossRedFont }, size: 11 };
+      grandTPctCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: grandAvgTargetPct >= 0 ? 'FF' + profitGreenBg : 'FF' + lossRedBg } };
+      applyBorder(grandTPctCell);
+
+      // Grand total Actual P/L
+      const grandPLCell = totalsRow.getCell(13);
       grandPLCell.value = grandTotalPL;
       grandPLCell.numFmt = currFmt;
       grandPLCell.font = { bold: true, color: { argb: grandTotalPL >= 0 ? 'FF' + profitGreenFont : 'FF' + lossRedFont }, size: 11 };
@@ -744,7 +830,7 @@ router.get(
             return sum + (sp > 0 ? calcProfitLoss(r) / sp : 0);
           }, 0) / data.length
         : 0;
-      const grandPctCell = totalsRow.getCell(11);
+      const grandPctCell = totalsRow.getCell(14);
       grandPctCell.value = grandAvgPct;
       grandPctCell.numFmt = pctFmt;
       grandPctCell.font = { bold: true, color: { argb: grandAvgPct >= 0 ? 'FF' + profitGreenFont : 'FF' + lossRedFont }, size: 11 };
@@ -754,8 +840,9 @@ router.get(
       // Summary column widths
       summary.getColumn(1).width = 22;
       summary.getColumn(2).width = 22;
-      [3, 4, 5, 6, 7, 8, 9, 10].forEach(c => { summary.getColumn(c).width = 18; });
-      summary.getColumn(11).width = 12;
+      [3, 4, 5, 6, 7, 8, 9, 10, 11, 13].forEach(c => { summary.getColumn(c).width = 18; });
+      summary.getColumn(12).width = 12;
+      summary.getColumn(14).width = 12;
       summary.views = [{ state: 'frozen', ySplit: 4, xSplit: 2 }];
 
       /* ========== PER-SITE DETAIL SHEETS ========== */
@@ -765,7 +852,7 @@ router.get(
         let rowCursor = 1;
 
         // Site title
-        sheet.mergeCells(rowCursor, 1, rowCursor, 7);
+        sheet.mergeCells(rowCursor, 1, rowCursor, 9);
         const siteTitleCell = sheet.getCell(rowCursor, 1);
         siteTitleCell.value = siteName;
         siteTitleCell.font = { size: 16, bold: true, color: { argb: 'FF' + brandColor } };
@@ -774,7 +861,7 @@ router.get(
         rowCursor++;
 
         // Site subtitle
-        sheet.mergeCells(rowCursor, 1, rowCursor, 7);
+        sheet.mergeCells(rowCursor, 1, rowCursor, 9);
         sheet.getCell(rowCursor, 1).value = `${rows.length} locations  |  Generated: ${new Date().toLocaleDateString('en-GB')}`;
         sheet.getCell(rowCursor, 1).font = { size: 10, italic: true, color: { argb: 'FF757575' } };
         rowCursor += 2;
@@ -782,7 +869,9 @@ router.get(
         // Site overview table header
         const overviewHeaders = [
           'Location', `Total Net (${currencySymbol})`, `Labour (${currencySymbol})`,
-          `Sale Price (${currencySymbol})`, `Profit/Loss (${currencySymbol})`, 'Profit %'
+          `Sale Price (${currencySymbol})`, `Expected Spent (${currencySymbol})`,
+          `Target Profit (${currencySymbol})`, 'Target %',
+          `Actual Profit (${currencySymbol})`, 'Actual %'
         ];
         const ohRow = sheet.getRow(rowCursor);
         ohRow.height = 24;
@@ -797,17 +886,21 @@ router.get(
         rowCursor++;
 
         // Site overview data rows
-        let siteTotalNet = 0, siteTotalSales = 0, siteTotalPL = 0;
+        let siteTotalNet = 0, siteTotalSales = 0, siteTotalTargetPL = 0, siteTotalPL = 0;
         rows.forEach((loc, idx) => {
           const totalNet = Number(loc.totals.net) + Number(loc.totals.labour || 0);
           const labour = Number(loc.totals.labour || 0);
           const salePrice = Number(loc.sale_price || 0);
+          const expectedSpent = loc.expected_spent != null ? Number(loc.expected_spent) : null;
+          const targetProfit = calcTargetProfit(loc);
           const profitLoss = calcProfitLoss(loc);
           const salePriceExVat = salePrice / (1 + vatRate);
+          const targetPctVal = targetProfit != null && salePriceExVat > 0 ? targetProfit / salePriceExVat : null;
           const profitPctVal = salePriceExVat > 0 ? profitLoss / salePriceExVat : 0;
 
           siteTotalNet += totalNet;
           siteTotalSales += salePrice;
+          if (targetProfit != null) siteTotalTargetPL += targetProfit;
           siteTotalPL += profitLoss;
 
           const row = sheet.getRow(rowCursor);
@@ -832,8 +925,36 @@ router.get(
           applyCurrencyCell(row.getCell(4), salePrice);
           if (altFill) row.getCell(4).fill = altFill;
 
-          applyProfitStyle(row.getCell(5), profitLoss);
-          applyPctStyle(row.getCell(6), profitPctVal);
+          // Expected Spent
+          const esCell2 = row.getCell(5);
+          if (expectedSpent != null) {
+            applyCurrencyCell(esCell2, expectedSpent);
+          } else {
+            esCell2.value = '';
+            applyBorder(esCell2);
+          }
+          if (altFill) esCell2.fill = altFill;
+
+          // Target Profit
+          if (targetProfit != null) {
+            applyProfitStyle(row.getCell(6), targetProfit);
+          } else {
+            row.getCell(6).value = '';
+            applyBorder(row.getCell(6));
+            if (altFill) row.getCell(6).fill = altFill;
+          }
+
+          // Target %
+          if (targetPctVal != null) {
+            applyPctStyle(row.getCell(7), targetPctVal);
+          } else {
+            row.getCell(7).value = '';
+            applyBorder(row.getCell(7));
+            if (altFill) row.getCell(7).fill = altFill;
+          }
+
+          applyProfitStyle(row.getCell(8), profitLoss);
+          applyPctStyle(row.getCell(9), profitPctVal);
 
           rowCursor++;
         });
@@ -866,15 +987,31 @@ router.get(
         stSalesCell.alignment = { horizontal: 'right' };
         applyBorder(stSalesCell);
 
-        const stPLCell = siteTotal.getCell(5);
+        // Expected Spent total (blank)
+        siteTotal.getCell(5).fill = totalsFill;
+        applyBorder(siteTotal.getCell(5));
+
+        // Target Profit total
+        const stTPLCell = siteTotal.getCell(6);
+        stTPLCell.value = siteTotalTargetPL;
+        stTPLCell.numFmt = currFmt;
+        stTPLCell.font = { bold: true, color: { argb: siteTotalTargetPL >= 0 ? 'FF' + profitGreenFont : 'FF' + lossRedFont }, size: 11 };
+        stTPLCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: siteTotalTargetPL >= 0 ? 'FF' + profitGreenBg : 'FF' + lossRedBg } };
+        applyBorder(stTPLCell);
+
+        // Target % (blank for total)
+        siteTotal.getCell(7).fill = totalsFill;
+        applyBorder(siteTotal.getCell(7));
+
+        const stPLCell = siteTotal.getCell(8);
         stPLCell.value = siteTotalPL;
         stPLCell.numFmt = currFmt;
         stPLCell.font = { bold: true, color: { argb: siteTotalPL >= 0 ? 'FF' + profitGreenFont : 'FF' + lossRedFont }, size: 11 };
         stPLCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: siteTotalPL >= 0 ? 'FF' + profitGreenBg : 'FF' + lossRedBg } };
         applyBorder(stPLCell);
 
-        siteTotal.getCell(6).fill = totalsFill;
-        applyBorder(siteTotal.getCell(6));
+        siteTotal.getCell(9).fill = totalsFill;
+        applyBorder(siteTotal.getCell(9));
 
         rowCursor += 3;
 
@@ -886,7 +1023,10 @@ router.get(
           const capitalCost = Number(loc.totals.capital_cost || 0);
           const solicitorCost = salePrice * (solicitorPct / 100);
           const auctioneerCost = salePrice * (auctioneerPct / 100);
+          const expectedSpent = loc.expected_spent != null ? Number(loc.expected_spent) : null;
+          const targetProfit = calcTargetProfit(loc);
           const profitLoss = calcProfitLoss(loc);
+          const targetPctVal = targetProfit != null && salePriceExVat > 0 ? targetProfit / salePriceExVat : null;
           const profitPctVal = salePriceExVat > 0 ? profitLoss / salePriceExVat : 0;
 
           // Location header
@@ -962,6 +1102,10 @@ router.get(
             [`Auctioneer (${auctioneerPct}%)`, auctioneerCost]
           ];
 
+          if (expectedSpent != null) {
+            plItems.push(['Expected Spent', expectedSpent]);
+          }
+
           plItems.forEach(([label, val]) => {
             const plRow = sheet.getRow(rowCursor);
             const plLabel = plRow.getCell(1);
@@ -976,7 +1120,7 @@ router.get(
           // Profit/Loss result
           const plResultRow = sheet.getRow(rowCursor);
           const plResultLabel = plResultRow.getCell(1);
-          plResultLabel.value = 'Profit / Loss';
+          plResultLabel.value = 'Actual Profit / Loss';
           plResultLabel.font = { bold: true, size: 11 };
           plResultLabel.alignment = { horizontal: 'left' };
           applyBorder(plResultLabel);
@@ -987,11 +1131,36 @@ router.get(
           // Profit % row
           const pctResultRow = sheet.getRow(rowCursor);
           const pctResultLabel = pctResultRow.getCell(1);
-          pctResultLabel.value = 'Profit %';
+          pctResultLabel.value = 'Actual Profit %';
           pctResultLabel.font = { bold: true, size: 11 };
           pctResultLabel.alignment = { horizontal: 'left' };
           applyBorder(pctResultLabel);
           applyPctStyle(pctResultRow.getCell(2), profitPctVal);
+
+          rowCursor++;
+
+          // Target Profit row (if available)
+          if (targetProfit != null) {
+            const tpResultRow = sheet.getRow(rowCursor);
+            const tpResultLabel = tpResultRow.getCell(1);
+            tpResultLabel.value = 'Target Profit / Loss';
+            tpResultLabel.font = { bold: true, size: 11 };
+            tpResultLabel.alignment = { horizontal: 'left' };
+            applyBorder(tpResultLabel);
+            applyProfitStyle(tpResultRow.getCell(2), targetProfit);
+
+            rowCursor++;
+
+            const tpPctRow = sheet.getRow(rowCursor);
+            const tpPctLabel = tpPctRow.getCell(1);
+            tpPctLabel.value = 'Target Profit %';
+            tpPctLabel.font = { bold: true, size: 11 };
+            tpPctLabel.alignment = { horizontal: 'left' };
+            applyBorder(tpPctLabel);
+            applyPctStyle(tpPctRow.getCell(2), targetPctVal);
+
+            rowCursor++;
+          }
 
           rowCursor += 3;
         });
@@ -1002,7 +1171,10 @@ router.get(
         sheet.getColumn(3).width = 20;
         sheet.getColumn(4).width = 20;
         sheet.getColumn(5).width = 20;
-        sheet.getColumn(6).width = 14;
+        sheet.getColumn(6).width = 20;
+        sheet.getColumn(7).width = 14;
+        sheet.getColumn(8).width = 20;
+        sheet.getColumn(9).width = 14;
 
         sheet.views = [{ state: 'frozen', ySplit: 4 }];
       }
