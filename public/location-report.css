@@ -220,11 +220,131 @@ background-color: #8d888841;
   margin-bottom: 0;
 }
 
+.report-actions-row {
+  gap: 12px;
+}
+
+.report-actions-row .spread-toggle {
+  display: flex;
+  align-items: center;
+}
+
+.report-filters select[multiple] {
+  min-height: 148px;
+}
+
+.totals-bar.location-report-totals {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 6px 12px;
+  align-items: center;
+  padding: 10px 16px;
+  font-size: 14px;
+}
+
+.totals-bar.location-report-totals > div {
+  min-width: 0;
+  line-height: 1.15;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.totals-bar.location-report-totals > div strong {
+  font-size: 0.78rem;
+  line-height: 1.1;
+}
+
+.totals-bar.location-report-totals > div > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0;
+}
+
+.totals-value-line {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0;
+}
+
+.totals-bar.location-report-totals > .totals-mobile-header {
+  display: none;
+}
+
+.totals-sites { grid-column: 1; grid-row: 1; }
+.totals-locations { grid-column: 1; grid-row: 2; }
+.totals-expected-spend { grid-column: 2; grid-row: 1; }
+.totals-total-spend { grid-column: 2; grid-row: 2; }
+.totals-expected-profit { grid-column: 3; grid-row: 1; }
+.totals-actual-profit { grid-column: 3; grid-row: 2; }
+.totals-sales { grid-column: 4; grid-row: 1; }
+
+.totals-avg-expected {
+  grid-column: 5;
+  grid-row: 1;
+}
+
+.totals-avg-actual {
+  grid-column: 5;
+  grid-row: 2;
+}
+
 @media (max-width: 768px) {
+  .totals-bar.location-report-totals {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding: 8px 14px;
+  }
+
+  .totals-bar.location-report-totals > .totals-mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-direction: row;
+  }
+
+  .totals-mobile-header strong {
+    font-size: 0.95rem;
+  }
+
+  .totals-mobile-header .btn {
+    min-width: 72px;
+  }
+
+  .totals-sites,
+  .totals-locations,
+  .totals-expected-spend,
+  .totals-total-spend,
+  .totals-expected-profit,
+  .totals-actual-profit,
+  .totals-sales,
+  .totals-avg-expected,
+  .totals-avg-actual {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .totals-bar.location-report-totals.is-collapsed {
+    gap: 0;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .totals-bar.location-report-totals.is-collapsed > div:not(.totals-mobile-header) {
+    display: none;
+  }
+
   .report-controls {
     flex-direction: column;
     align-items: stretch !important;
     gap: 12px;
+  }
+
+  .report-actions-row {
+    flex-direction: column;
+    align-items: stretch !important;
   }
 
   .report-filters {
@@ -233,17 +353,18 @@ background-color: #8d888841;
 
   .report-filters .form-group,
   .report-filters select,
-  .report-controls button {
+  .report-controls button,
+  .report-actions-row .spread-toggle {
     width: 100%;
   }
 
-  .report-filters .checkbox-row {
-    margin-left: 0 !important;
-    justify-content: center;
+  .report-filters select[multiple] {
+    min-height: 120px;
   }
 
-  .report-filters .spread-toggle {
+  .report-actions-row .spread-toggle {
     text-align: center;
+    justify-content: center;
   }
 
 }

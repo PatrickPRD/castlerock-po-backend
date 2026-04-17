@@ -258,6 +258,7 @@ function renderWorkers() {
           <div><strong>Safe Pass Number:</strong> ${escapeHtml(worker.safe_pass_number) || '—'}</div>
           <div><strong>Safe Pass Expiry:</strong> <span class="${safePassExpired ? 'expired-date' : ''}">${safePassExpiry || '—'}</span></div>
           <div><strong>Date of employment:</strong> ${formatDate(worker.date_of_employment)}</div>
+          <div><strong>Days Worked (${new Date().getFullYear()}):</strong> ${Number(worker.days_worked_this_year) || 0}</div>
           <div><strong>Status:</strong> ${isActive ? 'Active' : 'Inactive'}</div>
           <div><strong>Left at:</strong> ${formatDate(worker.left_at)}</div>
           <div class="full-width"><strong>Notes:</strong><br>${escapeHtml(worker.notes) || '—'}</div>

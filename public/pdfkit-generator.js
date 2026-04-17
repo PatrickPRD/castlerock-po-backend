@@ -609,8 +609,12 @@ async function generateWorkerPDF(workerData, leaveSummary = {}, settings = {}, a
     
     const sickTaken = leaveSummary.totals.sick || 0;
     const sickRemaining = entitlements.sick - sickTaken;
-    
+
+    const daysWorked = leaveSummary.days_worked !== undefined ? leaveSummary.days_worked : '—';
+    const currentYear = new Date().getFullYear();
+
     const leaveData = [
+      [`Days Worked (${currentYear})`, `${daysWorked} days`, ''],
       ['Annual Leave', `${annualTaken} days`, annualRemaining >= 0 ? `${annualRemaining} days` : 'Over limit'],
       ['Bank Holidays', `${bankTaken} days`, bankRemaining >= 0 ? `${bankRemaining} days` : 'Over limit'],
       ['Paid Sick Days', `${sickTaken} days`, sickRemaining >= 0 ? `${sickRemaining} days` : 'Over limit']

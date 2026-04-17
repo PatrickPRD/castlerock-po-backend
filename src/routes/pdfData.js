@@ -253,6 +253,17 @@ router.get(
         [workerId, formatDate(startDate), formatDate(endDate)]
       );
 
+      const [daysWorkedRows] = await db.query(
+        `
+        SELECT COUNT(*) AS days_worked
+        FROM timesheet_entries
+        WHERE worker_id = ?
+          AND YEAR(work_date) = YEAR(CURDATE())
+          AND (leave_type IS NULL OR leave_type = '')
+        `,
+        [workerId]
+      );
+
       console.log('Leave days query result:', leaveDays.length, 'rows');
 
       const leaveSummary = {
@@ -265,7 +276,8 @@ router.get(
           annual_leave: Number(settings.annual_leave_days_per_year || 20),
           bank_holiday: 9, // Standard UK bank holidays
           sick: Number(settings.sick_days_per_year || 3)
-        }
+        },
+        days_worked: Number((daysWorkedRows[0] || {}).days_worked || 0)
       };
 
       leaveDays.forEach(row => {

@@ -84,6 +84,12 @@ async function getLocationBreakdownData(showSpreadLocations) {
     locationsBySite.get(l.site_id).push(l.id);
   });
 
+  const [spreadRules] = await db.query(`
+    SELECT source_location_id
+    FROM location_spread_rules
+  `);
+  const spreadSourceLocationIds = new Set(spreadRules.map(rule => Number(rule.source_location_id)).filter(Boolean));
+
   const [locationTotals] = await db.query(`
     SELECT
       si.name AS site,
@@ -418,6 +424,8 @@ async function getLocationBreakdownData(showSpreadLocations) {
       location: loc.location,
       location_id: loc.location_id,
       sale_price: Number(loc.sale_price || 0),
+      floor_area: info ? info.floor_area : null,
+      is_spread_location: spreadSourceLocationIds.has(Number(loc.location_id)),
       expected_spent: info ? info.expected_spent : null,
       totals: {
         net: Number(loc.total_net),
@@ -518,8 +526,32 @@ router.get(
   authorizeRoles('super_admin'),
   async (req, res) => {
     try {
+      const parseMultiValueQuery = value => {
+        if (Array.isArray(value)) {
+          return value
+            .flatMap(entry => String(entry || '').split(','))
+            .map(entry => entry.trim())
+            .filter(Boolean);
+        }
+        if (value == null) return [];
+        return String(value)
+          .split(',')
+          .map(entry => entry.trim())
+          .filter(Boolean);
+      };
+
       const showSpreadLocations = req.query.showSpread === '1' || req.query.showSpread === 'true';
-      const data = await getLocationBreakdownData(showSpreadLocations);
+      const selectedSites = new Set(parseMultiValueQuery(req.query.sites));
+      const selectedLocations = new Set(parseMultiValueQuery(req.query.locations));
+
+      let data = await getLocationBreakdownData(showSpreadLocations);
+      if (selectedSites.size > 0 || selectedLocations.size > 0) {
+        data = data.filter(row => {
+          const siteMatch = selectedSites.size === 0 || selectedSites.has(row.site);
+          const locationMatch = selectedLocations.size === 0 || selectedLocations.has(row.location);
+          return siteMatch && locationMatch;
+        });
+      }
 
       /* -------- Load financial settings -------- */
       const settings = await SettingsService.getSettings();
@@ -552,8 +584,9 @@ router.get(
         const salePriceExVat = salePrice / (1 + vatRate);
         const solicitorCost = salePrice * (solicitorPct / 100);
         const auctioneerCost = salePrice * (auctioneerPct / 100);
+        const capitalCost = Number(r.totals.capital_cost || 0);
         const expectedSpent = Number(r.expected_spent);
-        return salePriceExVat - solicitorCost - auctioneerCost - expectedSpent;
+        return salePriceExVat - solicitorCost - auctioneerCost - capitalCost - expectedSpent;
       }
 
       /* -------- Group by site -------- */
@@ -1388,7 +1421,14 @@ router.get(
           SUM(CASE WHEN te.leave_type = 'annual_leave' THEN 1 ELSE 0 END) AS annual_leave,
           SUM(CASE WHEN te.leave_type = 'unpaid_leave' THEN 1 ELSE 0 END) AS unpaid_leave,
           SUM(CASE WHEN te.leave_type = 'bank_holiday' THEN 1 ELSE 0 END) AS bank_holiday,
-          SUM(CASE WHEN te.leave_type = 'absent' THEN 1 ELSE 0 END) AS absent
+          SUM(CASE WHEN te.leave_type = 'absent' THEN 1 ELSE 0 END) AS absent,
+          (
+            SELECT COUNT(*)
+            FROM timesheet_entries te2
+            WHERE te2.worker_id = w.id
+              AND YEAR(te2.work_date) = YEAR(CURDATE())
+              AND (te2.leave_type IS NULL OR te2.leave_type = '')
+          ) AS days_worked_this_year
         FROM workers w
         LEFT JOIN timesheet_entries te
           ON te.worker_id = w.id
@@ -1427,7 +1467,8 @@ router.get(
           unpaid_leave: Number(row.unpaid_leave || 0),
           bank_holiday: Number(row.bank_holiday || 0),
           bank_holiday_remaining: Math.max(bankHolidayAllowance - Number(row.bank_holiday || 0), 0),
-          absent: Number(row.absent || 0)
+          absent: Number(row.absent || 0),
+          days_worked_this_year: Number(row.days_worked_this_year || 0)
         }))
       });
     } catch (err) {

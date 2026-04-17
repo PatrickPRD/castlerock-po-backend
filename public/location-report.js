@@ -7,6 +7,8 @@ const siteFilter = document.getElementById('siteFilter');
 const locationFilter = document.getElementById('locationFilter');
 const sortHeaders = document.querySelectorAll('th[data-sort]');
 const loadingOverlay = document.getElementById('reportLoading');
+const totalsBar = document.getElementById('totalsBar');
+const totalsBarToggle = document.getElementById('totalsBarToggle');
 
 let allData = [];
 let sortState = { key: 'site', dir: 'asc' };
@@ -19,6 +21,7 @@ const SORT_SPINNER_MIN_MS = 120;
 const num = v => isNaN(Number(v)) ? 0 : Number(v);
 const euro = v => (window.formatMoney ? window.formatMoney(v) : `€${num(v).toFixed(2)}`);
 const getCurrencySymbol = () => (window.getCurrencySymbol ? window.getCurrencySymbol() : '€');
+const SQFT_PER_SQM = 10.7639;
 
 function getVatRate() {
   return num(saleCostSettings.vatOnSale) / 100;
@@ -44,8 +47,9 @@ function calcTargetProfit(r) {
   const salePriceExVat = salePrice / (1 + vatRate);
   const solicitorCost = salePrice * (num(saleCostSettings.solicitorPct) / 100);
   const auctioneerCost = salePrice * (num(saleCostSettings.auctioneerPct) / 100);
+  const capitalCost = num(r.totals.capital_cost || 0);
   const expectedSpent = num(r.expected_spent);
-  return salePriceExVat - solicitorCost - auctioneerCost - expectedSpent;
+  return salePriceExVat - solicitorCost - auctioneerCost - capitalCost - expectedSpent;
 }
 
 /* =========================
@@ -72,11 +76,18 @@ async function loadReport() {
   }
 }
 
+function getSelectedValues(selectEl) {
+  return Array.from(selectEl.selectedOptions).map(option => option.value).filter(Boolean);
+}
+
 function renderReport() {
-  const selectedSite = siteFilter.value;
-  const selectedLocation = locationFilter.value;
-  let data = selectedSite ? allData.filter(r => r.site === selectedSite) : allData;
-  data = selectedLocation ? data.filter(r => r.location === selectedLocation) : data;
+  const selectedSites = new Set(getSelectedValues(siteFilter));
+  const selectedLocations = new Set(getSelectedValues(locationFilter));
+  let data = allData.filter(r => {
+    const siteMatch = selectedSites.size === 0 || selectedSites.has(r.site);
+    const locationMatch = selectedLocations.size === 0 || selectedLocations.has(r.location);
+    return siteMatch && locationMatch;
+  });
 
   data = sortData(data);
   
@@ -189,35 +200,45 @@ function renderReport() {
 });
 
   // Update totals bar
-  let sumNet = 0, sumPL = 0, sumSales = 0, sumExpendedSpend = 0, sumExpectedProfit = 0;
+  let sumNet = 0, sumPL = 0, sumSales = 0, sumExpectedSpend = 0, sumExpectedProfit = 0;
   let sumSalePriceExVat = 0;
+  let sumFloorAreaSqm = 0;
   const siteSet = new Set();
   data.forEach(r => {
     sumNet += num(r.totals.net) + num(r.totals.labour || 0);
     sumPL += calcProfitLoss(r);
     sumSales += num(r.sale_price);
-    sumExpendedSpend += num(r.expected_spent || 0);
+    sumExpectedSpend += num(r.expected_spent || 0);
     sumSalePriceExVat += num(r.sale_price) / (1 + getVatRate());
+    if (num(r.floor_area) > 0) sumFloorAreaSqm += num(r.floor_area);
     const tp = calcTargetProfit(r);
     if (tp != null) sumExpectedProfit += tp;
     if (r.site) siteSet.add(r.site);
   });
+  const expectedAvgPerSqm = sumFloorAreaSqm > 0 ? (sumExpectedSpend / sumFloorAreaSqm) : 0;
+  const expectedAvgPerSqft = sumFloorAreaSqm > 0 ? (sumExpectedSpend / (sumFloorAreaSqm * SQFT_PER_SQM)) : 0;
+  const actualAvgPerSqm = sumFloorAreaSqm > 0 ? (sumNet / sumFloorAreaSqm) : 0;
+  const actualAvgPerSqft = sumFloorAreaSqm > 0 ? (sumNet / (sumFloorAreaSqm * SQFT_PER_SQM)) : 0;
   const actualProfitPct = sumSalePriceExVat > 0 ? ((sumPL / sumSalePriceExVat) * 100).toFixed(1) : '0.0';
   const expectedProfitPct = sumSalePriceExVat > 0 ? ((sumExpectedProfit / sumSalePriceExVat) * 100).toFixed(1) : '0.0';
   const locCountEl = document.getElementById('locCount');
   const siteCountEl = document.getElementById('siteCount');
   const barNetEl = document.getElementById('barTotalNet');
   const barSalesEl = document.getElementById('barTotalSales');
-  const barExpendedSpendEl = document.getElementById('barExpendedSpend');
+  const barExpectedSpendEl = document.getElementById('barExpectedSpend');
   const barExpectedProfitEl = document.getElementById('barExpectedProfit');
   const barExpectedProfitPctEl = document.getElementById('barExpectedProfitPct');
   const barActualProfitEl = document.getElementById('barActualProfit');
   const barActualProfitPctEl = document.getElementById('barActualProfitPct');
+  const barExpectedAvgPerAreaEl = document.getElementById('barExpectedAvgPerArea');
+  const barActualAvgPerAreaEl = document.getElementById('barActualAvgPerArea');
   if (locCountEl) locCountEl.textContent = data.length;
   if (siteCountEl) siteCountEl.textContent = siteSet.size;
   if (barNetEl) barNetEl.textContent = euro(sumNet);
   if (barSalesEl) barSalesEl.textContent = euro(sumSales);
-  if (barExpendedSpendEl) barExpendedSpendEl.textContent = euro(sumExpendedSpend);
+  if (barExpectedSpendEl) barExpectedSpendEl.textContent = euro(sumExpectedSpend);
+  if (barExpectedAvgPerAreaEl) barExpectedAvgPerAreaEl.textContent = euro(expectedAvgPerSqm) + ' / ' + euro(expectedAvgPerSqft);
+  if (barActualAvgPerAreaEl) barActualAvgPerAreaEl.textContent = euro(actualAvgPerSqm) + ' / ' + euro(actualAvgPerSqft);
   if (barExpectedProfitEl) {
     barExpectedProfitEl.textContent = euro(sumExpectedProfit);
     barExpectedProfitEl.className = sumExpectedProfit >= 0 ? 'profit-positive' : 'profit-negative';
@@ -314,33 +335,64 @@ function updateSortIndicators() {
 }
 
 function updateLocationOptions() {
-  const selectedSite = siteFilter.value;
-  const currentLocation = locationFilter.value;
+  const selectedSites = new Set(getSelectedValues(siteFilter));
+  const currentLocations = new Set(getSelectedValues(locationFilter));
   const options = new Set();
+  const includeSpreadLocations = showSpreadLocations.checked;
 
   allData.forEach(r => {
-    if (selectedSite && r.site !== selectedSite) return;
+    if (selectedSites.size > 0 && !selectedSites.has(r.site)) return;
+    if (!includeSpreadLocations && r.is_spread_location) return;
     if (r.location) options.add(r.location);
   });
 
-  locationFilter.innerHTML = '<option value="">All Locations</option>';
+  locationFilter.innerHTML = '';
   Array.from(options).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true }))
     .forEach(name => {
       const opt = document.createElement('option');
       opt.value = name;
       opt.textContent = name;
+      opt.selected = currentLocations.has(name);
       locationFilter.appendChild(opt);
     });
-
-  if (currentLocation && options.has(currentLocation)) {
-    locationFilter.value = currentLocation;
-  }
 }
 
 function setLoading(isLoading) {
   if (!loadingOverlay) return;
   loadingOverlay.classList.toggle('active', isLoading);
   loadingOverlay.setAttribute('aria-hidden', isLoading ? 'false' : 'true');
+}
+
+function updateTotalsToggleButton() {
+  if (!totalsBar || !totalsBarToggle) return;
+  const collapsed = totalsBar.classList.contains('is-collapsed');
+  totalsBarToggle.textContent = collapsed ? 'Show' : 'Hide';
+  totalsBarToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+}
+
+function initTotalsBarToggle() {
+  if (!totalsBar || !totalsBarToggle) return;
+
+  totalsBarToggle.addEventListener('click', () => {
+    totalsBar.classList.toggle('is-collapsed');
+    updateTotalsToggleButton();
+  });
+
+  const mobileQuery = window.matchMedia('(max-width: 768px)');
+  const handleViewportChange = event => {
+    if (!event.matches) {
+      totalsBar.classList.remove('is-collapsed');
+      updateTotalsToggleButton();
+    }
+  };
+
+  if (mobileQuery.addEventListener) {
+    mobileQuery.addEventListener('change', handleViewportChange);
+  } else if (mobileQuery.addListener) {
+    mobileQuery.addListener(handleViewportChange);
+  }
+
+  updateTotalsToggleButton();
 }
 
 function runSortWithSpinner() {
@@ -381,10 +433,15 @@ table.addEventListener('click', e => {
    ========================= */
 async function exportExcel() {
   const showSpread = showSpreadLocations.checked ? '1' : '0';
+  const selectedSites = getSelectedValues(siteFilter);
+  const selectedLocations = getSelectedValues(locationFilter);
+  const params = new URLSearchParams({ showSpread });
+  selectedSites.forEach(site => params.append('sites', site));
+  selectedLocations.forEach(location => params.append('locations', location));
   setLoading(true);
   try {
     const res = await fetch(
-      `/reports/po-totals-by-location-breakdown.xlsx?showSpread=${showSpread}`,
+      `/reports/po-totals-by-location-breakdown.xlsx?${params.toString()}`,
       {
         headers: {
           Authorization: 'Bearer ' + token
@@ -425,7 +482,10 @@ function back() {
 /* =========================
    Init
    ========================= */
-showSpreadLocations.addEventListener('change', loadReport);
+showSpreadLocations.addEventListener('change', () => {
+  updateLocationOptions();
+  loadReport();
+});
 siteFilter.addEventListener('change', () => {
   updateLocationOptions();
   renderReport();
@@ -447,15 +507,20 @@ sortHeaders.forEach(th => {
 
 async function loadSites() {
   try {
+    const currentSites = new Set(getSelectedValues(siteFilter));
     const res = await fetch('/sites', {
       headers: { Authorization: 'Bearer ' + token }
     });
     const sites = await res.json();
-    
-    sites.forEach(site => {
+
+    siteFilter.innerHTML = '';
+    sites
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base', numeric: true }))
+      .forEach(site => {
       const opt = document.createElement('option');
       opt.value = site.name;
       opt.textContent = site.name;
+      opt.selected = currentSites.has(site.name);
       siteFilter.appendChild(opt);
     });
   } catch (err) {
@@ -480,6 +545,7 @@ async function loadVatRates() {
 }
 
 (async () => {
+  initTotalsBarToggle();
   if (window.loadCurrencySettings) {
     try {
       await window.loadCurrencySettings();

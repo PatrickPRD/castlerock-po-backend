@@ -108,7 +108,7 @@ function renderTable() {
   if (!filtered.length) {
     table.innerHTML = `
       <tr>
-        <td colspan="12" style="text-align: center; padding: 2rem; color: #9ca3af;">
+        <td colspan="13" style="text-align: center; padding: 2rem; color: #9ca3af;">
           ${term ? 'No workers match your search' : 'No worker information found'}
         </td>
       </tr>
@@ -137,6 +137,7 @@ function renderTable() {
         <td data-label="Bank Holidays"><span class="cell-value">${num(row.bank_holiday)}</span></td>
         <td data-label="Bank Holidays Remaining"><span class="cell-value">${num(row.bank_holiday_remaining)}</span></td>
         <td data-label="Absent"><span class="cell-value">${num(row.absent)}</span></td>
+        <td data-label="Days Worked (This Year)"><span class="cell-value">${num(row.days_worked_this_year)}</span></td>
         <td data-label="Safe Pass Expiry" class="safe-pass-col"><span class="cell-value">${safePassContent}</span></td>
         <td class="pdf-col">
           <button

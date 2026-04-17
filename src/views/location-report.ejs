@@ -4,26 +4,24 @@
 <main class="container">
   <div class="card">
     <div class="report-controls mb-3">
-      <div class="d-flex justify-content-between align-items-center">
-        <div class="row g-2 report-filters align-items-md-center flex-grow-1">
-          <div class="col-12 col-md-4 form-group">
-            <label for="siteFilter">Site</label>
-            <select id="siteFilter">
-              <option value="">All Sites</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-4 form-group">
-            <label for="locationFilter">Location</label>
-            <select id="locationFilter">
-              <option value="">All Locations</option>
-            </select>
-          </div>
-          <div class="col-12 col-md-auto spread-toggle text-md-start">
-            <label class="checkbox-row mb-0">
-              <input type="checkbox" id="showSpreadLocations">
-              Show Spread Locations
-            </label>
-          </div>
+      <div class="row g-2 report-filters align-items-md-center">
+        <div class="col-12 col-md-4 form-group">
+          <label for="siteFilter">Sites</label>
+          <select id="siteFilter" multiple size="6" aria-label="Filter by one or more sites">
+          </select>
+          <small class="text-muted">Select one or more sites</small>
+        </div>
+        <div class="col-12 col-md-4 form-group">
+          <label for="locationFilter">Locations</label>
+          <select id="locationFilter" multiple size="6" aria-label="Filter by one or more locations">
+          </select>
+          <small class="text-muted">Select one or more locations</small>
+        </div>
+      </div>
+      <div class="report-actions-row d-flex justify-content-between align-items-center mt-3">
+        <div class="form-check form-switch spread-toggle mb-0">
+          <input class="form-check-input" type="checkbox" role="switch" id="showSpreadLocations">
+          <label class="form-check-label" for="showSpreadLocations">Show Spread Locations</label>
         </div>
         <button class="btn btn-outline-primary" onclick="exportExcel()">Export to Excel</button>
       </div>
@@ -53,36 +51,52 @@
   </div>
 </main>
 
-<div id="totalsBar" class="totals-bar">
-  <div>
-    <strong>Locations:</strong>
-    <span id="locCount">0</span>
+<div id="totalsBar" class="totals-bar location-report-totals">
+  <div class="totals-mobile-header">
+    <strong>Totals</strong>
+    <button id="totalsBarToggle" type="button" class="btn btn-sm btn-outline-secondary" aria-expanded="true">Hide</button>
   </div>
-  <div>
+  <div class="totals-sites">
     <strong>Sites:</strong>
     <span id="siteCount">0</span>
   </div>
-  <div>
-    <strong>Total Spend:</strong>
-    <span id="barTotalNet"><span data-currency-symbol>€</span>0</span>
+  <div class="totals-expected-spend">
+    <strong>Expected Spend:</strong>
+    <span id="barExpectedSpend"><span data-currency-symbol>€</span>0</span>
   </div>
-  <div>
-    <strong>Expended Spend:</strong>
-    <span id="barExpendedSpend"><span data-currency-symbol>€</span>0</span>
+  <div class="totals-expected-profit">
+    <strong>Expected Profit:</strong>
+    <span class="totals-value-line">
+      <span id="barExpectedProfit"><span data-currency-symbol>€</span>0</span>
+      <span id="barExpectedProfitPct">0.0%</span>
+    </span>
   </div>
-  <div>
+  <div class="totals-sales">
     <strong>Sales:</strong>
     <span id="barTotalSales"><span data-currency-symbol>€</span>0</span>
   </div>
-  <div>
-    <strong>Expected Profit:</strong>
-    <span id="barExpectedProfit"><span data-currency-symbol>€</span>0</span>
-    <span id="barExpectedProfitPct">0.0%</span>
+  <div class="totals-avg-expected">
+    <strong>Expected Avg sqm/sqft:</strong>
+    <span id="barExpectedAvgPerArea"><span data-currency-symbol>€</span>0 / <span data-currency-symbol>€</span>0</span>
   </div>
-  <div>
+  <div class="totals-locations">
+    <strong>Locations:</strong>
+    <span id="locCount">0</span>
+  </div>
+  <div class="totals-total-spend">
+    <strong>Total Spend:</strong>
+    <span id="barTotalNet"><span data-currency-symbol>€</span>0</span>
+  </div>
+  <div class="totals-actual-profit">
     <strong>Actual Profit:</strong>
-    <span id="barActualProfit"><span data-currency-symbol>€</span>0</span>
-    <span id="barActualProfitPct">0.0%</span>
+    <span class="totals-value-line">
+      <span id="barActualProfit"><span data-currency-symbol>€</span>0</span>
+      <span id="barActualProfitPct">0.0%</span>
+    </span>
+  </div>
+  <div class="totals-avg-actual">
+    <strong>Actual Avg sqm/sqft:</strong>
+    <span id="barActualAvgPerArea"><span data-currency-symbol>€</span>0 / <span data-currency-symbol>€</span>0</span>
   </div>
 </div>
 

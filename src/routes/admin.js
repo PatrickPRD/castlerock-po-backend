@@ -992,7 +992,14 @@ router.get(
            CASE
              WHEN left_at IS NULL OR left_at >= CURDATE() THEN 1
              ELSE 0
-           END AS active
+           END AS active,
+           (
+             SELECT COUNT(*)
+             FROM timesheet_entries te
+             WHERE te.worker_id = workers.id
+               AND YEAR(te.work_date) = YEAR(CURDATE())
+               AND (te.leave_type IS NULL OR te.leave_type = '')
+           ) AS days_worked_this_year
          FROM workers
          ${whereClause}
          ORDER BY last_name, first_name`
