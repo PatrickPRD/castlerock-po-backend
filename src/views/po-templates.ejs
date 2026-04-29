@@ -12,6 +12,7 @@
       <thead>
         <tr>
           <th>Template Name</th>
+          <th>Type</th>
           <th>Stage</th>
           <th>Line Items</th>
           <th style="width: 160px;">Actions</th>
@@ -33,6 +34,13 @@
           <div>
             <label for="templateName">Template Name</label>
             <input type="text" id="templateName" required placeholder="e.g. Standard Electrical Package">
+          </div>
+          <div>
+            <label for="templateType">Type</label>
+            <select id="templateType" required>
+              <option value="Sub-Contractor">Sub-Contractor</option>
+              <option value="Materials" selected>Materials</option>
+            </select>
           </div>
         </div>
 

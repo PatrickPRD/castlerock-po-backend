@@ -17,6 +17,7 @@ const templateModal = document.getElementById('templateModal');
 const templateForm = document.getElementById('templateForm');
 const templateId = document.getElementById('templateId');
 const templateName = document.getElementById('templateName');
+const templateType = document.getElementById('templateType');
 const templateStage = document.getElementById('templateStage');
 const templateModalTitle = document.getElementById('templateModalTitle');
 const templateLineItemsBody = document.getElementById('templateLineItemsBody');
@@ -34,6 +35,8 @@ const costItemLookup = window.createCostItemLookup
 
 let allTemplates = [];
 let lineItemSearchTimeout = null;
+const templateDetailsCache = new Map();
+let expandedTemplateId = null;
 
 /* =========================
    Helpers
@@ -84,24 +87,119 @@ async function loadStages() {
 async function loadTemplates() {
   try {
     allTemplates = await api('/po-templates');
+    expandedTemplateId = null;
     renderTemplates(allTemplates);
   } catch (err) {
     showToast('Error loading templates: ' + err.message, 'error');
   }
 }
 
+function closeExpandedTemplateRow() {
+  const expandedRow = templateTable.querySelector('.template-details-row');
+  if (expandedRow) expandedRow.remove();
+
+  const expandedMain = templateTable.querySelector('.template-main-row.expanded');
+  if (expandedMain) expandedMain.classList.remove('expanded');
+
+  expandedTemplateId = null;
+}
+
+function renderTemplateLineItems(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return '<div class="template-details-empty">No line items in this template.</div>';
+  }
+
+  return `
+    <table class="template-details-line-items">
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th style="width: 100px; text-align: right;">Qty</th>
+          <th style="width: 100px;">Unit</th>
+          <th style="width: 130px; text-align: right;">Unit Cost</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${items.map(item => `
+          <tr>
+            <td>${escapeHtml(item.description || '')}</td>
+            <td style="text-align: right;">${Number(item.quantity || 0).toLocaleString()}</td>
+            <td>${escapeHtml(item.unit || '—')}</td>
+            <td style="text-align: right;">${Number(item.unit_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderTemplateDetailsContent(template) {
+  const deliveryNotes = String(template.delivery_notes || '').trim();
+
+  return `
+    <div class="template-details-panel">
+      <div class="template-details-meta">
+        <div><strong>Type:</strong> ${escapeHtml(template.template_type || 'Materials')}</div>
+        <div><strong>Stage:</strong> ${template.stage_name ? escapeHtml(template.stage_name) : '—'}</div>
+      </div>
+      <div class="template-details-notes">
+        <strong>Delivery Notes:</strong>
+        <div>${deliveryNotes ? escapeHtml(deliveryNotes) : '<span style="color:#999;">No delivery notes</span>'}</div>
+      </div>
+      <div class="template-details-items-title"><strong>Line Items</strong></div>
+      ${renderTemplateLineItems(template.line_items)}
+    </div>
+  `;
+}
+
+async function toggleTemplateDetails(template, row) {
+  if (expandedTemplateId === template.id) {
+    closeExpandedTemplateRow();
+    return;
+  }
+
+  closeExpandedTemplateRow();
+  expandedTemplateId = template.id;
+  row.classList.add('expanded');
+
+  const detailsRow = document.createElement('tr');
+  detailsRow.className = 'template-details-row';
+  detailsRow.innerHTML = '<td colspan="5"><div class="template-details-panel">Loading template contents...</div></td>';
+  row.insertAdjacentElement('afterend', detailsRow);
+
+  try {
+    const details = templateDetailsCache.has(template.id)
+      ? templateDetailsCache.get(template.id)
+      : await api('/po-templates/' + template.id);
+
+    templateDetailsCache.set(template.id, details);
+
+    if (expandedTemplateId !== template.id) return;
+
+    detailsRow.innerHTML = '<td colspan="5">' + renderTemplateDetailsContent(details) + '</td>';
+  } catch (err) {
+    if (expandedTemplateId !== template.id) return;
+    detailsRow.innerHTML = '<td colspan="5"><div class="template-details-panel" style="color:#b91c1c;">Failed to load template details: ' + escapeHtml(err.message) + '</div></td>';
+  }
+}
+
 function renderTemplates(templates) {
+  closeExpandedTemplateRow();
   templateTable.innerHTML = '';
 
   if (!templates.length) {
-    templateTable.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#999; padding:2rem;">No templates found</td></tr>';
+    templateTable.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#999; padding:2rem;">No templates found</td></tr>';
     return;
   }
 
   templates.forEach(t => {
     const row = document.createElement('tr');
+    row.className = 'template-main-row';
+    row.tabIndex = 0;
+    row.title = 'Click to view template contents';
     row.innerHTML = `
       <td>${escapeHtml(t.name)}</td>
+      <td>${escapeHtml(t.template_type || 'Materials')}</td>
       <td>${t.stage_name ? escapeHtml(t.stage_name) : '<span style="color:#999;">—</span>'}</td>
       <td>${t.line_item_count} item(s)</td>
       <td>
@@ -110,8 +208,25 @@ function renderTemplates(templates) {
       </td>
     `;
 
-    row.querySelector('[data-edit]').addEventListener('click', () => openEditTemplate(t.id));
-    row.querySelector('[data-delete]').addEventListener('click', () => deleteTemplate(t.id, t.name));
+    row.addEventListener('click', (event) => {
+      if (event.target.closest('button')) return;
+      toggleTemplateDetails(t, row);
+    });
+
+    row.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      toggleTemplateDetails(t, row);
+    });
+
+    row.querySelector('[data-edit]').addEventListener('click', (event) => {
+      event.stopPropagation();
+      openEditTemplate(t.id);
+    });
+    row.querySelector('[data-delete]').addEventListener('click', (event) => {
+      event.stopPropagation();
+      deleteTemplate(t.id, t.name);
+    });
 
     templateTable.appendChild(row);
   });
@@ -128,6 +243,7 @@ filterInput.addEventListener('input', () => {
   }
   renderTemplates(allTemplates.filter(t =>
     t.name.toLowerCase().includes(q) ||
+    (t.template_type && t.template_type.toLowerCase().includes(q)) ||
     (t.stage_name && t.stage_name.toLowerCase().includes(q))
   ));
 });
@@ -242,6 +358,7 @@ addTemplateBtn.addEventListener('click', () => {
   templateModalTitle.textContent = 'New Template';
   templateId.value = '';
   templateName.value = '';
+  templateType.value = 'Materials';
   templateStage.value = '';
   templateDeliveryNotes.value = '';
   templateLineItemsBody.innerHTML = '';
@@ -257,6 +374,7 @@ async function openEditTemplate(id) {
     templateModalTitle.textContent = 'Edit Template';
     templateId.value = t.id;
     templateName.value = t.name;
+    templateType.value = t.template_type || 'Materials';
     templateStage.value = t.stage_id || '';
     templateDeliveryNotes.value = t.delivery_notes || '';
     templateLineItemsBody.innerHTML = '';
@@ -297,6 +415,7 @@ templateForm.addEventListener('submit', async (e) => {
 
   const payload = {
     name,
+    templateType: templateType.value,
     stageId: templateStage.value || null,
     deliveryNotes: templateDeliveryNotes.value || '',
     lineItems: items

@@ -266,6 +266,37 @@ router.get(
 
       console.log('Leave days query result:', leaveDays.length, 'rows');
 
+      // Fetch individual leave dates for the second PDF page
+      const [leaveDateRows] = await db.query(
+        `
+        SELECT leave_type, work_date
+        FROM timesheet_entries
+        WHERE worker_id = ?
+          AND work_date >= ?
+          AND work_date < ?
+          AND leave_type IN ('paid_sick', 'sick', 'annual_leave', 'unpaid_leave', 'bank_holiday', 'absent')
+        ORDER BY leave_type, work_date
+        `,
+        [workerId, formatDate(startDate), formatDate(endDate)]
+      );
+
+      const leaveDates = {
+        paid_sick: [],
+        sick: [],
+        annual_leave: [],
+        unpaid_leave: [],
+        bank_holiday: [],
+        absent: []
+      };
+
+      leaveDateRows.forEach(row => {
+        const d = row.work_date instanceof Date ? row.work_date : new Date(row.work_date);
+        const formatted = formatDate(d);
+        if (leaveDates[row.leave_type] !== undefined) {
+          leaveDates[row.leave_type].push(formatted);
+        }
+      });
+
       const leaveSummary = {
         totals: {
           annual_leave: 0,
@@ -296,6 +327,7 @@ router.get(
       res.json({
         workerData,
         leaveSummary,
+        leaveDates,
         settings,
         userRole: req.user.role
       });

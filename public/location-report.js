@@ -105,6 +105,14 @@ function renderReport() {
   const tpClass = hasTarget ? (targetProfit >= 0 ? 'profit-positive' : 'profit-negative') : '';
   const targetPct = hasTarget && salePriceExVat > 0 ? ((targetProfit / salePriceExVat) * 100).toFixed(1) : null;
 
+  // Build spread stage breakdown for tooltip/label
+  const spreadByStage = r.stages
+    .filter(s => num(s.spread_net) > 0)
+    .map(s => `${s.stage}: ${euro(num(s.spread_net))}`)
+    .join(', ');
+  const spreadTotal = num(r.totals.spread_net);
+  const directTotal = num(r.totals.direct_net);
+
   // MAIN ROW
  table.innerHTML += `
   <tr class="main-row" data-target="${rowId}">
@@ -112,7 +120,7 @@ function renderReport() {
     <td>
       ${r.location}
     </td>
-    <td>${euro(r.totals.net + (r.totals.labour || 0))}</td>
+    <td>${euro(directTotal)} ${spreadTotal > 0 ? `<span class="spread-label" title="${spreadByStage}">(${euro(spreadTotal)})</span>` : ''}</td>
     <td>${euro(r.totals.labour || 0)}</td>
     <td>${euro(r.sale_price || 0)}</td>
     <td>${r.expected_spent != null ? euro(r.expected_spent) : ''}</td>
@@ -131,6 +139,7 @@ function renderReport() {
   const solicitorCost = salePrice * solicitorPct;
   const auctioneerCost = salePrice * auctioneerPct;
   const capitalCost = num(r.totals.capital_cost || 0);
+  const hasSpread = num(r.totals.spread_net) > 0;
 
   table.innerHTML += `
     <tr class="details-row" id="${rowId}">
@@ -139,7 +148,9 @@ function renderReport() {
           <thead>
             <tr>
               <th>Stage</th>
-              <th>Net (${getCurrencySymbol()})</th>
+              <th>Direct Net (${getCurrencySymbol()})</th>
+              ${hasSpread ? `<th>Spread Net (${getCurrencySymbol()})</th>` : ''}
+              <th>Total Net (${getCurrencySymbol()})</th>
               <th>Gross (${getCurrencySymbol()})</th>
             </tr>
           </thead>
@@ -148,8 +159,10 @@ function renderReport() {
     r.stages.map(s => `
       <tr>
         <td>${s.stage}</td>
-        <td>${euro(s.net)}</td>
-        <td>${euro(s.gross)}</td>
+        <td>${euro(num(s.direct_net))}</td>
+        ${hasSpread ? `<td>${euro(num(s.spread_net))}</td>` : ''}
+        <td>${euro(num(s.net))}</td>
+        <td>${euro(num(s.gross))}</td>
       </tr>
     `).join('')
   }
@@ -157,6 +170,16 @@ function renderReport() {
 
         </table>
         <div class="detail-summary">
+          ${hasSpread ? `
+          <div class="detail-summary-item">
+            <span class="detail-summary-label">Direct Spent</span>
+            <span class="detail-summary-value">${euro(num(r.totals.direct_net))}</span>
+          </div>
+          <div class="detail-summary-item">
+            <span class="detail-summary-label">Total Spread In</span>
+            <span class="detail-summary-value">${euro(num(r.totals.spread_net))}</span>
+          </div>
+          ` : ''}
           <div class="detail-summary-item">
             <span class="detail-summary-label">Total Net</span>
             <span class="detail-summary-value">${euro(num(r.totals.net) + num(r.totals.labour || 0))}</span>

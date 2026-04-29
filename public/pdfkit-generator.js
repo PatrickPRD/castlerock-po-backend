@@ -82,6 +82,19 @@ function formatDate(dateStr) {
 }
 
 /**
+ * Format a YYYY-MM-DD date string for PDF display (avoids UTC timezone offset issues)
+ */
+function formatPdfDate(dateStr) {
+  if (!dateStr) return 'N/A';
+  const match = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return String(dateStr);
+  const day = match[3];
+  const month = match[2];
+  const year = match[1];
+  return `${day}/${month}/${year}`;
+}
+
+/**
  * Convert hex color to RGB array
  */
 function hexToRgb(hex) {
@@ -423,7 +436,7 @@ async function generatePOPDF(poData, invoices = [], settings = {}, action = 'dow
 /**
  * Generate Worker PDF
  */
-async function generateWorkerPDF(workerData, leaveSummary = {}, settings = {}, action = 'download', isBlank = false, userRole = null) {
+async function generateWorkerPDF(workerData, leaveSummary = {}, settings = {}, action = 'download', isBlank = false, userRole = null, leaveDates = null) {
   await loadPDFKitLibraries();
 
   const doc = new jsPDF();
@@ -656,10 +669,77 @@ async function generateWorkerPDF(workerData, leaveSummary = {}, settings = {}, a
     });
   }
 
-  // Footer
+  // Footer - Page 1
   doc.setFontSize(8);
   doc.setTextColor(128, 128, 128);
   doc.text('This is an electronically generated document.', 105, 285, { align: 'center' });
+
+  // Second page: recorded leave dates (only for real workers, not blank forms)
+  if (!isBlank && leaveDates) {
+    const leaveTypeConfig = [
+      { key: 'paid_sick',    label: 'Paid Sick' },
+      { key: 'sick',         label: 'Unpaid Sick' },
+      { key: 'annual_leave', label: 'Annual Leave' },
+      { key: 'bank_holiday', label: 'Bank Holidays' },
+      { key: 'unpaid_leave', label: 'Unpaid Leave' },
+      { key: 'absent',       label: 'Absences' }
+    ];
+
+    // Only add the page if at least one type has dates
+    const hasAnyDates = leaveTypeConfig.some(c => (leaveDates[c.key] || []).length > 0);
+
+    if (hasAnyDates) {
+      doc.addPage();
+
+      // Page 2 header
+      doc.setFillColor(headerRGB[0], headerRGB[1], headerRGB[2]);
+      doc.rect(0, 0, 210, 35, 'F');
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      doc.text(logoText, 15, 15);
+
+      doc.setFontSize(12);
+      doc.text('Leave Dates Record', 195, 12, { align: 'right' });
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      const workerNameP2 = `${workerData.first_name || ''} ${workerData.last_name || ''}`.trim();
+      if (workerNameP2) {
+        doc.text(workerNameP2, 195, 25, { align: 'right' });
+      }
+
+      doc.setTextColor(0, 0, 0);
+
+      let p2Y = 45;
+
+      leaveTypeConfig.forEach(({ key, label }) => {
+        const dates = leaveDates[key] || [];
+        const body = dates.length > 0
+          ? dates.map(d => [formatPdfDate(d)])
+          : [['No recorded dates']];
+
+        doc.autoTable({
+          startY: p2Y,
+          head: [[label]],
+          body,
+          theme: 'grid',
+          headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 9 },
+          styles: { fontSize: 8, cellPadding: 2.5 },
+          columnStyles: { 0: { cellWidth: 185 } },
+          margin: { left: 15, right: 15 }
+        });
+
+        p2Y = doc.lastAutoTable.finalY + 5;
+      });
+
+      // Footer - Page 2
+      doc.setFontSize(8);
+      doc.setTextColor(128, 128, 128);
+      doc.text('This is an electronically generated document.', 105, 285, { align: 'center' });
+    }
+  }
 
   // Save or view
   const fileName = `Worker-${workerData.last_name || 'Worker'}-${workerData.first_name || ''}.pdf`.replace(/\s+/g, '-');

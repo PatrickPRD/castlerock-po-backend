@@ -485,3 +485,17 @@ background-color: #8d888841;
   }
 
 }
+
+/* Spread label styling */
+.spread-label {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  background-color: #d4e5ff;
+  color: #1e40af;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-weight: 500;
+  border: 1px solid #a5b4fc;
+  cursor: help;
+}

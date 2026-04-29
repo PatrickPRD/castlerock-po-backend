@@ -361,6 +361,68 @@
   text-align: right;
 }
 
+.template-main-row {
+  cursor: pointer;
+}
+
+.template-main-row:hover td {
+  background: #fafafa;
+}
+
+.template-main-row.expanded td {
+  background: #f5f8ff;
+}
+
+.template-details-row td {
+  padding: 0;
+  border-bottom: 1px solid #eee;
+}
+
+.template-details-panel {
+  background: #f3f4f6;
+  border-left: 4px solid #2563eb;
+  padding: 14px 16px;
+}
+
+.template-details-meta {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.template-details-notes {
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.template-details-items-title {
+  margin-bottom: 6px;
+}
+
+.template-details-empty {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.template-details-line-items {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.template-details-line-items th,
+.template-details-line-items td {
+  border: 1px solid #e5e7eb;
+  padding: 6px 8px;
+}
+
+.template-details-line-items th {
+  background: #f3f4f6;
+  font-weight: 600;
+}
+
 /* Remove up/down arrows from number inputs for qty and unit cost */
 .line-item-qty::-webkit-outer-spin-button,
 .line-item-qty::-webkit-inner-spin-button,

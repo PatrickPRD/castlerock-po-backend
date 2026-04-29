@@ -183,6 +183,8 @@ async function getLocationBreakdownData(showSpreadLocations) {
   });
 
   const totalsMap = new Map();
+  const spreadTotalsMap = new Map(); // Track spread costs separately
+  
   locationTotals.forEach(l => {
     const info = locationMap.get(l.location_id);
     totalsMap.set(l.location_id, {
@@ -190,6 +192,12 @@ async function getLocationBreakdownData(showSpreadLocations) {
       site_id: l.site_id,
       location: l.location,
       location_id: l.location_id,
+      direct_net: Number(l.total_net),
+      direct_gross: Number(l.total_gross),
+      direct_invoiced: Number(l.total_invoiced),
+      spread_net: 0,
+      spread_gross: 0,
+      spread_invoiced: 0,
       total_net: Number(l.total_net),
       total_gross: Number(l.total_gross),
       total_invoiced: Number(l.total_invoiced),
@@ -208,6 +216,12 @@ async function getLocationBreakdownData(showSpreadLocations) {
       site_id: info.site_id,
       location: info.name,
       location_id: info.id,
+      direct_net: 0,
+      direct_gross: 0,
+      direct_invoiced: 0,
+      spread_net: 0,
+      spread_gross: 0,
+      spread_invoiced: 0,
       total_net: 0,
       total_gross: 0,
       total_invoiced: 0,
@@ -248,6 +262,12 @@ async function getLocationBreakdownData(showSpreadLocations) {
     }
     stageMap.get(s.location_id).set(s.stage, {
       stage: s.stage,
+      direct_net: Number(s.net_total),
+      direct_gross: Number(s.gross_total),
+      direct_invoiced: Number(s.invoiced_total),
+      spread_net: 0,
+      spread_gross: 0,
+      spread_invoiced: 0,
       net: Number(s.net_total),
       gross: Number(s.gross_total),
       invoiced: Number(s.invoiced_total)
@@ -367,6 +387,12 @@ async function getLocationBreakdownData(showSpreadLocations) {
               site_id: info.site_id,
               location: info.name,
               location_id: info.id,
+              direct_net: 0,
+              direct_gross: 0,
+              direct_invoiced: 0,
+              spread_net: 0,
+              spread_gross: 0,
+              spread_invoiced: 0,
               total_net: 0,
               total_gross: 0,
               total_invoiced: 0,
@@ -377,9 +403,16 @@ async function getLocationBreakdownData(showSpreadLocations) {
           }
 
           const targetTotals = totalsMap.get(targetId);
-          targetTotals.total_net += sourceTotals.total_net * weight;
-          targetTotals.total_gross += sourceTotals.total_gross * weight;
-          targetTotals.total_invoiced += sourceTotals.total_invoiced * weight;
+          const spreadAmount = sourceTotals.total_net * weight;
+          const spreadGross = sourceTotals.total_gross * weight;
+          const spreadInvoiced = sourceTotals.total_invoiced * weight;
+          
+          targetTotals.spread_net += spreadAmount;
+          targetTotals.spread_gross += spreadGross;
+          targetTotals.spread_invoiced += spreadInvoiced;
+          targetTotals.total_net += spreadAmount;
+          targetTotals.total_gross += spreadGross;
+          targetTotals.total_invoiced += spreadInvoiced;
           targetTotals.total_labour += (sourceTotals.total_labour || 0) * weight;
           targetTotals.capital_cost += (sourceTotals.capital_cost || 0) * weight;
         });
@@ -395,13 +428,31 @@ async function getLocationBreakdownData(showSpreadLocations) {
 
             const targetStages = stageMap.get(targetId);
             if (!targetStages.has(stage.stage)) {
-              targetStages.set(stage.stage, { stage: stage.stage, net: 0, gross: 0, invoiced: 0 });
+              targetStages.set(stage.stage, {
+                stage: stage.stage,
+                direct_net: 0,
+                direct_gross: 0,
+                direct_invoiced: 0,
+                spread_net: 0,
+                spread_gross: 0,
+                spread_invoiced: 0,
+                net: 0,
+                gross: 0,
+                invoiced: 0
+              });
             }
 
             const targetStage = targetStages.get(stage.stage);
-            targetStage.net += stage.net * weight;
-            targetStage.gross += stage.gross * weight;
-            targetStage.invoiced += stage.invoiced * weight;
+            const spreadAmount = stage.direct_net * weight;
+            const spreadGross = stage.direct_gross * weight;
+            const spreadInvoiced = stage.direct_invoiced * weight;
+            
+            targetStage.spread_net += spreadAmount;
+            targetStage.spread_gross += spreadGross;
+            targetStage.spread_invoiced += spreadInvoiced;
+            targetStage.net += spreadAmount;
+            targetStage.gross += spreadGross;
+            targetStage.invoiced += spreadInvoiced;
           });
         });
 
@@ -419,28 +470,41 @@ async function getLocationBreakdownData(showSpreadLocations) {
     })
     .map(loc => {
       const info = locationMap.get(loc.location_id);
-      return {
-      site: loc.site,
-      location: loc.location,
-      location_id: loc.location_id,
-      sale_price: Number(loc.sale_price || 0),
-      floor_area: info ? info.floor_area : null,
-      is_spread_location: spreadSourceLocationIds.has(Number(loc.location_id)),
-      expected_spent: info ? info.expected_spent : null,
-      totals: {
-        net: Number(loc.total_net),
-        gross: Number(loc.total_gross),
-        uninvoiced: Number(loc.total_gross) - Number(loc.total_invoiced),
-        labour: Number(loc.total_labour || 0),
-        capital_cost: Number(loc.capital_cost || 0)
-      },
-      stages: Array.from((stageMap.get(loc.location_id) || new Map()).values()).map(s => ({
+      const stagesArray = Array.from((stageMap.get(loc.location_id) || new Map()).values()).map(s => ({
         stage: s.stage,
+        direct_net: Number(s.direct_net),
+        direct_gross: Number(s.direct_gross),
+        direct_invoiced: Number(s.direct_invoiced),
+        spread_net: Number(s.spread_net),
+        spread_gross: Number(s.spread_gross),
+        spread_invoiced: Number(s.spread_invoiced),
         net: Number(s.net),
         gross: Number(s.gross),
         uninvoiced: Number(s.gross) - Number(s.invoiced)
-      }))
-    };
+      }));
+      return {
+        site: loc.site,
+        location: loc.location,
+        location_id: loc.location_id,
+        sale_price: Number(loc.sale_price || 0),
+        floor_area: info ? info.floor_area : null,
+        is_spread_location: spreadSourceLocationIds.has(Number(loc.location_id)),
+        expected_spent: info ? info.expected_spent : null,
+        totals: {
+          direct_net: Number(loc.direct_net),
+          direct_gross: Number(loc.direct_gross),
+          direct_invoiced: Number(loc.direct_invoiced),
+          spread_net: Number(loc.spread_net),
+          spread_gross: Number(loc.spread_gross),
+          spread_invoiced: Number(loc.spread_invoiced),
+          net: Number(loc.total_net),
+          gross: Number(loc.total_gross),
+          uninvoiced: Number(loc.total_gross) - Number(loc.total_invoiced),
+          labour: Number(loc.total_labour || 0),
+          capital_cost: Number(loc.capital_cost || 0)
+        },
+        stages: stagesArray
+      };
     });
 
 

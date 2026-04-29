@@ -7,6 +7,16 @@ const db = require('../db');
 const logAudit = require('../services/auditService');
 const { syncCostItemsFromLineItems } = require('../services/costSyncService');
 
+const ALLOWED_TEMPLATE_TYPES = ['Sub-Contractor', 'Materials'];
+
+function normalizeTemplateType(templateType) {
+  const normalizedType = String(templateType || '').trim();
+  if (!ALLOWED_TEMPLATE_TYPES.includes(normalizedType)) {
+    return null;
+  }
+  return normalizedType;
+}
+
 function normalizeTemplateLineItems(lineItems) {
   if (!Array.isArray(lineItems)) return [];
 
@@ -51,6 +61,7 @@ router.get(
         SELECT
           t.id,
           t.name,
+          t.template_type,
           t.stage_id,
           ps.name AS stage_name,
           t.active,
@@ -85,6 +96,7 @@ router.get(
         SELECT
           t.id,
           t.name,
+          t.template_type,
           t.delivery_notes,
           t.stage_id,
           ps.name AS stage_name,
@@ -133,10 +145,15 @@ router.post(
   authenticate,
   authorizeRoles('super_admin', 'admin'),
   async (req, res) => {
-    const { name, stageId, lineItems, deliveryNotes } = req.body;
+    const { name, stageId, lineItems, deliveryNotes, templateType } = req.body;
 
     if (!name || !String(name).trim()) {
       return res.status(400).json({ error: 'Template name is required' });
+    }
+
+    const normalizedTemplateType = normalizeTemplateType(templateType);
+    if (!normalizedTemplateType) {
+      return res.status(400).json({ error: 'Template type must be Sub-Contractor or Materials' });
     }
 
     const normalizedItems = normalizeTemplateLineItems(lineItems);
@@ -150,9 +167,9 @@ router.post(
       await conn.beginTransaction();
 
       const [result] = await conn.query(`
-        INSERT INTO po_templates (name, delivery_notes, stage_id, created_by)
-        VALUES (?, ?, ?, ?)
-      `, [String(name).trim(), deliveryNotes || '', stageId || null, req.user.id]);
+        INSERT INTO po_templates (name, template_type, delivery_notes, stage_id, created_by)
+        VALUES (?, ?, ?, ?, ?)
+      `, [String(name).trim(), normalizedTemplateType, deliveryNotes || '', stageId || null, req.user.id]);
 
       const values = normalizedItems.map(item => [
         result.insertId,
@@ -183,6 +200,7 @@ router.post(
         old_data: null,
         new_data: {
           name: String(name).trim(),
+          template_type: normalizedTemplateType,
           stage_id: stageId || null,
           line_items_count: normalizedItems.length
         },
@@ -209,10 +227,15 @@ router.put(
   authenticate,
   authorizeRoles('super_admin', 'admin'),
   async (req, res) => {
-    const { name, stageId, lineItems, deliveryNotes } = req.body;
+    const { name, stageId, lineItems, deliveryNotes, templateType } = req.body;
 
     if (!name || !String(name).trim()) {
       return res.status(400).json({ error: 'Template name is required' });
+    }
+
+    const normalizedTemplateType = normalizeTemplateType(templateType);
+    if (!normalizedTemplateType) {
+      return res.status(400).json({ error: 'Template type must be Sub-Contractor or Materials' });
     }
 
     const normalizedItems = normalizeTemplateLineItems(lineItems);
@@ -226,7 +249,7 @@ router.put(
       await conn.beginTransaction();
 
       const [[existing]] = await conn.query(
-        'SELECT id, name, stage_id FROM po_templates WHERE id = ?',
+        'SELECT id, name, template_type, stage_id FROM po_templates WHERE id = ?',
         [req.params.id]
       );
 
@@ -236,9 +259,9 @@ router.put(
       }
 
       await conn.query(`
-        UPDATE po_templates SET name = ?, delivery_notes = ?, stage_id = ?, updated_at = CURRENT_TIMESTAMP
+        UPDATE po_templates SET name = ?, template_type = ?, delivery_notes = ?, stage_id = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `, [String(name).trim(), deliveryNotes || '', stageId || null, req.params.id]);
+      `, [String(name).trim(), normalizedTemplateType, deliveryNotes || '', stageId || null, req.params.id]);
 
       await conn.query('DELETE FROM po_template_line_items WHERE template_id = ?', [req.params.id]);
 
@@ -270,10 +293,12 @@ router.put(
         action: 'UPDATE',
         old_data: {
           name: existing.name,
+          template_type: existing.template_type,
           stage_id: existing.stage_id
         },
         new_data: {
           name: String(name).trim(),
+          template_type: normalizedTemplateType,
           stage_id: stageId || null,
           line_items_count: normalizedItems.length
         },
