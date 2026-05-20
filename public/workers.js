@@ -264,11 +264,21 @@ function renderWorkers() {
           <div class="full-width"><strong>Notes:</strong><br>${escapeHtml(worker.notes) || '—'}</div>
         </div>
         <div class="details-actions">
-          <button class="btn btn-outline-primary" onclick="event.stopPropagation(); editWorker(${worker.id})">Edit</button>
-          <button class="btn btn-outline-secondary" onclick="event.stopPropagation(); downloadWorkerPDF(${worker.id}, '${escapeHtml(worker.first_name)} ${escapeHtml(worker.last_name)}');"><i class="bi bi-file-pdf"></i> PDF</button>
+          <button class="btn btn-outline-primary" data-action="edit" data-worker-id="${worker.id}">Edit</button>
+          <button class="btn btn-outline-secondary" data-action="pdf" data-worker-id="${worker.id}"><i class="bi bi-file-pdf"></i> PDF</button>
         </div>
       </td>
     `;
+
+    // Wire up action buttons via addEventListener — avoids any inline onclick injection issues
+    detailsRow.querySelector('[data-action="edit"]').addEventListener('click', (e) => {
+      e.stopPropagation();
+      editWorker(worker.id);
+    });
+    detailsRow.querySelector('[data-action="pdf"]').addEventListener('click', (e) => {
+      e.stopPropagation();
+      downloadWorkerPDF(worker.id);
+    });
 
     mainRow.onclick = () => toggleDetails(mainRow, detailsRow);
 
@@ -489,7 +499,7 @@ async function downloadWorkerPDF(workerId, workerName) {
       await loadPDFKitLibraries();
     }
 
-    const res = await fetch(`/pdf-data/worker/${workerId}`, {
+    const res = await fetch(`/pdf-data/worker/${encodeURIComponent(workerId)}`, {
       headers: { Authorization: 'Bearer ' + token }
     });
 
@@ -498,10 +508,10 @@ async function downloadWorkerPDF(workerId, workerName) {
       return;
     }
 
-    const { workerData, leaveSummary, settings, userRole } = await res.json();
+    const { workerData, leaveSummary, leaveDates, settings, userRole } = await res.json();
 
     if (typeof generateWorkerPDF === 'function') {
-      await generateWorkerPDF(workerData, leaveSummary, settings, 'download', false, userRole);
+      await generateWorkerPDF(workerData, leaveSummary, settings, 'download', false, userRole, leaveDates || null);
       showToast('Worker PDF downloaded', 'success');
     } else {
       throw new Error('PDFKit generator not loaded');

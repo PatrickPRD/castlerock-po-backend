@@ -247,7 +247,7 @@ router.get(
         WHERE worker_id = ?
           AND work_date >= ?
           AND work_date < ?
-          AND leave_type IN ('annual_leave', 'bank_holiday', 'sick')
+          AND leave_type IN ('annual_leave', 'bank_holiday', 'sick', 'paid_sick', 'absent')
         GROUP BY leave_type
         `,
         [workerId, formatDate(startDate), formatDate(endDate)]
@@ -301,7 +301,9 @@ router.get(
         totals: {
           annual_leave: 0,
           bank_holiday: 0,
-          sick: 0
+          sick: 0,
+          paid_sick: 0,
+          absent: 0
         },
         entitlements: {
           annual_leave: Number(settings.annual_leave_days_per_year || 20),
@@ -323,6 +325,16 @@ router.get(
       }[currencyCode] || currencyCode;
 
       settings.currency_symbol = currencySymbol;
+
+      // Strip sensitive fields for non-admin roles
+      if (req.user.role !== 'super_admin' && req.user.role !== 'admin') {
+        delete workerData.weekly_take_home;
+        delete workerData.weekly_cost;
+        delete workerData.bank_details;
+      } else if (req.user.role === 'admin') {
+        delete workerData.weekly_take_home;
+        delete workerData.weekly_cost;
+      }
 
       res.json({
         workerData,
@@ -356,7 +368,9 @@ router.get(
         totals: {
           annual_leave: 0,
           bank_holiday: 0,
-          sick: 0
+          sick: 0,
+          paid_sick: 0,
+          absent: 0
         },
         entitlements: {
           annual_leave: Number(settings.annual_leave_days_per_year || 20),
