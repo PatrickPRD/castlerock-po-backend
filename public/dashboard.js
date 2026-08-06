@@ -34,6 +34,12 @@ let editLineItems = null;
 let vatRatesCache = null;
 const poSearchDetailsCache = new Map();
 const poSearchLoadingIds = new Set();
+let poSearchRefreshTimer = null;
+
+function scheduleSearchRefresh() {
+  clearTimeout(poSearchRefreshTimer);
+  poSearchRefreshTimer = setTimeout(applyFilters, 150);
+}
 
 function buildPOSearchText(po, detail = null) {
   const baseParts = [
@@ -104,7 +110,7 @@ async function ensurePOSearchDetails(po) {
     poSearchDetailsCache.set(po.id, buildPOSearchText(po, detail));
 
     if (poSearchInput && poSearchInput.value.trim()) {
-      applyFilters();
+      scheduleSearchRefresh();
     }
   } catch (_) {
   } finally {
