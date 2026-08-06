@@ -261,17 +261,29 @@ function goToPage(page) {
   renderPagination();
 }
 
+let pendingBackupType = 'standard';
+
 // Create backup
 async function createBackup() {
   // Check if at limit
   if (allBackups.length >= MAX_BACKUPS) {
     const oldestBackup = allBackups[allBackups.length - 1];
     document.getElementById('oldestBackupName').textContent = oldestBackup.filename;
+    pendingBackupType = 'standard';
     backupLimitModal.show();
     return;
   }
   
   await proceedWithBackup();
+}
+
+// Dispatch to the correct proceed function based on pending type
+async function proceedWithPendingBackup() {
+  if (pendingBackupType === 'advanced') {
+    await proceedWithAdvancedBackup();
+  } else {
+    await proceedWithBackup();
+  }
 }
 
 // Proceed with backup creation (after warning if needed)
@@ -303,6 +315,7 @@ async function createAdvancedBackup() {
   if (allBackups.length >= MAX_BACKUPS) {
     const oldestBackup = allBackups[allBackups.length - 1];
     document.getElementById('oldestBackupName').textContent = oldestBackup.filename;
+    pendingBackupType = 'advanced';
     backupLimitModal.show();
     return;
   }
