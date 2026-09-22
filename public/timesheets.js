@@ -727,6 +727,7 @@ async function saveWeek() {
       entries: payloadEntries
     });
     showToast('Timesheets saved', 'success');
+    await refreshWeekOptions();
     await loadWeek();
   } catch (err) {
     showToast(err.message || 'Failed to save timesheets', 'error');
