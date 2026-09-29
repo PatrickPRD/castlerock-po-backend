@@ -111,7 +111,9 @@ function renderReport() {
     .map(s => `${s.stage}: ${euro(num(s.spread_net))}`)
     .join(', ');
   const spreadTotal = num(r.totals.spread_net);
-  const directTotal = num(r.totals.direct_net);
+  const labourCost = num(r.totals.labour || 0);
+  const capitalCost = num(r.totals.capital_cost || 0);
+  const totalSpend = num(r.totals.net) + labourCost + capitalCost;
 
   // MAIN ROW
  table.innerHTML += `
@@ -120,8 +122,7 @@ function renderReport() {
     <td>
       ${r.location}
     </td>
-    <td>${euro(directTotal)} ${spreadTotal > 0 ? `<span class="spread-label" title="${spreadByStage}">(${euro(spreadTotal)})</span>` : ''}</td>
-    <td>${euro(r.totals.labour || 0)}</td>
+    <td>${euro(totalSpend)} ${spreadTotal > 0 ? `<span class="spread-label" title="${spreadByStage}">(${euro(spreadTotal)} spread)</span>` : ''}</td>
     <td>${euro(r.sale_price || 0)}</td>
     <td>${r.expected_spent != null ? euro(r.expected_spent) : ''}</td>
     <td class="${tpClass}">${hasTarget ? euro(targetProfit) : ''}</td>
@@ -138,12 +139,11 @@ function renderReport() {
   const auctioneerPct = num(saleCostSettings.auctioneerPct) / 100;
   const solicitorCost = salePrice * solicitorPct;
   const auctioneerCost = salePrice * auctioneerPct;
-  const capitalCost = num(r.totals.capital_cost || 0);
   const hasSpread = num(r.totals.spread_net) > 0;
 
   table.innerHTML += `
     <tr class="details-row" id="${rowId}">
-      <td colspan="10">
+      <td colspan="9">
         <table class="inner-table">
           <thead>
             <tr>
@@ -181,8 +181,12 @@ function renderReport() {
           </div>
           ` : ''}
           <div class="detail-summary-item">
-            <span class="detail-summary-label">Total Net</span>
-            <span class="detail-summary-value">${euro(num(r.totals.net) + num(r.totals.labour || 0))}</span>
+            <span class="detail-summary-label">Total Spend</span>
+            <span class="detail-summary-value">${euro(totalSpend)}</span>
+          </div>
+          <div class="detail-summary-item">
+            <span class="detail-summary-label">Labour Cost</span>
+            <span class="detail-summary-value">${euro(labourCost)}</span>
           </div>
           <div class="detail-summary-item">
             <span class="detail-summary-label">Capital Cost</span>
@@ -228,7 +232,9 @@ function renderReport() {
   let sumFloorAreaSqm = 0;
   const siteSet = new Set();
   data.forEach(r => {
-    sumNet += num(r.totals.net) + num(r.totals.labour || 0);
+    // Total Spend includes allocated capital costs, including amounts received
+    // through location spread rules.
+    sumNet += num(r.totals.net) + num(r.totals.labour || 0) + num(r.totals.capital_cost || 0);
     sumPL += calcProfitLoss(r);
     sumSales += num(r.sale_price);
     sumExpectedSpend += num(r.expected_spent || 0);
@@ -289,8 +295,8 @@ function sortData(data) {
         result = String(a.location || '').localeCompare(String(b.location || ''), undefined, { sensitivity: 'base', numeric: true });
         break;
       case 'total': {
-        const aTotal = num(a.totals.net) + num(a.totals.labour || 0);
-        const bTotal = num(b.totals.net) + num(b.totals.labour || 0);
+        const aTotal = num(a.totals.net) + num(a.totals.labour || 0) + num(a.totals.capital_cost || 0);
+        const bTotal = num(b.totals.net) + num(b.totals.labour || 0) + num(b.totals.capital_cost || 0);
         result = aTotal - bTotal;
         break;
       }
