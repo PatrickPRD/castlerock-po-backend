@@ -32,6 +32,32 @@ async function login() {
   window.location.href = 'dashboard.html';
 }
 
+// Automatically sign in during local development. The server endpoint is disabled
+// unless NODE_ENV=development, LOCAL_AUTO_LOGIN=true, and the request is local.
+async function autoLoginLocal() {
+  if (localStorage.getItem('token')) return;
+
+  try {
+    const res = await fetch('/auth/local-login');
+    if (!res.ok) return;
+
+    const data = await res.json();
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('role', data.role);
+
+    if (data.first_name) {
+      localStorage.setItem('firstName', data.first_name);
+    }
+
+    window.location.replace('dashboard.html');
+  } catch (err) {
+    // Keep the normal login form available if auto-login is unavailable.
+    console.debug('Local auto-login unavailable');
+  }
+}
+
+autoLoginLocal();
+
 /* ============================
    Forgot Password
    ============================ */

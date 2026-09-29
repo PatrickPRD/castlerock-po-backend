@@ -102,6 +102,68 @@ router.post('/reset-password', async (req, res) => {
 
 const jwt = require('jsonwebtoken');
 
+/* ======================================================
+   LOCAL DEVELOPMENT AUTO-LOGIN
+   ====================================================== */
+router.get('/local-login', async (req, res) => {
+  const isLocalHost = ['localhost', '127.0.0.1'].includes(req.hostname);
+  const isEnabled = process.env.NODE_ENV === 'development'
+    && process.env.LOCAL_AUTO_LOGIN === 'true'
+    && isLocalHost;
+
+  if (!isEnabled) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  try {
+    const hasActive = await hasActiveColumn();
+    const [[user]] = await pool.query(
+      hasActive
+        ? `
+          SELECT id, email, first_name, role
+          FROM users
+          WHERE active = 1
+          ORDER BY CASE
+            WHEN role = 'super_admin' THEN 0
+            WHEN role = 'admin' THEN 1
+            ELSE 2
+          END, id
+          LIMIT 1
+        `
+        : `
+          SELECT id, email, first_name, role
+          FROM users
+          ORDER BY CASE
+            WHEN role = 'super_admin' THEN 0
+            WHEN role = 'admin' THEN 1
+            ELSE 2
+          END, id
+          LIMIT 1
+        `
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'No local user is available' });
+    }
+
+    const token = jwt.sign(
+      { id: user.id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '8h' }
+    );
+
+    res.json({
+      token,
+      role: user.role,
+      first_name: user.first_name,
+      email: user.email
+    });
+  } catch (err) {
+    console.error('LOCAL AUTO-LOGIN ERROR:', err);
+    res.status(500).json({ error: 'Local auto-login failed' });
+  }
+});
+
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;

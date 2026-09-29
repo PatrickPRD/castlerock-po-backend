@@ -105,12 +105,6 @@ function renderReport() {
   const tpClass = hasTarget ? (targetProfit >= 0 ? 'profit-positive' : 'profit-negative') : '';
   const targetPct = hasTarget && salePriceExVat > 0 ? ((targetProfit / salePriceExVat) * 100).toFixed(1) : null;
 
-  // Build spread stage breakdown for tooltip/label
-  const spreadByStage = r.stages
-    .filter(s => num(s.spread_net) > 0)
-    .map(s => `${s.stage}: ${euro(num(s.spread_net))}`)
-    .join(', ');
-  const spreadTotal = num(r.totals.spread_net);
   const labourCost = num(r.totals.labour || 0);
   const capitalCost = num(r.totals.capital_cost || 0);
   const totalSpend = num(r.totals.net) + labourCost + capitalCost;
@@ -122,7 +116,7 @@ function renderReport() {
     <td>
       ${r.location}
     </td>
-    <td>${euro(totalSpend)} ${spreadTotal > 0 ? `<span class="spread-label" title="${spreadByStage}">(${euro(spreadTotal)} spread)</span>` : ''}</td>
+    <td>${euro(totalSpend)}</td>
     <td>${euro(r.sale_price || 0)}</td>
     <td>${r.expected_spent != null ? euro(r.expected_spent) : ''}</td>
     <td class="${tpClass}">${hasTarget ? euro(targetProfit) : ''}</td>
@@ -170,56 +164,68 @@ function renderReport() {
 
         </table>
         <div class="detail-summary">
-          ${hasSpread ? `
-          <div class="detail-summary-item">
-            <span class="detail-summary-label">Direct Spent</span>
-            <span class="detail-summary-value">${euro(num(r.totals.direct_net))}</span>
+          <div class="detail-summary-row detail-summary-spend-row">
+            ${hasSpread ? `
+            <div class="detail-summary-item">
+              <span class="detail-summary-label">Direct Spent</span>
+              <span class="detail-summary-value">${euro(num(r.totals.direct_net))}</span>
+            </div>
+            <div class="detail-summary-item">
+              <span class="detail-summary-label">Total Spread In</span>
+              <span class="detail-summary-value">${euro(num(r.totals.spread_net))}</span>
+            </div>
+            ` : `
+            <div class="detail-summary-spacer"></div>
+            <div class="detail-summary-spacer"></div>
+            `}
+            <div class="detail-summary-item">
+              <span class="detail-summary-label">Labour Cost</span>
+              <span class="detail-summary-value">${euro(labourCost)}</span>
+            </div>
+            <div class="detail-summary-item">
+              <span class="detail-summary-label">Capital Cost</span>
+              <span class="detail-summary-value">${euro(capitalCost)}</span>
+            </div>
+            <div class="detail-summary-item detail-summary-total-spend"
+                 title="Total Spend = Direct Net + Spread Net + Labour Cost + Capital Cost">
+              <span class="detail-summary-label">Total Spend</span>
+              <span class="detail-summary-value">${euro(totalSpend)}</span>
+            </div>
+            ${r.expected_spent != null ? `
+            <div class="detail-summary-item detail-summary-expected-spend">
+              <span class="detail-summary-label">Expected Spend</span>
+              <span class="detail-summary-value">${euro(r.expected_spent)}</span>
+            </div>
+            ` : '<div class="detail-summary-spacer"></div>'}
           </div>
-          <div class="detail-summary-item">
-            <span class="detail-summary-label">Total Spread In</span>
-            <span class="detail-summary-value">${euro(num(r.totals.spread_net))}</span>
+          <div class="detail-summary-row detail-summary-sales-row">
+            <div class="detail-summary-item">
+              <span class="detail-summary-label">Sale Price</span>
+              <span class="detail-summary-value">${euro(salePrice)}</span>
+            </div>
+            <div class="detail-summary-item"
+                 title="Solicitor Cost = Sale Price x ${(solicitorPct * 100).toFixed(1)}%">
+              <span class="detail-summary-label">Solicitor (${(solicitorPct * 100).toFixed(1)}%)</span>
+              <span class="detail-summary-value">${euro(solicitorCost)}</span>
+            </div>
+            <div class="detail-summary-item"
+                 title="Auctioneer Cost = Sale Price x ${(auctioneerPct * 100).toFixed(1)}%">
+              <span class="detail-summary-label">Auctioneer (${(auctioneerPct * 100).toFixed(1)}%)</span>
+              <span class="detail-summary-value">${euro(auctioneerCost)}</span>
+            </div>
+            <div class="detail-summary-spacer"></div>
+            <div class="detail-summary-item detail-summary-pl ${plClass}"
+                 title="Actual Profit/Loss = Sale Price ex VAT - Total Net Spend - Capital Cost - Solicitor Cost - Auctioneer Cost. Sale Price ex VAT = Sale Price divided by (1 + VAT rate).">
+              <span class="detail-summary-label">Actual Profit/Loss</span>
+              <span class="detail-summary-value">${euro(profitLoss)} (${profitPct}%)</span>
+            </div>
+            ${hasTarget ? `
+            <div class="detail-summary-item detail-summary-pl ${tpClass}">
+              <span class="detail-summary-label">Target Profit/Loss</span>
+              <span class="detail-summary-value">${euro(targetProfit)} (${targetPct}%)</span>
+            </div>
+            ` : '<div class="detail-summary-spacer"></div>'}
           </div>
-          ` : ''}
-          <div class="detail-summary-item">
-            <span class="detail-summary-label">Total Spend</span>
-            <span class="detail-summary-value">${euro(totalSpend)}</span>
-          </div>
-          <div class="detail-summary-item">
-            <span class="detail-summary-label">Labour Cost</span>
-            <span class="detail-summary-value">${euro(labourCost)}</span>
-          </div>
-          <div class="detail-summary-item">
-            <span class="detail-summary-label">Capital Cost</span>
-            <span class="detail-summary-value">${euro(capitalCost)}</span>
-          </div>
-          <div class="detail-summary-item">
-            <span class="detail-summary-label">Sale Price</span>
-            <span class="detail-summary-value">${euro(salePrice)}</span>
-          </div>
-          <div class="detail-summary-item">
-            <span class="detail-summary-label">Solicitor (${(solicitorPct * 100).toFixed(1)}%)</span>
-            <span class="detail-summary-value">${euro(solicitorCost)}</span>
-          </div>
-          <div class="detail-summary-item">
-            <span class="detail-summary-label">Auctioneer (${(auctioneerPct * 100).toFixed(1)}%)</span>
-            <span class="detail-summary-value">${euro(auctioneerCost)}</span>
-          </div>
-          ${r.expected_spent != null ? `
-          <div class="detail-summary-item">
-            <span class="detail-summary-label">Expected Spend</span>
-            <span class="detail-summary-value">${euro(r.expected_spent)}</span>
-          </div>
-          ` : ''}
-          <div class="detail-summary-item detail-summary-pl ${plClass}">
-            <span class="detail-summary-label">Actual Profit/Loss</span>
-            <span class="detail-summary-value">${euro(profitLoss)} (${profitPct}%)</span>
-          </div>
-          ${hasTarget ? `
-          <div class="detail-summary-item detail-summary-pl ${tpClass}">
-            <span class="detail-summary-label">Target Profit/Loss</span>
-            <span class="detail-summary-value">${euro(targetProfit)} (${targetPct}%)</span>
-          </div>
-          ` : ''}
         </div>
       </td>
     </tr>
