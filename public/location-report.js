@@ -107,7 +107,8 @@ function renderReport() {
 
   const labourCost = num(r.totals.labour || 0);
   const capitalCost = num(r.totals.capital_cost || 0);
-  const totalSpend = num(r.totals.net) + labourCost + capitalCost;
+  const totalSpend = num(r.totals.direct_net || 0);
+  const siteWorks = num(r.totals.spread_net || 0);
 
   // MAIN ROW
  table.innerHTML += `
@@ -116,8 +117,10 @@ function renderReport() {
     <td>
       ${r.location}
     </td>
-    <td>${euro(totalSpend)}</td>
-    <td>${euro(r.sale_price || 0)}</td>
+     <td>${euro(totalSpend)}</td>
+     <td>${euro(siteWorks)}</td>
+     <td>${euro(capitalCost)}</td>
+     <td>${euro(r.sale_price || 0)}</td>
     <td>${r.expected_spent != null ? euro(r.expected_spent) : ''}</td>
     <td class="${tpClass}">${hasTarget ? euro(targetProfit) : ''}</td>
     <td class="${tpClass}">${targetPct != null ? targetPct + '%' : ''}</td>
@@ -137,7 +140,7 @@ function renderReport() {
 
   table.innerHTML += `
     <tr class="details-row" id="${rowId}">
-      <td colspan="9">
+       <td colspan="11">
         <table class="inner-table">
           <thead>
             <tr>
@@ -238,9 +241,8 @@ function renderReport() {
   let sumFloorAreaSqm = 0;
   const siteSet = new Set();
   data.forEach(r => {
-    // Total Spend includes allocated capital costs, including amounts received
-    // through location spread rules.
-    sumNet += num(r.totals.net) + num(r.totals.labour || 0) + num(r.totals.capital_cost || 0);
+     // Total Spend is direct PO cost only. Site Works and capital costs remain separate columns.
+     sumNet += num(r.totals.direct_net || 0);
     sumPL += calcProfitLoss(r);
     sumSales += num(r.sale_price);
     sumExpectedSpend += num(r.expected_spent || 0);
@@ -301,8 +303,8 @@ function sortData(data) {
         result = String(a.location || '').localeCompare(String(b.location || ''), undefined, { sensitivity: 'base', numeric: true });
         break;
       case 'total': {
-        const aTotal = num(a.totals.net) + num(a.totals.labour || 0) + num(a.totals.capital_cost || 0);
-        const bTotal = num(b.totals.net) + num(b.totals.labour || 0) + num(b.totals.capital_cost || 0);
+        const aTotal = num(a.totals.direct_net || 0);
+        const bTotal = num(b.totals.direct_net || 0);
         result = aTotal - bTotal;
         break;
       }

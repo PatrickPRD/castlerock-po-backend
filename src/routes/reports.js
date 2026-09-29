@@ -981,7 +981,7 @@ router.get(
         let rowCursor = 1;
 
         // Site title
-        sheet.mergeCells(rowCursor, 1, rowCursor, 9);
+        sheet.mergeCells(rowCursor, 1, rowCursor, 10);
         const siteTitleCell = sheet.getCell(rowCursor, 1);
         siteTitleCell.value = siteName;
         siteTitleCell.font = { size: 16, bold: true, color: { argb: 'FF' + brandColor } };
@@ -990,7 +990,7 @@ router.get(
         rowCursor++;
 
         // Site subtitle
-        sheet.mergeCells(rowCursor, 1, rowCursor, 9);
+        sheet.mergeCells(rowCursor, 1, rowCursor, 10);
         sheet.getCell(rowCursor, 1).value = `${rows.length} locations  |  Generated: ${new Date().toLocaleDateString('en-GB')}`;
         sheet.getCell(rowCursor, 1).font = { size: 10, italic: true, color: { argb: 'FF757575' } };
         rowCursor += 2;
@@ -998,8 +998,9 @@ router.get(
         // Site overview table header
         const overviewHeaders = [
           'Location', `Total Spend (${currencySymbol})`, `Site Works (${currencySymbol})`,
-          `Sale Price (${currencySymbol})`, `Expected Spend (${currencySymbol})`,
-          `Target Profit (${currencySymbol})`, 'Target %', `Actual Profit (${currencySymbol})`, 'Actual %'
+          `Capital Costs (${currencySymbol})`, `Sale Price (${currencySymbol})`,
+          `Expected Spend (${currencySymbol})`, `Target Profit (${currencySymbol})`, 'Target %',
+          `Actual Profit (${currencySymbol})`, 'Actual %'
         ];
         const ohRow = sheet.getRow(rowCursor);
         ohRow.height = 24;
@@ -1019,6 +1020,7 @@ router.get(
         rows.forEach((loc, idx) => {
           const totalSpend = Number(loc.totals.direct_net || 0);
           const siteWorks = Number(loc.totals.spread_net || 0);
+          const capitalCosts = Number(loc.totals.capital_cost || 0);
           const salePrice = Number(loc.sale_price || 0);
           const expectedSpent = loc.expected_spent != null ? Number(loc.expected_spent) : null;
           const targetProfit = calcTargetProfit(loc);
@@ -1052,11 +1054,14 @@ router.get(
           applyCurrencyCell(row.getCell(3), siteWorks);
           if (altFill) row.getCell(3).fill = altFill;
 
-          applyCurrencyCell(row.getCell(4), salePrice);
-          if (altFill) row.getCell(4).fill = altFill;
+          applyCurrencyCell(row.getCell(4), capitalCosts);
+           if (altFill) row.getCell(4).fill = altFill;
+
+          applyCurrencyCell(row.getCell(5), salePrice);
+          if (altFill) row.getCell(5).fill = altFill;
 
           // Expected Spend
-          const esCell2 = row.getCell(5);
+          const esCell2 = row.getCell(6);
           if (expectedSpent != null) {
             applyCurrencyCell(esCell2, expectedSpent);
           } else {
@@ -1067,24 +1072,24 @@ router.get(
 
           // Target Profit
           if (targetProfit != null) {
-            applyProfitStyle(row.getCell(6), targetProfit);
-          } else {
-            row.getCell(6).value = '';
-            applyBorder(row.getCell(6));
-            if (altFill) row.getCell(6).fill = altFill;
-          }
-
-          // Target %
-          if (targetPctVal != null) {
-            applyPctStyle(row.getCell(7), targetPctVal);
+            applyProfitStyle(row.getCell(7), targetProfit);
           } else {
             row.getCell(7).value = '';
             applyBorder(row.getCell(7));
             if (altFill) row.getCell(7).fill = altFill;
           }
 
-          applyProfitStyle(row.getCell(8), profitLoss);
-          applyPctStyle(row.getCell(9), profitPctVal);
+          // Target %
+          if (targetPctVal != null) {
+            applyPctStyle(row.getCell(8), targetPctVal);
+          } else {
+            row.getCell(8).value = '';
+            applyBorder(row.getCell(8));
+            if (altFill) row.getCell(8).fill = altFill;
+          }
+
+          applyProfitStyle(row.getCell(9), profitLoss);
+          applyPctStyle(row.getCell(10), profitPctVal);
 
           rowCursor++;
         });
@@ -1106,15 +1111,23 @@ router.get(
         stNetCell.alignment = { horizontal: 'right' };
         applyBorder(stNetCell);
 
-        const stSiteWorksCell = siteTotal.getCell(3);
+         const stSiteWorksCell = siteTotal.getCell(3);
         stSiteWorksCell.value = rows.reduce((sum, loc) => sum + Number(loc.totals.spread_net || 0), 0);
         stSiteWorksCell.numFmt = currFmt;
         stSiteWorksCell.fill = totalsFill;
         stSiteWorksCell.font = totalsFont;
         stSiteWorksCell.alignment = { horizontal: 'right' };
-        applyBorder(stSiteWorksCell);
+         applyBorder(stSiteWorksCell);
 
-        const stSalesCell = siteTotal.getCell(4);
+        const stCapitalCostsCell = siteTotal.getCell(4);
+        stCapitalCostsCell.value = rows.reduce((sum, loc) => sum + Number(loc.totals.capital_cost || 0), 0);
+        stCapitalCostsCell.numFmt = currFmt;
+        stCapitalCostsCell.fill = totalsFill;
+        stCapitalCostsCell.font = totalsFont;
+        stCapitalCostsCell.alignment = { horizontal: 'right' };
+        applyBorder(stCapitalCostsCell);
+
+        const stSalesCell = siteTotal.getCell(5);
         stSalesCell.value = siteTotalSales;
         stSalesCell.numFmt = currFmt;
         stSalesCell.fill = totalsFill;
@@ -1123,7 +1136,7 @@ router.get(
         applyBorder(stSalesCell);
 
         // Expected Spend total
-        const stExpectedCell = siteTotal.getCell(5);
+        const stExpectedCell = siteTotal.getCell(6);
         stExpectedCell.value = siteTotalExpected;
         stExpectedCell.numFmt = currFmt;
         stExpectedCell.fill = totalsFill;
@@ -1132,7 +1145,7 @@ router.get(
         applyBorder(stExpectedCell);
 
         // Target Profit total
-        const stTPLCell = siteTotal.getCell(6);
+        const stTPLCell = siteTotal.getCell(7);
         stTPLCell.value = siteTotalTargetPL;
         stTPLCell.numFmt = currFmt;
         stTPLCell.font = { bold: true, color: { argb: siteTotalTargetPL >= 0 ? 'FF' + profitGreenFont : 'FF' + lossRedFont }, size: 11 };
@@ -1140,18 +1153,18 @@ router.get(
         applyBorder(stTPLCell);
 
         // Target % (blank for total)
-        siteTotal.getCell(7).fill = totalsFill;
-        applyBorder(siteTotal.getCell(7));
+        siteTotal.getCell(8).fill = totalsFill;
+        applyBorder(siteTotal.getCell(8));
 
-        const stPLCell = siteTotal.getCell(8);
+        const stPLCell = siteTotal.getCell(9);
         stPLCell.value = siteTotalPL;
         stPLCell.numFmt = currFmt;
         stPLCell.font = { bold: true, color: { argb: siteTotalPL >= 0 ? 'FF' + profitGreenFont : 'FF' + lossRedFont }, size: 11 };
         stPLCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: siteTotalPL >= 0 ? 'FF' + profitGreenBg : 'FF' + lossRedBg } };
         applyBorder(stPLCell);
 
-        siteTotal.getCell(9).fill = totalsFill;
-        applyBorder(siteTotal.getCell(9));
+        siteTotal.getCell(10).fill = totalsFill;
+        applyBorder(siteTotal.getCell(10));
 
         rowCursor += 3;
 
@@ -1315,14 +1328,17 @@ router.get(
         sheet.getColumn(6).width = 20;
         sheet.getColumn(7).width = 14;
         sheet.getColumn(8).width = 20;
-        sheet.getColumn(9).width = 14;
+        sheet.getColumn(9).width = 20;
+        sheet.getColumn(10).width = 14;
 
         sheet.views = [{ state: 'frozen', ySplit: 4 }];
       }
 
-      /* ========== SINGLE-LOCATION PO SHEET ========== */
-      if (selectedLocations.size === 1 && data.length === 1) {
-        const selectedLocation = data[0];
+      /* ========== PO SHEETS FOR SELECTED LOCATIONS ========== */
+      if (selectedLocations.size > 0 && data.length > 0) {
+        const usedPoSheetNames = new Set(workbook.worksheets.map(sheet => sheet.name.toLowerCase()));
+
+        for (const selectedLocation of data) {
         const [purchaseOrders] = await db.query(
           `
           SELECT
@@ -1360,10 +1376,14 @@ router.get(
         const safeLocationName = String(selectedLocation.location || 'Location')
           .replace(/[\\/*?:\[\]]/g, ' ')
           .trim();
-        let poSheetName = `POs - ${safeLocationName}`.substring(0, 31) || 'Location POs';
-        if (workbook.getWorksheet(poSheetName)) {
-          poSheetName = 'Location POs';
+        const basePoSheetName = (`POs - ${safeLocationName}`.substring(0, 31) || 'Location POs');
+        let poSheetName = basePoSheetName;
+        let nameSuffix = 2;
+        while (usedPoSheetNames.has(poSheetName.toLowerCase())) {
+          const suffix = ` (${nameSuffix++})`;
+          poSheetName = `${basePoSheetName.substring(0, 31 - suffix.length)}${suffix}`;
         }
+        usedPoSheetNames.add(poSheetName.toLowerCase());
 
         const poSheet = workbook.addWorksheet(poSheetName, {
           properties: { tabColor: { argb: 'FF' + brandColor } }
@@ -1460,6 +1480,7 @@ router.get(
         [8, 9, 10, 11, 12].forEach(column => { poSheet.getColumn(column).width = 18; });
         poSheet.autoFilter = { from: 'A4', to: 'L4' };
         poSheet.views = [{ state: 'frozen', ySplit: 4 }];
+        }
       }
 
       res.setHeader(
