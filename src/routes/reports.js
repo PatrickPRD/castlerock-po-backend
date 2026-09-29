@@ -726,7 +726,7 @@ router.get(
       });
 
       // Title row
-      summary.mergeCells('A1:I1');
+      summary.mergeCells('A1:K1');
       const titleCell = summary.getCell('A1');
       titleCell.value = 'Location Report — Profit & Loss Summary';
       titleCell.font = { size: 16, bold: true, color: { argb: 'FF' + brandColor } };
@@ -734,7 +734,7 @@ router.get(
       summary.getRow(1).height = 30;
 
       // Subtitle with settings
-      summary.mergeCells('A2:I2');
+      summary.mergeCells('A2:K2');
       const subtitleCell = summary.getCell('A2');
       subtitleCell.value = `Generated: ${new Date().toLocaleDateString('en-GB')}  |  VAT on Sale: ${vatOnSale}%  |  Solicitor: ${solicitorPct}%  |  Auctioneer: ${auctioneerPct}%`;
       subtitleCell.font = { size: 10, italic: true, color: { argb: 'FF757575' } };
@@ -742,7 +742,8 @@ router.get(
 
       // Summary headers (row 4)
       const summaryHeaders = [
-        'Site', 'Location', `Total Spend (${currencySymbol})`, `Sale Price (${currencySymbol})`,
+        'Site', 'Location', `Total Spend (${currencySymbol})`, `Site Works (${currencySymbol})`,
+        `Capital Costs (${currencySymbol})`, `Sale Price (${currencySymbol})`,
         `Expected Spend (${currencySymbol})`, `Target Profit (${currencySymbol})`, 'Target %',
         `Actual Profit (${currencySymbol})`, 'Actual %'
       ];
@@ -760,13 +761,18 @@ router.get(
       // Summary data rows
       let summaryRowIdx = 5;
       let grandTotalSpend = 0;
+      let grandTotalSiteWorks = 0;
+      let grandTotalCapitalCosts = 0;
       let grandTotalSales = 0;
       let grandTotalExpectedSpent = 0, grandTotalTargetPL = 0, grandTotalPL = 0;
 
       data.forEach((r, idx) => {
         const salePrice = Number(r.sale_price || 0);
         const salePriceExVat = salePrice / (1 + vatRate);
-        const totalSpend = Number(r.totals.net) + Number(r.totals.labour || 0) + Number(r.totals.capital_cost || 0);
+        // Total Spend is direct PO cost only. Site Works is the spread cost allocated to this location.
+        const totalSpend = Number(r.totals.direct_net || 0);
+        const siteWorks = Number(r.totals.spread_net || 0);
+        const capitalCosts = Number(r.totals.capital_cost || 0);
         const expectedSpent = r.expected_spent != null ? Number(r.expected_spent) : null;
         const targetProfit = calcTargetProfit(r);
         const targetPctVal = targetProfit != null && salePriceExVat > 0 ? targetProfit / salePriceExVat : null;
@@ -774,6 +780,8 @@ router.get(
         const profitPctVal = salePriceExVat > 0 ? profitLoss / salePriceExVat : 0;
 
         grandTotalSpend += totalSpend;
+        grandTotalSiteWorks += siteWorks;
+        grandTotalCapitalCosts += capitalCosts;
         grandTotalSales += salePrice;
         if (expectedSpent != null) grandTotalExpectedSpent += expectedSpent;
         if (targetProfit != null) grandTotalTargetPL += targetProfit;
@@ -803,12 +811,20 @@ router.get(
         applyCurrencyCell(row.getCell(3), totalSpend);
         if (altFill) row.getCell(3).fill = altFill;
 
-        // Sale Price
-        applyCurrencyCell(row.getCell(4), salePrice);
+        // Site Works (spread cost)
+        applyCurrencyCell(row.getCell(4), siteWorks);
         if (altFill) row.getCell(4).fill = altFill;
 
+        // Capital Costs
+        applyCurrencyCell(row.getCell(5), capitalCosts);
+        if (altFill) row.getCell(5).fill = altFill;
+
+        // Sale Price
+        applyCurrencyCell(row.getCell(6), salePrice);
+        if (altFill) row.getCell(6).fill = altFill;
+
         // Expected Spend
-        const esCell = row.getCell(5);
+        const esCell = row.getCell(7);
         if (expectedSpent != null) {
           applyCurrencyCell(esCell, expectedSpent);
         } else {
@@ -819,27 +835,27 @@ router.get(
 
         // Target Profit
         if (targetProfit != null) {
-          applyProfitStyle(row.getCell(6), targetProfit);
+          applyProfitStyle(row.getCell(8), targetProfit);
         } else {
-          row.getCell(6).value = '';
-          applyBorder(row.getCell(6));
-          if (altFill) row.getCell(6).fill = altFill;
+          row.getCell(8).value = '';
+          applyBorder(row.getCell(8));
+          if (altFill) row.getCell(8).fill = altFill;
         }
 
         // Target %
         if (targetPctVal != null) {
-          applyPctStyle(row.getCell(7), targetPctVal);
+          applyPctStyle(row.getCell(9), targetPctVal);
         } else {
-          row.getCell(7).value = '';
-          applyBorder(row.getCell(7));
-          if (altFill) row.getCell(7).fill = altFill;
+          row.getCell(9).value = '';
+          applyBorder(row.getCell(9));
+          if (altFill) row.getCell(9).fill = altFill;
         }
 
         // Actual Profit/Loss
-        applyProfitStyle(row.getCell(8), profitLoss);
+        applyProfitStyle(row.getCell(10), profitLoss);
 
         // Actual Profit %
-        applyPctStyle(row.getCell(9), profitPctVal);
+        applyPctStyle(row.getCell(11), profitPctVal);
 
         summaryRowIdx++;
       });
@@ -871,7 +887,23 @@ router.get(
       grandSpendCell.alignment = { horizontal: 'right' };
       applyBorder(grandSpendCell);
 
-      const grandSalesCell = totalsRow.getCell(4);
+      const grandSiteWorksCell = totalsRow.getCell(4);
+      grandSiteWorksCell.value = grandTotalSiteWorks;
+      grandSiteWorksCell.numFmt = currFmt;
+      grandSiteWorksCell.fill = totalsFill;
+      grandSiteWorksCell.font = totalsFont;
+      grandSiteWorksCell.alignment = { horizontal: 'right' };
+      applyBorder(grandSiteWorksCell);
+
+      const grandCapitalCostsCell = totalsRow.getCell(5);
+      grandCapitalCostsCell.value = grandTotalCapitalCosts;
+      grandCapitalCostsCell.numFmt = currFmt;
+      grandCapitalCostsCell.fill = totalsFill;
+      grandCapitalCostsCell.font = totalsFont;
+      grandCapitalCostsCell.alignment = { horizontal: 'right' };
+      applyBorder(grandCapitalCostsCell);
+
+      const grandSalesCell = totalsRow.getCell(6);
       grandSalesCell.value = grandTotalSales;
       grandSalesCell.numFmt = currFmt;
       grandSalesCell.fill = totalsFill;
@@ -880,7 +912,7 @@ router.get(
       applyBorder(grandSalesCell);
 
       // Grand total Expected Spent
-      const grandESCell = totalsRow.getCell(5);
+      const grandESCell = totalsRow.getCell(7);
       grandESCell.value = grandTotalExpectedSpent;
       grandESCell.numFmt = currFmt;
       grandESCell.fill = totalsFill;
@@ -889,7 +921,7 @@ router.get(
       applyBorder(grandESCell);
 
       // Grand total Target P/L
-      const grandTPLCell = totalsRow.getCell(6);
+      const grandTPLCell = totalsRow.getCell(8);
       grandTPLCell.value = grandTotalTargetPL;
       grandTPLCell.numFmt = currFmt;
       grandTPLCell.font = { bold: true, color: { argb: grandTotalTargetPL >= 0 ? 'FF' + profitGreenFont : 'FF' + lossRedFont }, size: 11 };
@@ -905,7 +937,7 @@ router.get(
             return sum + (sp > 0 && tp != null ? tp / sp : 0);
           }, 0) / locationsWithTarget.length
         : 0;
-      const grandTPctCell = totalsRow.getCell(7);
+      const grandTPctCell = totalsRow.getCell(9);
       grandTPctCell.value = grandAvgTargetPct;
       grandTPctCell.numFmt = pctFmt;
       grandTPctCell.font = { bold: true, color: { argb: grandAvgTargetPct >= 0 ? 'FF' + profitGreenFont : 'FF' + lossRedFont }, size: 11 };
@@ -913,7 +945,7 @@ router.get(
       applyBorder(grandTPctCell);
 
       // Grand total Actual P/L
-      const grandPLCell = totalsRow.getCell(8);
+      const grandPLCell = totalsRow.getCell(10);
       grandPLCell.value = grandTotalPL;
       grandPLCell.numFmt = currFmt;
       grandPLCell.font = { bold: true, color: { argb: grandTotalPL >= 0 ? 'FF' + profitGreenFont : 'FF' + lossRedFont }, size: 11 };
@@ -927,7 +959,7 @@ router.get(
             return sum + (sp > 0 ? calcProfitLoss(r) / sp : 0);
           }, 0) / data.length
         : 0;
-      const grandPctCell = totalsRow.getCell(9);
+      const grandPctCell = totalsRow.getCell(11);
       grandPctCell.value = grandAvgPct;
       grandPctCell.numFmt = pctFmt;
       grandPctCell.font = { bold: true, color: { argb: grandAvgPct >= 0 ? 'FF' + profitGreenFont : 'FF' + lossRedFont }, size: 11 };
@@ -937,9 +969,9 @@ router.get(
       // Summary column widths
       summary.getColumn(1).width = 22;
       summary.getColumn(2).width = 22;
-      [3, 4, 5, 6, 8].forEach(c => { summary.getColumn(c).width = 18; });
-      summary.getColumn(7).width = 12;
+      [3, 4, 5, 6, 7, 8, 10].forEach(c => { summary.getColumn(c).width = 18; });
       summary.getColumn(9).width = 12;
+      summary.getColumn(11).width = 12;
       summary.views = [{ state: 'frozen', ySplit: 4, xSplit: 2 }];
 
       /* ========== PER-SITE DETAIL SHEETS ========== */
@@ -949,7 +981,7 @@ router.get(
         let rowCursor = 1;
 
         // Site title
-        sheet.mergeCells(rowCursor, 1, rowCursor, 8);
+        sheet.mergeCells(rowCursor, 1, rowCursor, 9);
         const siteTitleCell = sheet.getCell(rowCursor, 1);
         siteTitleCell.value = siteName;
         siteTitleCell.font = { size: 16, bold: true, color: { argb: 'FF' + brandColor } };
@@ -958,17 +990,16 @@ router.get(
         rowCursor++;
 
         // Site subtitle
-        sheet.mergeCells(rowCursor, 1, rowCursor, 8);
+        sheet.mergeCells(rowCursor, 1, rowCursor, 9);
         sheet.getCell(rowCursor, 1).value = `${rows.length} locations  |  Generated: ${new Date().toLocaleDateString('en-GB')}`;
         sheet.getCell(rowCursor, 1).font = { size: 10, italic: true, color: { argb: 'FF757575' } };
         rowCursor += 2;
 
         // Site overview table header
         const overviewHeaders = [
-          'Location', `Total Spend (${currencySymbol})`, `Sale Price (${currencySymbol})`,
-          `Expected Spend (${currencySymbol})`,
-          `Target Profit (${currencySymbol})`, 'Target %',
-          `Actual Profit (${currencySymbol})`, 'Actual %'
+          'Location', `Total Spend (${currencySymbol})`, `Site Works (${currencySymbol})`,
+          `Sale Price (${currencySymbol})`, `Expected Spend (${currencySymbol})`,
+          `Target Profit (${currencySymbol})`, 'Target %', `Actual Profit (${currencySymbol})`, 'Actual %'
         ];
         const ohRow = sheet.getRow(rowCursor);
         ohRow.height = 24;
@@ -986,7 +1017,8 @@ router.get(
         let siteTotalSpend = 0, siteTotalSales = 0, siteTotalExpected = 0;
         let siteTotalTargetPL = 0, siteTotalPL = 0;
         rows.forEach((loc, idx) => {
-          const totalSpend = Number(loc.totals.net) + Number(loc.totals.labour || 0) + Number(loc.totals.capital_cost || 0);
+          const totalSpend = Number(loc.totals.direct_net || 0);
+          const siteWorks = Number(loc.totals.spread_net || 0);
           const salePrice = Number(loc.sale_price || 0);
           const expectedSpent = loc.expected_spent != null ? Number(loc.expected_spent) : null;
           const targetProfit = calcTargetProfit(loc);
@@ -1017,11 +1049,14 @@ router.get(
           applyCurrencyCell(row.getCell(2), totalSpend);
           if (altFill) row.getCell(2).fill = altFill;
 
-          applyCurrencyCell(row.getCell(3), salePrice);
+          applyCurrencyCell(row.getCell(3), siteWorks);
           if (altFill) row.getCell(3).fill = altFill;
 
+          applyCurrencyCell(row.getCell(4), salePrice);
+          if (altFill) row.getCell(4).fill = altFill;
+
           // Expected Spend
-          const esCell2 = row.getCell(4);
+          const esCell2 = row.getCell(5);
           if (expectedSpent != null) {
             applyCurrencyCell(esCell2, expectedSpent);
           } else {
@@ -1032,24 +1067,24 @@ router.get(
 
           // Target Profit
           if (targetProfit != null) {
-            applyProfitStyle(row.getCell(5), targetProfit);
-          } else {
-            row.getCell(5).value = '';
-            applyBorder(row.getCell(5));
-            if (altFill) row.getCell(5).fill = altFill;
-          }
-
-          // Target %
-          if (targetPctVal != null) {
-            applyPctStyle(row.getCell(6), targetPctVal);
+            applyProfitStyle(row.getCell(6), targetProfit);
           } else {
             row.getCell(6).value = '';
             applyBorder(row.getCell(6));
             if (altFill) row.getCell(6).fill = altFill;
           }
 
-          applyProfitStyle(row.getCell(7), profitLoss);
-          applyPctStyle(row.getCell(8), profitPctVal);
+          // Target %
+          if (targetPctVal != null) {
+            applyPctStyle(row.getCell(7), targetPctVal);
+          } else {
+            row.getCell(7).value = '';
+            applyBorder(row.getCell(7));
+            if (altFill) row.getCell(7).fill = altFill;
+          }
+
+          applyProfitStyle(row.getCell(8), profitLoss);
+          applyPctStyle(row.getCell(9), profitPctVal);
 
           rowCursor++;
         });
@@ -1071,7 +1106,15 @@ router.get(
         stNetCell.alignment = { horizontal: 'right' };
         applyBorder(stNetCell);
 
-        const stSalesCell = siteTotal.getCell(3);
+        const stSiteWorksCell = siteTotal.getCell(3);
+        stSiteWorksCell.value = rows.reduce((sum, loc) => sum + Number(loc.totals.spread_net || 0), 0);
+        stSiteWorksCell.numFmt = currFmt;
+        stSiteWorksCell.fill = totalsFill;
+        stSiteWorksCell.font = totalsFont;
+        stSiteWorksCell.alignment = { horizontal: 'right' };
+        applyBorder(stSiteWorksCell);
+
+        const stSalesCell = siteTotal.getCell(4);
         stSalesCell.value = siteTotalSales;
         stSalesCell.numFmt = currFmt;
         stSalesCell.fill = totalsFill;
@@ -1080,7 +1123,7 @@ router.get(
         applyBorder(stSalesCell);
 
         // Expected Spend total
-        const stExpectedCell = siteTotal.getCell(4);
+        const stExpectedCell = siteTotal.getCell(5);
         stExpectedCell.value = siteTotalExpected;
         stExpectedCell.numFmt = currFmt;
         stExpectedCell.fill = totalsFill;
@@ -1089,7 +1132,7 @@ router.get(
         applyBorder(stExpectedCell);
 
         // Target Profit total
-        const stTPLCell = siteTotal.getCell(5);
+        const stTPLCell = siteTotal.getCell(6);
         stTPLCell.value = siteTotalTargetPL;
         stTPLCell.numFmt = currFmt;
         stTPLCell.font = { bold: true, color: { argb: siteTotalTargetPL >= 0 ? 'FF' + profitGreenFont : 'FF' + lossRedFont }, size: 11 };
@@ -1097,18 +1140,18 @@ router.get(
         applyBorder(stTPLCell);
 
         // Target % (blank for total)
-        siteTotal.getCell(6).fill = totalsFill;
-        applyBorder(siteTotal.getCell(6));
+        siteTotal.getCell(7).fill = totalsFill;
+        applyBorder(siteTotal.getCell(7));
 
-        const stPLCell = siteTotal.getCell(7);
+        const stPLCell = siteTotal.getCell(8);
         stPLCell.value = siteTotalPL;
         stPLCell.numFmt = currFmt;
         stPLCell.font = { bold: true, color: { argb: siteTotalPL >= 0 ? 'FF' + profitGreenFont : 'FF' + lossRedFont }, size: 11 };
         stPLCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: siteTotalPL >= 0 ? 'FF' + profitGreenBg : 'FF' + lossRedBg } };
         applyBorder(stPLCell);
 
-        siteTotal.getCell(8).fill = totalsFill;
-        applyBorder(siteTotal.getCell(8));
+        siteTotal.getCell(9).fill = totalsFill;
+        applyBorder(siteTotal.getCell(9));
 
         rowCursor += 3;
 
@@ -1143,7 +1186,7 @@ router.get(
 
           // Stage breakdown header
           const stgHdrRow = sheet.getRow(rowCursor);
-          ['Stage', `Net (${currencySymbol})`, `Gross (${currencySymbol})`].forEach((h, i) => {
+           ['Stage', `Spend [POs] (${currencySymbol})`, `Site Costs [Spread Costs] (${currencySymbol})`].forEach((h, i) => {
             const cell = stgHdrRow.getCell(i + 1);
             cell.value = h;
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
@@ -1160,8 +1203,8 @@ router.get(
             stgCell.value = s.stage;
             stgCell.alignment = { horizontal: 'left' };
             applyBorder(stgCell);
-            applyCurrencyCell(stgRow.getCell(2), s.net);
-            applyCurrencyCell(stgRow.getCell(3), s.gross);
+             applyCurrencyCell(stgRow.getCell(2), s.direct_net);
+             applyCurrencyCell(stgRow.getCell(3), s.spread_net);
             rowCursor++;
           });
 
@@ -1172,11 +1215,11 @@ router.get(
           stgTotalLabel.font = { bold: true };
           stgTotalLabel.alignment = { horizontal: 'left' };
           applyBorder(stgTotalLabel);
-          const stgNetTotal = loc.stages.reduce((s, st) => s + st.net, 0);
-          const stgGrossTotal = loc.stages.reduce((s, st) => s + st.gross, 0);
-          applyCurrencyCell(stgTotalRow.getCell(2), stgNetTotal);
-          stgTotalRow.getCell(2).font = { bold: true };
-          applyCurrencyCell(stgTotalRow.getCell(3), stgGrossTotal);
+           const stgSpendTotal = loc.stages.reduce((s, st) => s + st.direct_net, 0);
+           const stgSiteCostsTotal = loc.stages.reduce((s, st) => s + st.spread_net, 0);
+           applyCurrencyCell(stgTotalRow.getCell(2), stgSpendTotal);
+           stgTotalRow.getCell(2).font = { bold: true };
+           applyCurrencyCell(stgTotalRow.getCell(3), stgSiteCostsTotal);
           stgTotalRow.getCell(3).font = { bold: true };
           rowCursor += 2;
 
@@ -1191,10 +1234,10 @@ router.get(
 
           const plItems = [
             ['Direct Spent', Number(loc.totals.direct_net || 0)],
-            ['Total Spread In', Number(loc.totals.spread_net || 0)],
+            ['Site Works', Number(loc.totals.spread_net || 0)],
             ['Labour Cost', labour],
             ['Capital Cost', capitalCost],
-            ['Total Spend', Number(loc.totals.net) + labour + capitalCost],
+            ['Total Spend', Number(loc.totals.direct_net || 0)],
             ['Sale Price', salePrice],
             [`Solicitor (${solicitorPct}%)`, solicitorCost],
             [`Auctioneer (${auctioneerPct}%)`, auctioneerCost]
@@ -1271,7 +1314,8 @@ router.get(
         sheet.getColumn(5).width = 20;
         sheet.getColumn(6).width = 20;
         sheet.getColumn(7).width = 14;
-        sheet.getColumn(8).width = 14;
+        sheet.getColumn(8).width = 20;
+        sheet.getColumn(9).width = 14;
 
         sheet.views = [{ state: 'frozen', ySplit: 4 }];
       }
