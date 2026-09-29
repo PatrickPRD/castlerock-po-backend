@@ -1016,7 +1016,8 @@ router.get(
 
         // Site overview data rows
         let siteTotalSpend = 0, siteTotalSales = 0, siteTotalExpected = 0;
-        let siteTotalTargetPL = 0, siteTotalPL = 0;
+        let siteTotalTargetPL = 0, siteTotalPL = 0, siteTargetProfitCount = 0;
+        let siteTargetPctTotal = 0, siteActualPctTotal = 0;
         rows.forEach((loc, idx) => {
           const totalSpend = Number(loc.totals.direct_net || 0);
           const siteWorks = Number(loc.totals.spread_net || 0);
@@ -1032,7 +1033,12 @@ router.get(
           siteTotalSpend += totalSpend;
           siteTotalSales += salePrice;
           if (expectedSpent != null) siteTotalExpected += expectedSpent;
-          if (targetProfit != null) siteTotalTargetPL += targetProfit;
+           if (targetProfit != null) {
+             siteTotalTargetPL += targetProfit;
+             siteTargetProfitCount++;
+           }
+           if (targetPctVal != null) siteTargetPctTotal += targetPctVal;
+           siteActualPctTotal += profitPctVal;
           siteTotalPL += profitLoss;
 
           const row = sheet.getRow(rowCursor);
@@ -1152,9 +1158,10 @@ router.get(
         stTPLCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: siteTotalTargetPL >= 0 ? 'FF' + profitGreenBg : 'FF' + lossRedBg } };
         applyBorder(stTPLCell);
 
-        // Target % (blank for total)
-        siteTotal.getCell(8).fill = totalsFill;
-        applyBorder(siteTotal.getCell(8));
+        // Average Target %
+        const stTargetPctCell = siteTotal.getCell(8);
+        const averageTargetPct = siteTargetProfitCount > 0 ? siteTargetPctTotal / siteTargetProfitCount : 0;
+        applyPctStyle(stTargetPctCell, averageTargetPct);
 
         const stPLCell = siteTotal.getCell(9);
         stPLCell.value = siteTotalPL;
@@ -1163,8 +1170,10 @@ router.get(
         stPLCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: siteTotalPL >= 0 ? 'FF' + profitGreenBg : 'FF' + lossRedBg } };
         applyBorder(stPLCell);
 
-        siteTotal.getCell(10).fill = totalsFill;
-        applyBorder(siteTotal.getCell(10));
+        // Average Actual %
+        const stActualPctCell = siteTotal.getCell(10);
+        const averageActualPct = rows.length > 0 ? siteActualPctTotal / rows.length : 0;
+        applyPctStyle(stActualPctCell, averageActualPct);
 
         rowCursor += 3;
 
@@ -1250,7 +1259,11 @@ router.get(
             ['Site Works', Number(loc.totals.spread_net || 0)],
             ['Labour Cost', labour],
             ['Capital Cost', capitalCost],
-            ['Total Spend', Number(loc.totals.direct_net || 0)],
+            ['Total Spend',
+              Number(loc.totals.direct_net || 0) +
+              Number(loc.totals.spread_net || 0) +
+              labour +
+              capitalCost],
             ['Sale Price', salePrice],
             [`Solicitor (${solicitorPct}%)`, solicitorCost],
             [`Auctioneer (${auctioneerPct}%)`, auctioneerCost]
